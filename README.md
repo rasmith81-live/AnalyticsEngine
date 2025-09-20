@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project demonstrates a refactored microservices architecture with centralized database and messaging services, implementing the CQRS pattern with TimescaleDB for real-time data processing.
+This project demonstrates a microservices architecture with centralized database and messaging services, implementing the CQRS pattern with TimescaleDB for real-time data processing.
 
 ## Architecture
 
