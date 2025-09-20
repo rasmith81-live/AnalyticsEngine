@@ -1,0 +1,644 @@
+@startuml Microservices Endpoints Interaction
+
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 200
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceGroupBackgroundColor #EEEEEE
+skinparam sequenceGroupBorderColor #CCCCCC
+skinparam sequenceGroupHeaderFontStyle bold
+skinparam sequenceGroupBodyBackgroundColor #FFFFFF
+skinparam noteBackgroundColor #FFFFCC
+skinparam noteBorderColor #999999
+skinparam participantBackgroundColor #FFFFFF
+skinparam participantBorderColor #AAAAAA
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #AAAAAA
+
+title Detailed Microservices Endpoints and Events Interaction Diagram
+
+actor "Client Application" as Client
+participant "API Gateway" as Gateway
+participant "Business Service A" as ServiceA
+participant "Business Service B" as ServiceB
+participant "Messaging Service" as Messaging
+participant "Database Service" as Database
+participant "Observability Service" as Observability
+participant "Prometheus Pushgateway" as Prometheus
+database "TimescaleDB" as TimescaleDB
+queue "Redis" as Redis
+
+== 1. Message Creation Flow (Detailed API Endpoints) ==
+
+Client -> Gateway: POST /api/v1/messages
+activate Gateway
+note right of Gateway: API Gateway routes request
+to appropriate service
+
+Gateway -> ServiceA: POST /api/messages
+activate ServiceA
+note right of ServiceA: Business Service A
+endpoint handler
+
+ServiceA -> Messaging: POST /messaging/publish
+{channel: "command.create_message", message: {...}}
+activate Messaging
+note right of Messaging: Endpoint: /messaging/publish
+PublishMessageRequest
+
+== 1.1 Command Flow (Write) - Detailed ==
+Messaging -> Redis: PUBLISH command.create_message {message_data}
+activate Redis
+note right of Redis: Redis pub/sub channel:
+command.create_message
+Redis --> Messaging: OK (message_id)
+deactivate Redis
+
+Database -> Redis: SUBSCRIBE command.create_message
+activate Redis
+Redis -> Database: {message_data}
+deactivate Redis
+activate Database
+
+note right of Database: Write Model Operation
+Endpoint: /database/command
+Database -> TimescaleDB: INSERT INTO messages_write
+activate TimescaleDB
+TimescaleDB --> Database: OK
+deactivate TimescaleDB
+
+Database -> Redis: PUBLISH event.message_created {message_id, status}
+activate Redis
+Redis --> Database: OK
+deactivate Redis
+deactivate Database
+
+Messaging -> Redis: SUBSCRIBE event.message_created
+activate Redis
+Redis -> Messaging: {message_id, status}
+deactivate Redis
+
+== 1.2 Read Model Update - Detailed ==
+Messaging -> Redis: PUBLISH command.update_read_model {message_id}
+activate Redis
+Redis --> Messaging: OK
+deactivate Redis
+
+Database -> Redis: SUBSCRIBE command.update_read_model
+activate Redis
+Redis -> Database: {message_id}
+deactivate Redis
+activate Database
+
+note right of Database: Read Model Update
+CQRS Pattern
+Database -> TimescaleDB: INSERT INTO messages_read
+activate TimescaleDB
+TimescaleDB --> Database: OK
+deactivate TimescaleDB
+
+Database -> Redis: PUBLISH event.read_model_updated {message_id, status}
+activate Redis
+Redis --> Database: OK
+deactivate Redis
+deactivate Database
+
+Messaging -> Redis: SUBSCRIBE event.read_model_updated
+activate Redis
+Redis -> Messaging: {message_id, status}
+deactivate Redis
+
+Messaging --> ServiceA: 201 Created (message_id)
+deactivate Messaging
+
+ServiceA --> Gateway: 201 Created (message_id)
+deactivate ServiceA
+
+Gateway --> Client: 201 Created (message_id)
+deactivate Gateway
+
+== 2. Message Retrieval Flow (Detailed API Endpoints) ==
+
+Client -> Gateway: GET /api/v1/messages/{id}
+activate Gateway
+note right of Gateway: API Gateway routes request
+to appropriate service
+
+Gateway -> ServiceA: GET /api/messages/{id}
+activate ServiceA
+
+== 2.1 Cache Check - Detailed ==
+ServiceA -> Redis: GET message:{id}
+activate Redis
+note right of Redis: Redis key pattern:
+message:{id}
+alt Cache Hit
+    Redis --> ServiceA: {message_data}
+    ServiceA --> Gateway: 200 OK (message_data)
+    Gateway --> Client: 200 OK (message_data)
+else Cache Miss
+    Redis --> ServiceA: nil
+    
+    == 2.2 Query Flow (Read) - Detailed ==
+    ServiceA -> Messaging: POST /messaging/publish
+{channel: "query.get_message", message: {"id": "message_id"}}
+    activate Messaging
+    note right of Messaging: Endpoint: /messaging/publish
+PublishMessageRequest
+    
+    Messaging -> Redis: PUBLISH query.get_message {message_id}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    Messaging --> ServiceA: 200 OK (message_id)
+    deactivate Messaging
+    
+    Database -> Redis: SUBSCRIBE query.get_message
+    activate Redis
+    Redis -> Database: {message_id}
+    deactivate Redis
+    activate Database
+    
+    note right of Database: Query Read Model
+Endpoint: /database/query
+    Database -> TimescaleDB: SELECT FROM messages_read WHERE id = ?
+    activate TimescaleDB
+    TimescaleDB --> Database: {message_data}
+    deactivate TimescaleDB
+    
+    Database -> Messaging: POST /messaging/publish
+{channel: "response.message_data", message: {"id": "message_id", "data": {...}}}
+    activate Messaging
+    Messaging -> Redis: PUBLISH response.message_data {message_id, message_data}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    Messaging --> Database: 200 OK
+    deactivate Messaging
+    deactivate Database
+    
+    ServiceA -> Messaging: POST /messaging/subscriptions
+{channel: "response.message_data", service_name: "service_a"}
+    activate Messaging
+    note right of Messaging: Endpoint: /messaging/subscriptions
+SubscriptionRequest
+    
+    Messaging -> Redis: SUBSCRIBE response.message_data
+    activate Redis
+    Redis -> Messaging: {message_id, message_data}
+    deactivate Redis
+    
+    Messaging -> ServiceA: Webhook callback with message data
+    deactivate Messaging
+    
+    == 2.3 Cache Update - Detailed ==
+    ServiceA -> Redis: SET message:{id} {message_data} EX 3600
+    activate Redis
+    Redis --> ServiceA: OK
+    deactivate Redis
+    
+    ServiceA --> Gateway: 200 OK (message_data)
+    deactivate ServiceA
+    Gateway --> Client: 200 OK (message_data)
+end
+deactivate Gateway
+
+== 3. Message List Flow (Detailed API Endpoints) ==
+
+Client -> Gateway: GET /api/v1/messages?limit=10&offset=0
+activate Gateway
+note right of Gateway: API Gateway routes request
+with query parameters
+
+Gateway -> ServiceB: GET /api/messages?limit=10&offset=0
+activate ServiceB
+note right of ServiceB: Business Service B
+endpoint handler
+
+== 3.1 Query Flow (List) - Detailed ==
+ServiceB -> Messaging: POST /messaging/publish
+{channel: "query.list_messages", message: {"limit": 10, "offset": 0}}
+activate Messaging
+note right of Messaging: Endpoint: /messaging/publish
+PublishMessageRequest
+
+Messaging -> Redis: PUBLISH query.list_messages {limit: 10, offset: 0}
+activate Redis
+Redis --> Messaging: OK
+deactivate Redis
+Messaging --> ServiceB: 200 OK (message_id)
+deactivate Messaging
+
+Database -> Redis: SUBSCRIBE query.list_messages
+activate Redis
+Redis -> Database: {limit: 10, offset: 0}
+deactivate Redis
+activate Database
+
+note right of Database: Query Read Model with Pagination
+Endpoint: /database/query
+Database -> TimescaleDB: SELECT FROM messages_read LIMIT 10 OFFSET 0
+activate TimescaleDB
+TimescaleDB --> Database: {messages_list, total_count}
+deactivate TimescaleDB
+
+Database -> Messaging: POST /messaging/publish
+{channel: "response.messages_list", message: {"messages": [...], "total": 42}}
+activate Messaging
+Messaging -> Redis: PUBLISH response.messages_list {messages_list, total_count}
+activate Redis
+Redis --> Messaging: OK
+deactivate Redis
+Messaging --> Database: 200 OK
+deactivate Messaging
+deactivate Database
+
+ServiceB -> Messaging: POST /messaging/subscriptions
+{channel: "response.messages_list", service_name: "service_b"}
+activate Messaging
+note right of Messaging: Endpoint: /messaging/subscriptions
+SubscriptionRequest
+
+Messaging -> Redis: SUBSCRIBE response.messages_list
+activate Redis
+Redis -> Messaging: {messages_list, total_count}
+deactivate Redis
+
+Messaging -> ServiceB: Webhook callback with messages list
+deactivate Messaging
+
+== 3.2 Cache List Results - Detailed ==
+ServiceB -> Redis: SETEX messages_list:limit=10:offset=0 60 {messages_list}
+activate Redis
+note right of Redis: Redis cache key with
+query parameters
+Redis --> ServiceB: OK
+deactivate Redis
+
+ServiceB --> Gateway: 200 OK (messages_list, total_count)
+deactivate ServiceB
+
+Gateway --> Client: 200 OK (messages_list, total_count)
+deactivate Gateway
+
+== 4. Telemetry and Metrics Flow (Detailed API Endpoints) ==
+
+group every 15 seconds
+    == 4.1 Metrics Collection - Detailed ==
+    ServiceA -> Messaging: POST /messaging/publish
+    {channel: "telemetry.metrics", message: {service: "service_a", metrics: [...]}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH telemetry.metrics {service: "service_a", metrics: [...]}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> ServiceA: 200 OK
+    deactivate Messaging
+    
+    Messaging -> Messaging: POST /messaging/publish
+    {channel: "telemetry.metrics", message: {service: "messaging_service", metrics: [...]}}
+    activate Messaging
+    note right of Messaging: OpenTelemetry SDK
+with batch span processor
+    
+    Messaging -> Redis: PUBLISH telemetry.metrics {service: "messaging_service", metrics: [...]} 
+    activate Redis
+    note right of Redis: Redis pub/sub channel:
+telemetry.metrics
+    Redis ---> Messaging: OK
+    deactivate Redis
+    
+    Observability -> Redis: SUBSCRIBE telemetry.metrics
+    activate Redis
+    Redis -> Observability: {service: "messaging_service", metrics: [...]}
+    deactivate Redis
+    activate Observability
+    
+    note right of Observability: Process metrics and store via messaging
+    
+    Observability -> Messaging: POST /messaging/publish
+    {channel: "database", message: {event_type: "metric.store", event_data: {metrics: [...]}}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH database {event_type: "metric.store", event_data: {metrics: [...]}}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> Observability: 200 OK
+    deactivate Messaging
+    deactivate Observability
+    
+    ServiceA -> Prometheus: POST /metrics/job/service_a
+    activate Prometheus
+    note right of Prometheus: Prometheus Pushgateway
+for metrics collection
+    Prometheus --> ServiceA: 200 OK
+    deactivate Prometheus
+    
+    Messaging -> Prometheus: POST /metrics/job/messaging_service
+    activate Prometheus
+    Prometheus --> Messaging: 200 OK
+    deactivate Prometheus
+    
+    Database -> Prometheus: POST /metrics/job/database_service
+    activate Prometheus
+    Prometheus --> Database: 200 OK
+    deactivate Prometheus
+    
+    == 4.2 Trace Events Collection - Detailed ==
+    ServiceA -> Messaging: POST /messaging/publish
+    {channel: "telemetry.traces", message: {service: "service_a", traces: [...]}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH telemetry.traces {service: "service_a", traces: [...]}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> ServiceA: 200 OK
+    deactivate Messaging
+    
+    Observability -> Redis: SUBSCRIBE telemetry.traces
+    activate Redis
+    Redis -> Observability: {service: "service_a", traces: [...]}
+    deactivate Redis
+    activate Observability
+    
+    note right of Observability: Process traces and store via messaging
+    
+    Observability -> Messaging: POST /messaging/publish
+    {channel: "database", message: {event_type: "trace.store", event_data: {trace: {...}}}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH database {event_type: "trace.store", event_data: {trace: {...}}}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> Observability: 200 OK
+    deactivate Messaging
+    deactivate Observability
+    
+    == 4.3 Dependency Events Collection - Detailed ==
+    ServiceA -> Messaging: POST /messaging/publish
+    {channel: "telemetry.dependencies", message: {service: "service_a", dependencies: [...]}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH telemetry.dependencies {service: "service_a", dependencies: [...]}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> ServiceA: 200 OK
+    deactivate Messaging
+    
+    Observability -> Redis: SUBSCRIBE telemetry.dependencies
+    activate Redis
+    Redis -> Observability: {service: "service_a", dependencies: [...]}
+    deactivate Redis
+    activate Observability
+    
+    note right of Observability: Process dependency data and store via messaging
+    
+    Observability -> Messaging: POST /messaging/publish
+    {channel: "database", message: {event_type: "dependency.store", event_data: {dependency: {...}}}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH database {event_type: "dependency.store", event_data: {dependency: {...}}}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> Observability: 200 OK
+    deactivate Messaging
+    deactivate Observability
+end
+
+== 5. Health Check Flow (Detailed API Endpoints) ==
+
+group every 30 seconds
+    == 5.1 Gateway Health Checks - Detailed ==
+    Gateway -> Gateway: health_check_services()
+    note right of Gateway: Internal scheduled task
+    
+    Gateway -> Redis: PUBLISH health.check {service: "messaging_service"}
+    activate Redis
+    note right of Redis: Redis pub/sub channel:
+health.check
+    Redis --> Gateway: OK
+    deactivate Redis
+    
+    Messaging -> Redis: SUBSCRIBE health.check
+    activate Redis
+    Redis -> Messaging: {service: "messaging_service"}
+    deactivate Redis
+    activate Messaging
+    
+    Messaging -> Messaging: health_check()
+    note right of Messaging: Endpoint: /messaging/health
+HealthResponse
+    
+    Messaging -> Redis: PUBLISH health.status {service: "messaging_service", status: "healthy", details: {...}}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    deactivate Messaging
+    
+    Gateway -> Redis: SUBSCRIBE health.status
+    activate Redis
+    Redis -> Gateway: {service: "messaging_service", status: "healthy", details: {...}}
+    deactivate Redis
+    
+    == 5.2 Database Health Check - Detailed ==
+    Gateway -> Redis: PUBLISH health.check {service: "database_service"}
+    activate Redis
+    Redis --> Gateway: OK
+    deactivate Redis
+    
+    Database -> Redis: SUBSCRIBE health.check
+    activate Redis
+    Redis -> Database: {service: "database_service"}
+    deactivate Redis
+    activate Database
+    
+    Database -> Database: health_check()
+    note right of Database: Endpoint: /database/health
+HealthResponse
+    
+    Database -> TimescaleDB: SELECT 1
+    activate TimescaleDB
+    TimescaleDB --> Database: OK
+    deactivate TimescaleDB
+    
+    Database -> Redis: PUBLISH health.status {service: "database_service", status: "healthy", details: {...}}
+    activate Redis
+    Redis --> Database: OK
+    deactivate Redis
+    deactivate Database
+    
+    Gateway -> Redis: SUBSCRIBE health.status
+    activate Redis
+    Redis -> Gateway: {service: "database_service", status: "healthy", details: {...}}
+    deactivate Redis
+    
+    == 5.3 Business Services Health Check - Detailed ==
+    Gateway -> Redis: PUBLISH health.check {service: "service_a"}
+    activate Redis
+    Redis --> Gateway: OK
+    deactivate Redis
+    
+    ServiceA -> Redis: SUBSCRIBE health.check
+    activate Redis
+    Redis -> ServiceA: {service: "service_a"}
+    deactivate Redis
+    activate ServiceA
+    
+    ServiceA -> ServiceA: get_service_status()
+    note right of ServiceA: Endpoint: /status
+HealthResponse
+    
+    ServiceA -> Redis: PUBLISH health.status {service: "service_a", status: "healthy", details: {...}}
+    activate Redis
+    Redis --> ServiceA: OK
+    deactivate Redis
+    deactivate ServiceA
+    
+    Gateway -> Redis: SUBSCRIBE health.status
+    activate Redis
+    Redis -> Gateway: {service: "service_a", status: "healthy", details: {...}}
+    deactivate Redis
+    
+    == 5.4 Observability Health Check - Detailed ==
+    Gateway -> Redis: PUBLISH health.check {service: "observability_service"}
+    activate Redis
+    Redis --> Gateway: OK
+    deactivate Redis
+    
+    Observability -> Redis: SUBSCRIBE health.check
+    activate Redis
+    Redis -> Observability: {service: "observability_service"}
+    deactivate Redis
+    activate Observability
+    
+    Observability -> Observability: health_check()
+    note right of Observability: Endpoint: /observability/health
+HealthResponse
+    
+    Observability -> Messaging: POST /messaging/publish
+    {channel: "health.check", message: {service: "redis", check_type: "ping"}}
+    activate Messaging
+    
+    Messaging -> Redis: PING
+    activate Redis
+    Redis --> Messaging: PONG
+    deactivate Redis
+    
+    Messaging --> Observability: 200 OK {status: "healthy"}
+    deactivate Messaging
+    
+    Observability -> Messaging: POST /messaging/publish
+    {channel: "database", message: {event_type: "health.check", check_type: "connection"}}
+    activate Messaging
+    
+    Messaging -> Redis: PUBLISH database {event_type: "health.check", check_type: "connection"}
+    activate Redis
+    Redis --> Messaging: OK
+    deactivate Redis
+    
+    Messaging --> Observability: 200 OK
+    deactivate Messaging
+    
+    Observability -> Redis: PUBLISH health.status {service: "observability_service", status: "healthy", details: {...}}
+    activate Redis
+    Redis --> Observability: OK
+    deactivate Redis
+    deactivate Observability
+    
+    Gateway -> Redis: SUBSCRIBE health.status
+    activate Redis
+    Redis -> Gateway: {service: "observability_service", status: "healthy", details: {...}}
+    deactivate Redis
+end
+
+== 6. Database Migration Flow (Detailed API Endpoints) ==
+
+Client -> Gateway: POST /api/admin/migrations
+activate Gateway
+
+Gateway -> Database: POST /database/migrations
+activate Database
+note right of Database: Endpoint: /database/migrations
+MigrationRequest
+
+Database -> Database: run_migrations_background()
+note right of Database: Background task execution
+
+Database -> TimescaleDB: CREATE HYPERTABLE
+activate TimescaleDB
+note right of TimescaleDB: TimescaleDB-specific DDL
+for time-series data
+TimescaleDB --> Database: OK
+deactivate TimescaleDB
+
+Database -> Redis: PUBLISH event.migration_completed {service: "database_service", status: "success"}
+activate Redis
+Redis --> Database: OK
+deactivate Redis
+
+Database --> Gateway: 202 Accepted (migration_id)
+deactivate Database
+
+Gateway --> Client: 202 Accepted (migration_id)
+deactivate Gateway
+
+== 7. Command Execution Flow (Detailed API Endpoints) ==
+
+Client -> Gateway: POST /api/commands
+activate Gateway
+
+Gateway -> ServiceA: POST /api/command
+activate ServiceA
+note right of ServiceA: Endpoint: /api/command
+CommandModel
+
+ServiceA -> Messaging: POST /messaging/publish
+activate Messaging
+note right of Messaging: Endpoint: /messaging/publish
+PublishMessageRequest
+
+Messaging -> Redis: PUBLISH commands.service_a {command_data}
+activate Redis
+Redis --> Messaging: OK
+deactivate Redis
+
+Messaging --> ServiceA: 200 OK (message_id)
+deactivate Messaging
+
+ServiceA --> Gateway: 202 Accepted (command_id)
+deactivate ServiceA
+
+Gateway --> Client: 202 Accepted (command_id)
+deactivate Gateway
+
+== Client Health Check ==
+    Client -> Gateway: GET /health
+    activate Gateway
+    Gateway --> Client: 200 OK {status: "healthy", services: {messaging: "healthy", database: "healthy", observability: "healthy"}}
+    deactivate Gateway
+end
+
+== Database TimescaleDB Operations ==
+
+group Periodic Background Operations
+    Database -> Database: Automatic chunk creation and management
+    activate Database
+    note right: TimescaleDB hypertable operations
+    Database -> Database: Compression of older chunks
+    Database -> Database: Data retention policy enforcement
+    deactivate Database
+end
+
+@enduml

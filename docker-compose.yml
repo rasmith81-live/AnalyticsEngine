@@ -1,0 +1,857 @@
+version: '3.8'
+
+services:
+  # Database Service - Centralized database operations with CQRS
+  database_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/database_service
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=database_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - RUN_MIGRATIONS_ON_STARTUP=1
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - SCHEMA_VALIDATION_LEVEL=basic
+      - AUTO_ROLLBACK_ON_FAILURE=false
+      - MONITORING_ENABLED=true
+      - TIMESCALE_CHUNK_INTERVAL=7 days
+      - METRICS_RETENTION_PERIOD=365 days
+      - PYTHONPATH=.
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Messaging Service - Centralized Redis operations and pub/sub
+  messaging_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/messaging_service
+    ports:
+      - "8001:8000"
+    environment:
+      - SERVICE_NAME=messaging_service
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - METRICS_EXPORT_TIMEOUT=5
+      - PYTHONPATH=.
+    depends_on:
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Systems Monitor Service
+  systems_monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/systems_monitor
+    ports:
+      - "8010:8000"
+    environment:
+      - SERVICE_NAME=systems_monitor
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=systems_monitor
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Controller Service
+  controller_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/controller_service
+    ports:
+      - "8011:8000"
+    environment:
+      - SERVICE_NAME=controller_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - SYSTEMS_MONITOR_URL=http://systems_monitor:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      systems_monitor:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Entity Resolution Service
+  entity_resolution_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/entity_resolution_service
+    ports:
+      - "8012:8000"
+    environment:
+      - SERVICE_NAME=entity_resolution_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=entity_resolution_service
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Data Governance Service
+  data_governance_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/data_governance_service
+    ports:
+      - "8013:8000"
+    environment:
+      - SERVICE_NAME=data_governance_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=data_governance_service
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Machine Learning Service
+  machine_learning_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/machine_learning_service
+    ports:
+      - "8014:8000"
+    environment:
+      - SERVICE_NAME=machine_learning_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=machine_learning_service
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Historical Data Provider Service
+  historical_data_provider_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/historical_data_provider_service
+    ports:
+      - "8015:8000"
+    environment:
+      - SERVICE_NAME=historical_data_provider_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=historical_data_provider_service
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Market Data Provider Service
+  market_data_provider_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/market_data_provider_service
+    ports:
+      - "8016:8000"
+    environment:
+      - SERVICE_NAME=market_data_provider_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - METRICS_PUSH_INTERVAL=15
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_EXPORT_JOB_NAME=market_data_provider_service
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      
+  broker_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/broker_service
+    ports:
+      - "8002:8000"
+    environment:
+      - SERVICE_NAME=broker_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  asset_profile_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/asset_profile_service
+    ports:
+      - "8003:8000"
+    environment:
+      - SERVICE_NAME=asset_profile_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  news_provider_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/news_provider_service
+    ports:
+      - "8004:8000"
+    environment:
+      - SERVICE_NAME=news_provider_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  strategy_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/strategy_service
+    ports:
+      - "8005:8000"
+    environment:
+      - SERVICE_NAME=strategy_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  assessment_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/assessment_service
+    ports:
+      - "8006:8000"
+    environment:
+      - SERVICE_NAME=assessment_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  allocation_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/allocation_service
+    ports:
+      - "8007:8000"
+    environment:
+      - SERVICE_NAME=allocation_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  market_monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/market_monitor
+    ports:
+      - "8008:8000"
+    environment:
+      - SERVICE_NAME=market_monitor
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      - database_service
+      - messaging_service
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Archival Service - TimescaleDB data archival to lakehouse
+  archival_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/archival_service
+    ports:
+      - "8004:8000"
+    environment:
+      - SERVICE_NAME=archival_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - LAKEHOUSE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-devstoreaccount1}
+      - LAKEHOUSE_CONTAINER=${AZURE_STORAGE_CONTAINER:-timescaledb-archive}
+      - LAKEHOUSE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # TimescaleDB - Time-series database with PostgreSQL
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres
+      -c shared_preload_libraries=timescaledb
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c random_page_cost=1.1
+      -c temp_file_limit=2GB
+      -c log_min_duration_statement=200ms
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_temp_files=0
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+
+  # Redis - In-memory data structure store for messaging
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --notify-keyspace-events Ex
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --rdbcompression yes
+      --rdbchecksum yes
+      --appendonly yes
+      --appendfsync everysec
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      
+  # Azurite - Azure Storage Emulator for local development
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000" # Blob service
+      - "10001:10001" # Queue service
+      - "10002:10002" # Table service
+    volumes:
+      - azurite_data:/data
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose --location /data --debug /data/debug.log"
+
+  # Prometheus Pushgateway - Metrics collection endpoint
+  prometheus-pushgateway:
+    image: prom/pushgateway:latest
+    ports:
+      - "9091:9091"
+    volumes:
+      - prometheus_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9091"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Observability Service - Centralized monitoring and tracing
+  observability_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/observability_service
+    ports:
+      - "8080:8000"
+      - "4317:4317"
+    environment:
+      - SERVICE_NAME=observability_service
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=true
+      - TIMESCALE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=none
+      - LOGS_INDEX=service-logs
+      - OTLP_ENDPOINT=0.0.0.0:4317
+      - OPENTELEMETRY_ENDPOINT=0.0.0.0:4317
+      - PROMETHEUS_ENDPOINT=http://localhost:9090
+      - NOTIFICATION_ENDPOINTS={"email":"none","slack":"none"}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - API_KEY_HEADER=X-API-Key
+      - API_KEYS={}
+      - METRICS_RETENTION_DAYS=30
+      - TRACES_RETENTION_DAYS=7
+      - LOGS_RETENTION_DAYS=14
+      - BATCH_SIZE=1000
+      - WORKER_THREADS=4
+      - PYTHONPATH=.
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - SERVICE_URL=http://observability_service:8000
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      
+  # API Gateway - Unified interface for all services
+  api_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/api_gateway
+    ports:
+      - "8090:8000"
+    environment:
+      - SERVICE_NAME=api_gateway
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=true
+      - REDIS_URL=redis://redis:6379/0
+      - CORS_ORIGINS=["*"]
+      - RATE_LIMIT=100
+      - RATE_LIMIT_WINDOW=60
+      - CIRCUIT_BREAKER_THRESHOLD=5
+      - CIRCUIT_BREAKER_RECOVERY_TIME=30
+      - CACHE_ENABLED=true
+      - CACHE_TTL=300
+      - HEALTH_CHECK_INTERVAL=30
+      - QUERY_TIMEOUT=10
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=.
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - ARCHIVAL_SERVICE_URL=http://archival_service:8000
+      - SYSTEMS_MONITOR_URL=http://systems_monitor:8000
+      - CONTROLLER_SERVICE_URL=http://controller_service:8000
+      - ENTITY_RESOLUTION_SERVICE_URL=http://entity_resolution_service:8000
+      - DATA_GOVERNANCE_SERVICE_URL=http://data_governance_service:8000
+      - MACHINE_LEARNING_SERVICE_URL=http://machine_learning_service:8000
+      - HISTORICAL_DATA_PROVIDER_SERVICE_URL=http://historical_data_provider_service:8000
+      - MARKET_DATA_PROVIDER_SERVICE_URL=http://market_data_provider_service:8000
+      - BROKER_SERVICE_URL=http://broker_service:8002
+      - ASSET_PROFILE_SERVICE_URL=http://asset_profile_service:8003
+      - NEWS_PROVIDER_SERVICE_URL=http://news_provider_service:8004
+      - STRATEGY_SERVICE_URL=http://strategy_service:8005
+      - ASSESSMENT_SERVICE_URL=http://assessment_service:8006
+      - ALLOCATION_SERVICE_URL=http://allocation_service:8007
+      - MARKET_MONITOR_URL=http://market_monitor:8008
+    depends_on:
+      redis:
+        condition: service_healthy
+      systems_monitor:
+        condition: service_healthy
+      controller_service:
+        condition: service_healthy
+      entity_resolution_service:
+        condition: service_healthy
+      data_governance_service:
+        condition: service_healthy
+      machine_learning_service:
+        condition: service_healthy
+      historical_data_provider_service:
+        condition: service_healthy
+      market_data_provider_service:
+        condition: service_healthy
+      broker_service:
+        condition: service_healthy
+      asset_profile_service:
+        condition: service_healthy
+      news_provider_service:
+        condition: service_healthy
+      strategy_service:
+        condition: service_healthy
+      assessment_service:
+        condition: service_healthy
+      allocation_service:
+        condition: service_healthy
+      market_monitor:
+        condition: service_healthy
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      archival_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  timescaledb_data:
+    driver: local
+  redis_data:
+    driver: local
+  azurite_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge

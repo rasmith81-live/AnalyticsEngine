@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Detailed Microservices Endpoints and Events Interaction Diagram</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .sequence-diagram {
+            overflow-x: auto;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: white;
+        }
+        .actors {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            background-color: white;
+            padding: 10px 0;
+            z-index: 100;
+        }
+        .actor {
+            text-align: center;
+            min-width: 120px;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #e6f7ff;
+            font-weight: bold;
+        }
+        .lifeline {
+            position: relative;
+            height: 100%;
+            border-left: 2px dashed #3498db;
+            margin: 0 auto;
+            width: 0;
+        }
+        .flow-section {
+            margin-bottom: 40px;
+            border-left: 5px solid #3498db;
+            padding-left: 15px;
+        }
+        .flow-title {
+            background-color: #3498db;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .message {
+            display: flex;
+            margin: 15px 0;
+            align-items: center;
+        }
+        .arrow {
+            flex-grow: 1;
+            height: 2px;
+            background-color: #2c3e50;
+            position: relative;
+            margin: 0 10px;
+        }
+        .arrow::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 10px solid #2c3e50;
+        }
+        .arrow.response {
+            background-color: #e74c3c;
+        }
+        .arrow.response::after {
+            border-left-color: #e74c3c;
+        }
+        .message-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .endpoint {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .note {
+            background-color: #fffde7;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 15px 0;
+            font-style: italic;
+        }
+        .activation {
+            background-color: #3498db;
+            width: 10px;
+            position: absolute;
+            left: -5px;
+            border-radius: 2px;
+        }
+        .group {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+        }
+        .group-title {
+            background-color: #ddd;
+            padding: 5px 10px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Detailed Microservices Endpoints and Events Interaction Diagram</h1>
+        
+        <div class="sequence-diagram">
+            <div class="actors">
+                <div class="actor">Client Application</div>
+                <div class="actor">API Gateway</div>
+                <div class="actor">Business Service A</div>
+                <div class="actor">Business Service B</div>
+                <div class="actor">Messaging Service</div>
+                <div class="actor">Database Service</div>
+                <div class="actor">Archive Service</div>
+                <div class="actor">Observability Service</div>
+                <div class="actor">Prometheus Pushgateway</div>
+                <div class="actor">TimescaleDB</div>
+                <div class="actor">Redis</div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">1. Message Creation Flow (Detailed API Endpoints)</div>
+                
+                <div class="message">
+                    <div>Client</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">POST /api/v1/messages</span></span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                <div class="note">API Gateway routes request to appropriate service</div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">POST /api/messages</span></span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                <div class="note">Business Service A endpoint handler</div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "command.create_message", message: {...}}</span>
+                    </div>
+                    <div>Messaging Service</div>
+                </div>
+                <div class="note">Endpoint: /messaging/publish - PublishMessageRequest</div>
+                
+                <div class="group">
+                    <div class="group-title">1.1 Command Flow (Write) - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH command.create_message {message_data}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    <div class="note">Redis pub/sub channel: command.create_message</div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK (message_id)</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE command.create_message</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{message_data}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="note">Write Model Operation - Endpoint: /database/command</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">INSERT INTO messages_write</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH event.message_created {message_id, status}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE event.message_created</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{message_id, status}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">1.2 Read Model Update - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH command.update_read_model {message_id}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE command.update_read_model</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{message_id}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="note">Read Model Update: CQRS Pattern</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">INSERT INTO messages_read</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH event.read_model_updated {message_id, status}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE event.read_model_updated</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{message_id, status}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                </div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow response">
+                        <span class="message-label">201 Created (message_id)</span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow response">
+                        <span class="message-label">201 Created (message_id)</span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow response">
+                        <span class="message-label">201 Created (message_id)</span>
+                    </div>
+                    <div>Client</div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">2. Message Retrieval Flow (Detailed API Endpoints)</div>
+                
+                <div class="message">
+                    <div>Client</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">GET /api/v1/messages/{id}</span></span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                <div class="note">API Gateway routes request to appropriate service</div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">GET /api/messages/{id}</span></span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "query.get_message", message: {id: "message_id"}}</span>
+                    </div>
+                    <div>Messaging Service</div>
+                </div>
+                <div class="note">Business Service A requests message via Messaging Service</div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow">
+                        <span class="message-label">GET message:{id}</span>
+                    </div>
+                    <div>Redis</div>
+                </div>
+                <div class="note">Check Redis cache first</div>
+                
+                <div class="group">
+                    <div class="group-title">2.1 Cache Miss Scenario - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">nil (cache miss)</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH query.get_message {id: "message_id"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE query.get_message</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{id: "message_id"}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="note">Database Service endpoint: /database/query</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SELECT FROM messages_read WHERE id = ?</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">message_data</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH response.get_message {message_data}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE response.get_message</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{message_data}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SET message:{id} {message_data}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    <div class="note">Cache the result for future requests</div>
+                </div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (message_data)</span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (message_data)</span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (message_data)</span>
+                    </div>
+                    <div>Client</div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">3. Message List Flow with Pagination (Detailed API Endpoints)</div>
+                
+                <div class="message">
+                    <div>Client</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">GET /api/v1/messages?limit=10&offset=0</span></span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                <div class="note">API Gateway routes request with pagination parameters</div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">GET /api/messages?limit=10&offset=0</span></span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                <div class="note">Business Service A endpoint for paginated list</div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow">
+                        <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "query.list_messages", message: {limit: 10, offset: 0}}</span>
+                    </div>
+                    <div>Messaging Service</div>
+                </div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow">
+                        <span class="message-label">PUBLISH query.list_messages {limit: 10, offset: 0}</span>
+                    </div>
+                    <div>Redis</div>
+                </div>
+                
+                <div class="message">
+                    <div>Database Service</div>
+                    <div class="arrow">
+                        <span class="message-label">SUBSCRIBE query.list_messages</span>
+                    </div>
+                    <div>Redis</div>
+                </div>
+                
+                <div class="message">
+                    <div>Redis</div>
+                    <div class="arrow">
+                        <span class="message-label">{limit: 10, offset: 0}</span>
+                    </div>
+                    <div>Database Service</div>
+                </div>
+                
+                <div class="note">Database Service endpoint: /database/query with pagination parameters</div>
+                
+                <div class="message">
+                    <div>Database Service</div>
+                    <div class="arrow">
+                        <span class="message-label">SELECT FROM messages_read LIMIT 10 OFFSET 0</span>
+                    </div>
+                    <div>TimescaleDB</div>
+                </div>
+                
+                <div class="message">
+                    <div>TimescaleDB</div>
+                    <div class="arrow response">
+                        <span class="message-label">[{message_data}, ...]</span>
+                    </div>
+                    <div>Database Service</div>
+                </div>
+                
+                <div class="message">
+                    <div>Database Service</div>
+                    <div class="arrow">
+                        <span class="message-label">PUBLISH response.list_messages {messages: [{message_data}, ...]}</span>
+                    </div>
+                    <div>Redis</div>
+                </div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow">
+                        <span class="message-label">SUBSCRIBE response.list_messages</span>
+                    </div>
+                    <div>Redis</div>
+                </div>
+                
+                <div class="message">
+                    <div>Redis</div>
+                    <div class="arrow">
+                        <span class="message-label">{messages: [{message_data}, ...]}</span>
+                    </div>
+                    <div>Messaging Service</div>
+                </div>
+                
+                <div class="message">
+                    <div>Messaging Service</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (messages_list)</span>
+                    </div>
+                    <div>Business Service A</div>
+                </div>
+                
+                <div class="message">
+                    <div>Business Service A</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (messages_list)</span>
+                    </div>
+                    <div>API Gateway</div>
+                </div>
+                
+                <div class="message">
+                    <div>API Gateway</div>
+                    <div class="arrow response">
+                        <span class="message-label">200 OK (messages_list)</span>
+                    </div>
+                    <div>Client</div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">4. Telemetry and Metrics Flow (Detailed API Endpoints)</div>
+                
+                <div class="group">
+                    <div class="group-title">4.1 Metrics Collection - Every 15 seconds</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">export_metrics_to_observability()</span></span>
+                        </div>
+                        <div>Business Service A</div>
+                    </div>
+                    <div class="note">Internal function call triggered by background task</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /metrics/job/business_service_a</span> {metrics_data}</span>
+                        </div>
+                        <div>Prometheus Pushgateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Prometheus Pushgateway</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Business Service A</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Business Service B</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">export_metrics_to_observability()</span></span>
+                        </div>
+                        <div>Business Service B</div>
+                    </div>
+                    <div class="note">Internal function call triggered by background task</div>
+                    
+                    <div class="message">
+                        <div>Business Service B</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /metrics/job/business_service_b</span> {metrics_data}</span>
+                        </div>
+                        <div>Prometheus Pushgateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Prometheus Pushgateway</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Business Service B</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">export_metrics_to_observability()</span></span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    <div class="note">Internal function call triggered by background task</div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /metrics/job/messaging_service</span> {metrics_data}</span>
+                        </div>
+                        <div>Prometheus Pushgateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Prometheus Pushgateway</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">export_metrics_to_observability()</span></span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    <div class="note">Internal function call triggered by background task</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /metrics/job/database_service</span> {metrics_data}</span>
+                        </div>
+                        <div>Prometheus Pushgateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Prometheus Pushgateway</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">4.2 Telemetry Tracing</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.traces {service: "business_service_a", traces: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Business Service B</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.traces {service: "business_service_b", traces: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.traces {service: "messaging_service", traces: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.traces {service: "database_service", traces: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.traces</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="note">Observability Service processes and stores traces</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.processed {status: "success"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.processed</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Business Service B</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.processed</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.processed</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.processed</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">4. Telemetry and Metrics Flow (Detailed API Endpoints)</div>
+                
+                <div class="group">
+                    <div class="group-title">4.1 Metrics Collection - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "telemetry.metrics", message: {service: "service_a", metrics: [...]}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.metrics {service: "service_a", metrics: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Business Service A</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "telemetry.metrics", message: {service: "messaging_service", metrics: [...]}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    <div class="note">OpenTelemetry SDK with batch span processor</div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.metrics {service: "messaging_service", metrics: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    <div class="note">Redis pub/sub channel: telemetry.metrics</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.metrics</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{service: "messaging_service", metrics: [...]}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    <div class="note">Process metrics and store via messaging</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "database", message: {event_type: "metric.store", event_data: {metrics: [...]}}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH database {event_type: "metric.store", event_data: {metrics: [...]}}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">4.2 Trace Events Collection - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "telemetry.traces", message: {service: "service_a", traces: [...]}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.traces {service: "service_a", traces: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Business Service A</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.traces</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{service: "service_a", traces: [...]}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    <div class="note">Process traces and store via messaging</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "database", message: {event_type: "trace.store", event_data: {trace: {...}}}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH database {event_type: "trace.store", event_data: {trace: {...}}}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">4.3 Dependency Events Collection - Detailed</div>
+                    
+                    <div class="message">
+                        <div>Business Service A</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "telemetry.dependencies", message: {service: "service_a", dependencies: [...]}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH telemetry.dependencies {service: "service_a", dependencies: [...]}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Business Service A</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE telemetry.dependencies</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{service: "service_a", dependencies: [...]}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    <div class="note">Process dependency data and store via messaging</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "database", message: {event_type: "dependency.store", event_data: {dependency: {...}}}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH database {event_type: "dependency.store", event_data: {dependency: {...}}}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">5. Health Check Flow (Detailed API Endpoints)</div>
+                
+                <div class="group">
+                    <div class="group-title">5.1 Service Health Checks - Every 30 seconds</div>
+                    
+                    <div class="group">
+                        <div class="group-title">Business Service A Health Check</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /api/health</span></span>
+                            </div>
+                            <div>Business Service A</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service A</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.check {service: "business_service_a"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service A</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.status {service: "business_service_a", status: "healthy"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label">SUBSCRIBE health.status</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-title">Business Service B Health Check</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /api/health</span></span>
+                            </div>
+                            <div>Business Service B</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service B</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.check {service: "business_service_b"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service B</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.status {service: "business_service_b", status: "healthy"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label">SUBSCRIBE health.status</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-title">Messaging Service Health Check</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /messaging/health</span></span>
+                            </div>
+                            <div>Messaging Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Messaging Service</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.check {service: "messaging_service"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Redis</div>
+                            <div class="arrow response">
+                                <span class="message-label">OK</span>
+                            </div>
+                            <div>Messaging Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Messaging Service</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.status {service: "messaging_service", status: "healthy"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label">SUBSCRIBE health.status</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-title">Database Service Health Check</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /database/health</span></span>
+                            </div>
+                            <div>Database Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Database Service</div>
+                            <div class="arrow">
+                                <span class="message-label">SELECT 1</span>
+                            </div>
+                            <div>TimescaleDB</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>TimescaleDB</div>
+                            <div class="arrow response">
+                                <span class="message-label">1</span>
+                            </div>
+                            <div>Database Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Database Service</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.status {service: "database_service", status: "healthy"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label">SUBSCRIBE health.status</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-title">Observability Service Health Check</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /observability/health</span></span>
+                            </div>
+                            <div>Observability Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Observability Service</div>
+                            <div class="arrow">
+                                <span class="message-label">PUBLISH health.status {service: "observability_service", status: "healthy"}</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label">SUBSCRIBE health.status</span>
+                            </div>
+                            <div>Redis</div>
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-title">5.2 Client Health Check Request</div>
+                        
+                        <div class="message">
+                            <div>Client</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /health</span></span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="note">API Gateway aggregates health status from all services</div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /api/health</span></span>
+                            </div>
+                            <div>Business Service A</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service A</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy"}</span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /api/health</span></span>
+                            </div>
+                            <div>Business Service B</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Business Service B</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy"}</span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /messaging/health</span></span>
+                            </div>
+                            <div>Messaging Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Messaging Service</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy"}</span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /database/health</span></span>
+                            </div>
+                            <div>Database Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Database Service</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy"}</span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow">
+                                <span class="message-label"><span class="endpoint">GET /observability/health</span></span>
+                            </div>
+                            <div>Observability Service</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>Observability Service</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy"}</span>
+                            </div>
+                            <div>API Gateway</div>
+                        </div>
+                        
+                        <div class="message">
+                            <div>API Gateway</div>
+                            <div class="arrow response">
+                                <span class="message-label">200 OK {status: "healthy", services: {"business_service_a": "healthy", "business_service_b": "healthy", "messaging_service": "healthy", "database_service": "healthy", "observability_service": "healthy"}}</span>
+                            </div>
+                        <div>Client</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">5.4 Observability Health Check - Detailed</div>
+                    
+                    <div class="message">
+                        <div>API Gateway</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH health.check {service: "observability_service"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE health.check</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{service: "observability_service"}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    
+                    <div class="note">Observability Service performs health_check()</div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "health.check", message: {service: "redis"}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PING</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow response">
+                            <span class="message-label">PONG</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK {status: "healthy"}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "database", message: {event_type: "health.check"}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH database {event_type: "health.check"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE database</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{event_type: "health.check"}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SELECT 1</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">1</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /messaging/publish</span> {channel: "database.response", message: {event_type: "health.status", status: "healthy"}}</span>
+                        </div>
+                        <div>Messaging Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Messaging Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH database.response {event_type: "health.status", status: "healthy"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE database.response</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{event_type: "health.status", status: "healthy"}</span>
+                        </div>
+                        <div>Observability Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Observability Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH health.status {service: "observability_service", status: "healthy", components: {"redis": "healthy", "database": "healthy"}}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>API Gateway</div>
+                        <div class="arrow">
+                            <span class="message-label">SUBSCRIBE health.status</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Redis</div>
+                        <div class="arrow">
+                            <span class="message-label">{service: "observability_service", status: "healthy", components: {"redis": "healthy", "database": "healthy"}}</span>
+                        </div>
+                        <div>API Gateway</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">6. Archive Service Operations (Detailed)</div>
+                
+                <div class="group">
+                    <div class="group-title">6.1 Data Archiving Flow</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /archive/data</span> {entity: "messages", criteria: {older_than: "30d"}}</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="note">Archive Service processes archival request for data older than specified criteria</div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH command.archive_data {entity: "messages", criteria: {older_than: "30d"}}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">GET /database/query</span> {entity: "messages", criteria: {older_than: "30d"}, limit: 1000}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">SELECT * FROM messages WHERE created_at < NOW() - INTERVAL '30 days' LIMIT 1000</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">Result set (messages data)</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK (messages data)</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label">Store data in long-term storage</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="note">Archive Service compresses and stores data in cold storage</div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">POST /database/command</span> {command: "delete_archived", entity: "messages", ids: [...]}</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label">DELETE FROM messages WHERE id IN (...)</span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>TimescaleDB</div>
+                        <div class="arrow response">
+                            <span class="message-label">OK (deleted_count)</span>
+                        </div>
+                        <div>Database Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK {deleted_count: N}</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH event.data_archived {entity: "messages", count: N, status: "success"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">6.2 Data Retrieval from Archive</div>
+                    
+                    <div class="message">
+                        <div>Client</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">GET /api/v1/archive/messages</span> {criteria: {date_range: "2023-01-01/2023-01-31"}}</span>
+                        </div>
+                        <div>API Gateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>API Gateway</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">GET /archive/retrieve</span> {entity: "messages", criteria: {date_range: "2023-01-01/2023-01-31"}}</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="note">Archive Service searches and retrieves data from cold storage</div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK {messages: [...], total_count: N}</span>
+                        </div>
+                        <div>API Gateway</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>API Gateway</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK {messages: [...], total_count: N}</span>
+                        </div>
+                        <div>Client</div>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">6.3 Archive Service Health Check</div>
+                    
+                    <div class="message">
+                        <div>API Gateway</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">GET /archive/health</span></span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label">Check storage connectivity</span>
+                        </div>
+                        <div>Archive Service</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow">
+                            <span class="message-label">PUBLISH health.status {service: "archive_service", status: "healthy"}</span>
+                        </div>
+                        <div>Redis</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Archive Service</div>
+                        <div class="arrow response">
+                            <span class="message-label">200 OK {status: "healthy", storage: "connected"}</span>
+                        </div>
+                        <div>API Gateway</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">7. TimescaleDB Operations (Detailed)</div>
+                
+                <div class="group">
+                    <div class="group-title">7.1 Database Service to TimescaleDB Interactions</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">EXECUTE write_command()</span></span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">EXECUTE read_query()</span></span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="note">Database Service uses SQLAlchemy with asyncpg for async database operations</div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">7.2 Automated Database Migration Pattern</div>
+                    
+                    <div class="note">Container Startup Integration:</div>
+                    <ul>
+                        <li><strong>Automatic Trigger:</strong> RUN_MIGRATIONS_ON_STARTUP=1 environment variable</li>
+                        <li><strong>Service Detection:</strong> Uses SERVICE_NAME for service-specific migrations</li>
+                        <li><strong>Driver Management:</strong> Converts async URLs (+asyncpg) to sync (+psycopg2) for migrations</li>
+                    </ul>
+                    
+                    <div class="group-title">7.3 TimescaleDB-Specific Operations</div>
+                    <ul>
+                        <li><strong>Hypertable Creation:</strong> <code>SELECT create_hypertable('table_name', 'time_column_name');</code></li>
+                        <li><strong>Automatic chunk creation and management</strong> based on time intervals</li>
+                        <li><strong>Compression of older chunks</strong> for storage optimization</li>
+                        <li><strong>Data retention policy enforcement</strong> for time-series data lifecycle</li>
+                        <li><strong>Time-based partitioning</strong> for query performance</li>
+                    </ul>
+                    
+                    <div class="group-title">7.4 CQRS Pattern Integration</div>
+                    <ul>
+                        <li><strong>Write Model Migrations:</strong> Standard Alembic migrations for primary data models</li>
+                        <li><strong>Read Model Generation:</strong> Automated from write models</li>
+                        <li><strong>Event Schema Validation:</strong> Ensures event schemas match model changes</li>
+                    </ul>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">7.5 Real-time Data Processing</div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">EXECUTE continuous_aggregates()</span></span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="message">
+                        <div>Database Service</div>
+                        <div class="arrow">
+                            <span class="message-label"><span class="endpoint">EXECUTE refresh_materialized_views()</span></span>
+                        </div>
+                        <div>TimescaleDB</div>
+                    </div>
+                    
+                    <div class="note">Background workers handle time-series data processing tasks</div>
+                </div>
+            </div>
+            
+            <div class="flow-section">
+                <div class="flow-title">8. Architecture Notes (Detailed)</div>
+                
+                <div class="group">
+                    <div class="group-title">8.1 Core Components</div>
+                    
+                    <div class="note">
+                        <ul>
+                            <li><strong>API Gateway:</strong> Central entry point for all client requests, handling routing, authentication, and load balancing.</li>
+                            <li><strong>Business Services:</strong> Domain-specific services (Business Service A and B) that implement business logic and expose REST APIs.</li>
+                            <li><strong>Messaging Service:</strong> Handles message publishing and subscription, manages Redis pub/sub channels.</li>
+                            <li><strong>Database Service:</strong> Manages database operations, implements CQRS pattern with write commands and read queries.</li>
+                            <li><strong>Archive Service:</strong> Handles long-term data archiving, retrieval, and cold storage management.</li>
+                            <li><strong>Observability Service:</strong> Collects telemetry data, processes traces and metrics.</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">8.2 Service Endpoints</div>
+                    
+                    <div class="note">
+                        <ul>
+                            <li><strong>API Gateway:</strong> <code>/health</code>, <code>/api/*</code></li>
+                            <li><strong>Business Services:</strong> <code>/api/messages</code>, <code>/api/command</code>, <code>/api/health</code></li>
+                            <li><strong>Messaging Service:</strong> <code>/messaging/publish</code>, <code>/messaging/subscriptions</code>, <code>/messaging/health</code></li>
+                            <li><strong>Database Service:</strong> <code>/database/command</code>, <code>/database/query</code>, <code>/database/migrations</code>, <code>/database/health</code></li>
+                            <li><strong>Archive Service:</strong> <code>/archive/data</code>, <code>/archive/retrieve</code>, <code>/archive/health</code></li>
+                            <li><strong>Observability Service:</strong> <code>/observability/traces</code>, <code>/observability/metrics</code>, <code>/observability/health</code></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">8.3 Architectural Patterns</div>
+                    
+                    <div class="note">
+                        <ul>
+                            <li><strong>CQRS Pattern:</strong> Separate Command (Write) and Query (Read) models and handlers with distinct message channels:
+                                <ul>
+                                    <li>Write commands: <code>commands.{entity}.{action}</code> Redis channels</li>
+                                    <li>Read queries: <code>queries.{entity}.{action}</code> Redis channels</li>
+                                    <li>Events: <code>events.{entity}.{event}</code> Redis channels</li>
+                                </ul>
+                            </li>
+                            <li><strong>Event-Driven Architecture:</strong> Services communicate through events and commands via Redis channels, enabling loose coupling and scalability.</li>
+                            <li><strong>Microservices Communication:</strong> All service-to-service communication happens through well-defined API endpoints or Redis pub/sub channels.</li>
+                            <li><strong>Observability Pipeline:</strong> Comprehensive telemetry collection with distributed tracing, metrics export, and centralized monitoring.</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="group">
+                    <div class="group-title">8.4 Infrastructure Components</div>
+                    
+                    <div class="note">
+                        <ul>
+                            <li><strong>TimescaleDB:</strong> Specialized PostgreSQL for time-series data with automatic partitioning via hypertables. Used for persistent storage with the following features:
+                                <ul>
+                                    <li>Hypertable creation in migrations</li>
+                                    <li>Automatic chunk management and compression</li>
+                                    <li>Time-based partitioning for query performance</li>
+                                </ul>
+                            </li>
+                            <li><strong>Redis:</strong> Central message broker for all service-to-service communication using pub/sub channels:
+                                <ul>
+                                    <li>Command channels: <code>commands.*</code></li>
+                                    <li>Query channels: <code>queries.*</code></li>
+                                    <li>Event channels: <code>events.*</code></li>
+                                    <li>Telemetry channels: <code>telemetry.*</code></li>
+                                    <li>Health check channels: <code>health.*</code></li>
+                                    <li>Archive channels: <code>archive.*</code></li>
+                                </ul>
+                            </li>
+                            <li><strong>Prometheus Pushgateway:</strong> Receives metrics from all services for monitoring and alerting.</li>
+                            <li><strong>Health Check System:</strong> Services expose <code>/health</code> endpoints and participate in the distributed health check system.</li>
+                            <li><strong>Archive Storage:</strong> Cold storage system for long-term data retention and retrieval.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

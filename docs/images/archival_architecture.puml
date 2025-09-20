@@ -1,0 +1,60 @@
+@startuml archival_architecture
+
+!define RECTANGLE class
+!define DATABASE database
+!define QUEUE queue
+
+skinparam componentStyle rectangle
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam padding 5
+skinparam roundCorner 10
+
+title TimescaleDB Event-Driven Archival Architecture
+
+package "Database Service" {
+  [RetentionManager] as RM
+  [MessagingClient] as DBMC
+}
+
+package "Archival Service" {
+  [LakehouseClient] as LC
+  [MessagingClient] as AMC
+  [ArchivalProcessor] as AP
+}
+
+database "TimescaleDB" as TSDB {
+  [Active Chunks] as AC
+  [Old Chunks] as OC
+}
+
+queue "Redis" as REDIS {
+  [PubSub] as PS
+}
+
+cloud "Azure Data Lake\nStorage Gen2" as ADLS {
+  [Parquet Files] as PF
+}
+
+' Flow for identification and request
+RM --> OC : 1. Identify chunks\nolder than 2 years
+RM --> DBMC : 2. Create\nArchivalEvent
+DBMC --> PS : 3. Publish to\ndatabase.archival.request
+
+' Flow for processing
+PS --> AMC : 4. Subscribe to\narchival events
+AMC --> AP : 5. Process\narchival event
+AP --> OC : 6. Extract\nchunk data
+AP --> LC : 7. Convert to\nParquet format
+LC --> PF : 8. Write to\nlakehouse storage
+AP --> AMC : 9. Create\nArchivalConfirmation
+AMC --> PS : 10. Publish to\ndatabase.archival.confirmation
+
+' Flow for confirmation
+PS --> DBMC : 11. Subscribe to\nconfirmations
+DBMC --> RM : 12. Process\nconfirmation
+RM --> OC : 13. Drop chunk\nif successful
+
+@enduml
