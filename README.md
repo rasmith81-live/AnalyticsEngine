@@ -1,8 +1,8 @@
-# Multi-Microservice Pattern
+# MarketNovaTrader
 
 ## Overview
 
-This project demonstrates a microservices architecture with centralized database and messaging services, implementing the CQRS pattern with TimescaleDB for real-time data processing.
+This project extends to base-platforn into an automated trading platform called MarketNovaTrader.
 
 ## Architecture
 
