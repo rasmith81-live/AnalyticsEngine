@@ -1,43 +1,494 @@
-# Architectural Analysis Report: `observability_service`
+# Observability Service
 
-## 1. Executive Summary
+## Overview
 
-The `observability_service` is the central hub for monitoring, telemetry, and insights across the entire microservices ecosystem. It provides a unified platform for ingesting, querying, and analyzing telemetry data, including metrics, traces, logs, and health checks. By decoupling data collection from data storage and analysis, it offers a scalable and resilient solution for maintaining system-wide visibility.
+Observability Service API
 
-## 2. Core Architectural Pillars
+This is the main module for the Observability Service API.
+It provides endpoints for telemetry ingestion, querying, and analysis.
 
-The service's architecture is built on the following key principles:
+## Data Models
 
-*   **Centralized Ingestion**: The service acts as the single entry point for all telemetry data. It provides both a direct HTTP endpoint for metrics ingestion and subscribes to a variety of telemetry events via the `messaging_service`, ensuring that all observability data is collected in a standardized way.
+### `ErrorResponse`
 
-*   **Asynchronous Querying**: The service does not store data itself. Instead, it queries the `database_service` using a fully asynchronous, event-driven pattern. When a query is initiated, it publishes a request to the `messaging_service` and listens for a response, making the query process non-blocking and highly efficient.
+Standard error response model.
 
-*   **Unified API**: It exposes a comprehensive and unified API for querying all types of observability data. This provides a single pane of glass for developers and operators to gain insights into the health, performance, and behavior of the entire system.
+**Fields:**
 
-*   **Decoupling and Scalability**: The service is completely decoupled from both the producers of telemetry data and the `database_service` that stores it. This allows each component to scale independently and evolve without impacting the others, which is critical for a large-scale microservices architecture.
+- `status_code`: `int`
+- `detail`: `str`
+- `timestamp`: `datetime`
+- `path`: `Optional[str]`
+- `trace_id`: `Optional[str]`
 
-## 3. Key Components and Their Roles
+### `HealthData`
 
-*   **`main.py` (Service Entrypoint)**: Initializes the FastAPI application, configures all middleware, and manages the lifecycle of the core components. It sets up the `messaging_client`, registers the API routers, and defines the startup and shutdown procedures, including model registration and event subscriptions.
+Model for health check data ingestion.
 
-*   **`messaging_client.py` (Messaging Client)**: This client handles all communication with the `messaging_service`. It is responsible for publishing query requests and subscribing to response events, forming the backbone of the service's asynchronous communication architecture.
+**Fields:**
 
-*   **`query_response_handler.py` (Query Response Handler)**: This component is the key to the asynchronous query pattern. It listens for query response events from the `database_service` and uses a callback mechanism to match responses with their original requests, completing the query lifecycle.
+- `service`: `str`
+- `status`: `HealthStatus`
+- `timestamp`: `Optional[datetime]`
+- `details`: `Dict[str, Any]`
+- `latency_ms`: `Optional[float]`
 
-*   **`api/` (API Routers)**: This directory contains the various API endpoints exposed by the service, including:
-    *   `query.py`: Endpoints for querying telemetry data.
-    *   `metrics.py`: Endpoints for ingesting and exposing Prometheus metrics.
-    *   `traces.py`: Endpoints specifically for querying trace data.
-    *   `health.py`: Endpoints for checking the health of the service and its dependencies.
+### `HealthDataBatch`
 
-## 4. Architectural Consistency and Best Practices
+Model for batch health data ingestion.
 
-The `observability_service` is a model of a well-architected, centralized infrastructure service. It adheres to the same high standards seen across the ecosystem:
+**Fields:**
 
-*   **Event-Driven**: Its extensive use of the `messaging_service` for both data ingestion and querying makes it a prime example of an event-driven architecture.
-*   **CQRS (Command Query Responsibility Segregation)**: The asynchronous query pattern is a form of CQRS, separating the responsibility of writing data (ingestion) from reading it (querying).
-*   **Observability by Design**: As the service responsible for observability, it is, of course, thoroughly instrumented with its own tracing and metrics, providing full visibility into its own operations.
+- `health_data`: `List[HealthData]`
 
-## 5. Conclusion
+### `HealthQuery`
 
-The `observability_service` is a critical component that provides the visibility and insights necessary to operate a complex microservices ecosystem. Its scalable, decoupled, and event-driven architecture ensures that it can handle the vast amounts of telemetry data generated by a growing number of services, making it an indispensable tool for maintaining the health and performance of the entire system.
+Model for health data queries.
+
+**Fields:**
+
+- `service`: `Optional[str]`
+- `status`: `Optional[HealthStatus]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `limit`: `int`
+- `offset`: `int`
+
+### `HealthResponse`
+
+Response model for health operations.
+
+**Fields:**
+
+- `service`: `str`
+- `status`: `str`
+- `message`: `str`
+
+### `HealthStatistics`
+
+Health statistics model.
+
+**Fields:**
+
+- `total_checks`: `int`
+- `healthy_count`: `int`
+- `degraded_count`: `int`
+- `unhealthy_count`: `int`
+- `avg_latency_ms`: `float`
+- `service_count`: `int`
+- `services`: `List[str]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `ComponentHealth`
+
+Component health model for service health checks.
+
+**Fields:**
+
+- `status`: `HealthStatus`
+- `details`: `Dict[str, Any]`
+- `last_check`: `datetime`
+
+### `ServiceHealthResponse`
+
+Service health response model.
+
+**Fields:**
+
+- `service`: `str`
+- `status`: `HealthStatus`
+- `version`: `str`
+- `uptime_seconds`: `float`
+- `components`: `Dict[str, ComponentHealth]`
+
+### `DependencyData`
+
+Model for dependency check data ingestion.
+
+**Fields:**
+
+- `service`: `str`
+- `name`: `str`
+- `type`: `str`
+- `status`: `DependencyStatus`
+- `timestamp`: `Optional[datetime]`
+- `details`: `Dict[str, Any]`
+- `latency_ms`: `Optional[float]`
+
+### `DependencyDataBatch`
+
+Model for batch dependency data ingestion.
+
+**Fields:**
+
+- `dependency_data`: `List[DependencyData]`
+
+### `DependencyQuery`
+
+Model for dependency data queries.
+
+**Fields:**
+
+- `service`: `Optional[str]`
+- `name`: `Optional[str]`
+- `type`: `Optional[str]`
+- `status`: `Optional[DependencyStatus]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `limit`: `int`
+- `offset`: `int`
+
+### `DependencyResponse`
+
+Response model for dependency operations.
+
+**Fields:**
+
+- `name`: `str`
+- `status`: `str`
+- `message`: `str`
+
+### `DependencyStatistics`
+
+Dependency statistics model.
+
+**Fields:**
+
+- `total_checks`: `int`
+- `available_count`: `int`
+- `unavailable_count`: `int`
+- `degraded_count`: `int`
+- `avg_latency_ms`: `float`
+- `dependency_count`: `int`
+- `service_count`: `int`
+- `dependencies`: `List[str]`
+- `services`: `List[str]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `EventData`
+
+Model for event data ingestion.
+
+**Fields:**
+
+- `event_type`: `str`
+- `source_service`: `str`
+- `event_data`: `Dict[str, Any]`
+- `timestamp`: `Optional[datetime]`
+- `correlation_id`: `Optional[str]`
+- `severity`: `EventSeverity`
+- `metadata`: `Dict[str, Any]`
+
+### `EventDataBatch`
+
+Model for batch event data ingestion.
+
+**Fields:**
+
+- `events`: `List[EventData]`
+
+### `EventQuery`
+
+Model for event data queries.
+
+**Fields:**
+
+- `event_type`: `Optional[str]`
+- `source_service`: `Optional[str]`
+- `severity`: `Optional[EventSeverity]`
+- `correlation_id`: `Optional[str]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `limit`: `int`
+- `offset`: `int`
+
+### `EventResponse`
+
+Response model for event operations.
+
+**Fields:**
+
+- `event_type`: `str`
+- `status`: `str`
+- `message`: `str`
+
+### `EventStatistics`
+
+Event statistics model.
+
+**Fields:**
+
+- `total_events`: `int`
+- `info_count`: `int`
+- `warning_count`: `int`
+- `error_count`: `int`
+- `critical_count`: `int`
+- `event_type_count`: `int`
+- `service_count`: `int`
+- `event_types`: `List[str]`
+- `services`: `List[str]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `EventRequest`
+
+Model for event publishing requests.
+
+**Fields:**
+
+- `event_type`: `str`
+- `source_service`: `str`
+- `event_data`: `Dict[str, Any]`
+- `correlation_id`: `Optional[str]`
+- `metadata`: `Dict[str, Any]`
+- `channel`: `Optional[str]`
+- `headers`: `Dict[str, str]`
+
+### `EventPublishResponse`
+
+Response model for event publishing.
+
+**Fields:**
+
+- `event_id`: `str`
+- `status`: `str`
+- `message`: `str`
+- `channel`: `Optional[str]`
+
+### `MetricData`
+
+Model for metric data ingestion.
+
+**Fields:**
+
+- `name`: `str`
+- `value`: `float`
+- `timestamp`: `Optional[datetime]`
+- `service_name`: `str`
+- `aggregation`: `str`
+- `labels`: `Dict[str, str]`
+
+### `MetricDataBatch`
+
+Model for batch metric data ingestion.
+
+**Fields:**
+
+- `metrics`: `List[MetricData]`
+
+### `MetricQuery`
+
+Model for metric data queries.
+
+**Fields:**
+
+- `name`: `Optional[str]`
+- `service_name`: `Optional[str]`
+- `aggregation`: `Optional[str]`
+- `labels`: `Dict[str, str]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `limit`: `int`
+- `offset`: `int`
+
+### `MetricResponse`
+
+Response model for metric operations.
+
+**Fields:**
+
+- `name`: `str`
+- `status`: `str`
+- `message`: `str`
+
+### `MetricStatistics`
+
+Metric statistics model.
+
+**Fields:**
+
+- `total_metrics`: `int`
+- `gauge_count`: `int`
+- `counter_count`: `int`
+- `histogram_count`: `int`
+- `summary_count`: `int`
+- `metric_name_count`: `int`
+- `service_count`: `int`
+- `metric_names`: `List[str]`
+- `services`: `List[str]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `TraceData`
+
+Model for trace data ingestion.
+
+**Fields:**
+
+- `service`: `str`
+- `trace_id`: `str`
+- `span_id`: `str`
+- `parent_span_id`: `Optional[str]`
+- `name`: `str`
+- `kind`: `str`
+- `timestamp`: `Optional[datetime]`
+- `duration_ms`: `Optional[float]`
+- `attributes`: `Dict[str, Any]`
+- `events`: `List[Dict[str, Any]]`
+- `status_code`: `str`
+- `status_message`: `Optional[str]`
+
+### `TraceDataBatch`
+
+Model for batch trace data ingestion.
+
+**Fields:**
+
+- `traces`: `List[TraceData]`
+
+### `TraceQuery`
+
+Model for trace data queries.
+
+**Fields:**
+
+- `service`: `Optional[str]`
+- `trace_id`: `Optional[str]`
+- `span_id`: `Optional[str]`
+- `parent_span_id`: `Optional[str]`
+- `name`: `Optional[str]`
+- `kind`: `Optional[str]`
+- `status_code`: `Optional[str]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `min_duration_ms`: `Optional[float]`
+- `max_duration_ms`: `Optional[float]`
+- `limit`: `int`
+- `offset`: `int`
+
+### `TraceResponse`
+
+Response model for trace operations.
+
+**Fields:**
+
+- `trace_id`: `str`
+- `status`: `str`
+- `message`: `str`
+
+### `TraceStatistics`
+
+Trace statistics model.
+
+**Fields:**
+
+- `total_traces`: `int`
+- `error_count`: `int`
+- `error_rate`: `float`
+- `avg_duration_ms`: `float`
+- `service_count`: `int`
+- `services`: `List[str]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `QueryData`
+
+Model for advanced query data.
+
+**Fields:**
+
+- `query_id`: `str`
+- `query_type`: `str`
+- `parameters`: `Dict[str, Any]`
+- `timestamp`: `Optional[datetime]`
+
+### `QueryDataBatch`
+
+Model for batch query data.
+
+**Fields:**
+
+- `queries`: `List[QueryData]`
+
+### `QueryQuery`
+
+Model for advanced query parameters.
+
+**Fields:**
+
+- `data_types`: `List[str]`
+- `service`: `Optional[str]`
+- `start_time`: `Optional[datetime]`
+- `end_time`: `Optional[datetime]`
+- `correlation_id`: `Optional[str]`
+- `trace_id`: `Optional[str]`
+- `span_id`: `Optional[str]`
+- `parent_span_id`: `Optional[str]`
+- `metric_name`: `Optional[str]`
+- `event_type`: `Optional[str]`
+- `limit`: `int`
+- `offset`: `int`
+- `order_by`: `Optional[str]`
+- `order_direction`: `Optional[str]`
+
+### `QueryResponse`
+
+Response model for query operations.
+
+**Fields:**
+
+- `query_id`: `str`
+- `status`: `str`
+- `message`: `str`
+- `results`: `Dict[str, List[Dict[str, Any]]]`
+- `execution_time_ms`: `float`
+
+### `QueryStatistics`
+
+Query statistics model.
+
+**Fields:**
+
+- `total_queries`: `int`
+- `avg_execution_time_ms`: `float`
+- `data_type_counts`: `Dict[str, int]`
+- `service_counts`: `Dict[str, int]`
+- `start_time`: `datetime`
+- `end_time`: `datetime`
+
+### `MetricsIngestRequest`
+
+Model for metrics ingestion requests.
+
+**Fields:**
+
+- `service`: `str`
+- `timestamp`: `datetime`
+- `metrics`: `str`
+- `format`: `str`
+
+### `MetricsIngestResponse`
+
+Model for metrics ingestion responses.
+
+**Fields:**
+
+- `success`: `bool`
+- `message`: `str`
+- `metrics_count`: `Optional[int]`
+
+### `IncomingEvent`
+
+Generic model for an event received from the messaging service callback.
+
+**Fields:**
+
+- `event_type`: `str`
+- `event_data`: `Dict[str, Any]`
+- `source_service`: `str`
+- `timestamp`: `datetime`
+- `correlation_id`: `Optional[str]`
+- `message_id`: `Optional[str]`
+
