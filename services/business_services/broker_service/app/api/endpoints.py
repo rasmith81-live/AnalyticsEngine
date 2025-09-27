@@ -58,6 +58,15 @@ async def get_service_status(
     
     return status_info
 
+@router.post("/trading/stop-buys", status_code=status.HTTP_200_OK)
+async def stop_buy_orders():
+    """
+    Stops any further buy order executions.
+    """
+    logger.info("Received command to stop all buy orders.")
+    # In a real implementation, you would add logic here to halt buy orders.
+    return {"status": "success", "message": "Buy orders have been halted."}
+
 @router.post("/data/request", response_model=Dict[str, Any], status_code=status.HTTP_202_ACCEPTED)
 async def request_data(
     limit: int = Query(100, ge=1, le=1000),

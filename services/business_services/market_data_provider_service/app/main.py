@@ -36,6 +36,7 @@ from .metrics import (
     track_db_operation, track_domain_event, update_system_metrics,
     update_db_connection_metrics, export_metrics_to_observability
 )
+from .api import endpoints as api_router
 
 # Configure logging
 logging.basicConfig(
@@ -46,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
+streaming_task: Optional[asyncio.Task] = None
+streaming_active = False
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -124,6 +127,19 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        if messaging_client:
+            await messaging_client.close()
+                # Stop the streaming task if it's running
+        if streaming_task:
+            logger.info("Stopping market data streaming task...")
+            global streaming_active
+            streaming_active = False
+            streaming_task.cancel()
+            try:
+                await streaming_task
+            except asyncio.CancelledError:
+                logger.info("Market data streaming task cancelled.")
+
         if messaging_client:
             await messaging_client.close()
         logger.info("Service B shutdown complete")
@@ -723,6 +739,8 @@ async def process_event(event: EventCallback) -> bool:
             # Handle different event types
             if event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
+            elif event_type in ["StartMarketDataStream", "StopMarketDataStream"]:
+                return await process_trading_command(event_type, event_data)
             elif event_type and event_type.startswith("service_b."):
                 return await process_service_b_event(event_type, event_data)
             else:
@@ -778,6 +796,69 @@ async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> boo
 
 
 @trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
+async def stream_market_data():
+    """
+    Background task to stream market data.
+    """
+    global streaming_active, messaging_client
+    logger.info("Market data streaming task started.")
+    while streaming_active:
+        try:
+            # In a real implementation, you would fetch market data from a live source.
+            market_data = {
+                "symbol": "AAPL",
+                "price": 150.00,
+                "volume": 1000,
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+            
+            if messaging_client:
+                await messaging_client.publish_event(
+                    event_type="market.data.stream",
+                    event_data=market_data
+                )
+                logger.debug(f"Published market data for {market_data['symbol']}")
+            
+            await asyncio.sleep(1)  # Publish every second
+            
+        except Exception as e:
+            logger.error(f"Error during market data streaming: {e}")
+            await asyncio.sleep(10)
+            
+    logger.info("Market data streaming task stopped.")
+
+async def start_streaming():
+    global streaming_active, streaming_task
+    if not streaming_active:
+        streaming_active = True
+        streaming_task = asyncio.create_task(stream_market_data())
+        logger.info("Market data streaming initiated by command.")
+        return True
+    logger.warning("Attempted to start streaming when it was already active.")
+    return False
+
+async def stop_streaming():
+    global streaming_active, streaming_task
+    if streaming_active:
+        streaming_active = False
+        if streaming_task:
+            streaming_task.cancel()
+        logger.info("Market data streaming stopped by command.")
+        return True
+    logger.warning("Attempted to stop streaming when it was not active.")
+    return False
+
+async def process_trading_command(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process trading-related commands."""
+    if event_type == "StartMarketDataStream":
+        await start_streaming()
+    elif event_type == "StopMarketDataStream":
+        await stop_streaming()
+    else:
+        logger.warning(f"Unknown trading command type: {event_type}")
+        return False
+    return True
+
 async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
     """Process events from Service B."""
     try:
@@ -806,6 +887,8 @@ async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -
         logger.error(f"Failed to process Service B event: {e}")
         return False
 
+
+app.include_router(api_router.router, prefix="/api", tags=["MarketData"])
 
 if __name__ == "__main__":
     import uvicorn

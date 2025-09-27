@@ -36,6 +36,7 @@ from .metrics import (
     track_db_operation, track_domain_event, update_system_metrics,
     update_db_connection_metrics, export_metrics_to_observability
 )
+from .api import endpoints as api_router
 
 # Configure logging
 logging.basicConfig(
@@ -725,6 +726,8 @@ async def process_event(event: EventCallback) -> bool:
             # Handle different event types
             if event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
+            elif event_type == "HaltBuyOrders":
+                return await process_trading_command(event_type, event_data)
             elif event_type and event_type.startswith("service_b."):
                 return await process_service_b_event(event_type, event_data)
             else:
@@ -779,20 +782,30 @@ async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> boo
         return False
 
 
-@trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
-async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process events from Service B."""
+@trace_method(name="process_broker_event", kind=SpanKind.CONSUMER)
+async def process_trading_command(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process trading-related commands."""
+    if event_type == "HaltBuyOrders":
+        logger.info("Received HaltBuyOrders command. Halting all new buy orders.")
+        # In a real implementation, you would add logic here to halt buy orders.
+    else:
+        logger.warning(f"Unknown trading command type: {event_type}")
+        return False
+    return True
+
+async def process_broker_event(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process events from Broker."""
     try:
         correlation_id = event_data.get("correlation_id")
         
         # Add span attributes for service B event processing
         add_span_attributes({
             "messaging.event_type": event_type,
-            "messaging.source_service": "service_b",
+            "messaging.source_service": "broker_service",
             "correlation_id": correlation_id
         })
         
-        logger.info(f"Processing Service B event: {event_type}")
+        logger.info(f"Processing Broker event: {event_type}")
         
         # Add cross-service communication logic here
         # This demonstrates how services can react to events from other services
@@ -808,6 +821,8 @@ async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -
         logger.error(f"Failed to process Service B event: {e}")
         return False
 
+
+app.include_router(api_router.router, prefix="/api", tags=["Broker"])
 
 if __name__ == "__main__":
     import uvicorn
