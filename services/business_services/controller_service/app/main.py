@@ -37,6 +37,7 @@ from .metrics import (
     update_db_connection_metrics, export_metrics_to_observability
 )
 from .api import endpoints as api_router
+from .session_monitor import SessionMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
+session_monitor: Optional[SessionMonitor] = None
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -86,6 +88,10 @@ async def lifespan(app: FastAPI):
             retries=settings.messaging_service_retries
         )
         await messaging_client.initialize()
+
+        # Initialize and start session monitor
+        session_monitor = SessionMonitor()
+        await session_monitor.start()
         
         # Set up event subscriptions if enabled
         if settings.subscribe_to_events:
@@ -127,6 +133,9 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        if session_monitor:
+            await session_monitor.stop()
+
         if messaging_client:
             await messaging_client.close()
         logger.info("Service A shutdown complete")

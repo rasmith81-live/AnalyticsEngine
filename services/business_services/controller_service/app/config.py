@@ -47,6 +47,27 @@ class Settings(BaseSettings):
         description="Database service request retries"
     )
     
+    # News Provider Service Configuration
+    news_provider_service_url: str = Field(
+        default="http://news_provider_service:8000",
+        env="NEWS_PROVIDER_SERVICE_URL",
+        description="URL for the business_services/news_provider_service"
+    )
+
+    # Market Data Provider Service Configuration
+    market_data_provider_service_url: str = Field(
+        default="http://market_data_provider_service:8000",
+        env="MARKET_DATA_PROVIDER_SERVICE_URL",
+        description="URL for the business_services/market_data_provider_service"
+    )
+
+    # Broker Service Configuration
+    broker_service_url: str = Field(
+        default="http://broker_service:8000",
+        env="BROKER_SERVICE_URL",
+        description="URL for the business_services/broker_service"
+    )
+
     # Messaging Service Configuration
     messaging_service_url: str = Field(
         default="http://messaging_service:8001",

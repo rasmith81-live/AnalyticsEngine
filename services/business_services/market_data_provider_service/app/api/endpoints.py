@@ -7,7 +7,8 @@ This module provides the API endpoints for Market Data Provider Service function
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
+import asyncio
 from pydantic import BaseModel, Field
 
 from ..messaging_client import MessagingClient, get_messaging_client
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize router
 router = APIRouter()
+
 
 @router.get("/status", response_model=Dict[str, Any])
 async def get_service_status(
@@ -57,6 +59,7 @@ async def get_service_status(
         status_info["status"] = "degraded"
     
     return status_info
+
 
 @router.post("/data/request", response_model=Dict[str, Any], status_code=status.HTTP_202_ACCEPTED)
 async def request_data(

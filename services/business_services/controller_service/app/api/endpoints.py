@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 from ..messaging_client import MessagingClient, get_messaging_client
 from ..models import DataModel, CommandModel, ResponseModel
 from ..config import get_settings
+from ..session_monitor import SessionMonitor, TradingSession
+from ..main import session_monitor
 import httpx
 
 # Configure logging
@@ -166,6 +168,7 @@ async def call_news_provider_api(endpoint: str, method: str = "POST"):
                 detail="Could not connect to the news provider service."
             )
 
+
 @router.post("/news/stream/start", status_code=status.HTTP_200_OK)
 async def start_news_stream():
     """
@@ -179,3 +182,56 @@ async def stop_news_stream():
     Stops the news stream in the news provider service.
     """
     return await call_news_provider_api("/stream/stop")
+
+def get_session_monitor() -> SessionMonitor:
+    """Dependency to get session monitor instance."""
+    if session_monitor is None:
+        raise HTTPException(status_code=503, detail="Session monitor not initialized")
+    return session_monitor
+
+@router.get("/session/status", response_model=Dict[str, TradingSession])
+async def get_session_status(
+    monitor: SessionMonitor = Depends(get_session_monitor)
+):
+    """
+    Get the current NYSE trading session status.
+    """
+    return {"session": monitor.current_session}
+
+@router.post("/trading/start", status_code=status.HTTP_202_ACCEPTED)
+async def start_trading(
+    monitor: SessionMonitor = Depends(get_session_monitor),
+    messaging_client: MessagingClient = Depends(get_messaging_client)
+):
+    """
+    Publishes a command to start the market data stream if the market is open.
+    """
+    if monitor.current_session == TradingSession.CLOSED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Market is closed. Cannot start trading."
+        )
+    
+    await messaging_client.publish_command(
+        command_type="StartMarketDataStream",
+        payload={}
+    )
+    
+    return {"status": "accepted", "message": "Start market data stream command published."}
+
+@router.post("/trading/stop", status_code=status.HTTP_202_ACCEPTED)
+async def stop_trading(messaging_client: MessagingClient = Depends(get_messaging_client)):
+    """
+    Publishes commands to stop the market data stream and halt buy orders.
+    """
+    await messaging_client.publish_command(
+        command_type="StopMarketDataStream",
+        payload={}
+    )
+    
+    await messaging_client.publish_command(
+        command_type="HaltBuyOrders",
+        payload={}
+    )
+    
+    return {"status": "accepted", "message": "Stop trading commands published."}
