@@ -124,12 +124,15 @@ def update_model_docs():
 
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef) and 'BaseModel' in [getattr(b, 'id', None) for b in node.bases]:
-            # Simple heuristic: if it has a '__table_args__' with an Index on a time column, it's likely a hypertable model.
+            # Heuristic: if the model has a DateTime column with 'time' or 'date' in the name, it's likely a hypertable.
             is_hypertable = False
-            for item in node.body:
-                if isinstance(item, ast.Assign) and item.targets[0].id == '__table_args__':
-                    is_hypertable = True
-                    break
+            for field_node in node.body:
+                if isinstance(field_node, ast.AnnAssign):
+                    field_name = field_node.target.id
+                    field_type_str = ast.unparse(field_node.annotation)
+                    if 'datetime' in field_type_str.lower() and ('time' in field_name.lower() or 'date' in field_name.lower()):
+                        is_hypertable = True
+                        break
             
             if is_hypertable:
                 print(f"  Processing model: {node.name}")
