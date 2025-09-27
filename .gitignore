@@ -1,0 +1,15 @@
+# PYTHON CACHE FILES
+*.pyc
+__pycache__/
+
+# ROOT TEST FILES
+/test*.py
+
+# VENV
+.venv
+
+# VSCODE
+.vscode/
+
+# ENVIRONMENT VARIABLES
+.env
