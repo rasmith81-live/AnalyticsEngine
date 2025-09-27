@@ -1,42 +1,100 @@
-# Architectural Analysis Report: `archival_service`
+# Archival Service
 
-## 1. Executive Summary
+## Overview
 
-The `archival_service` is a robust, event-driven microservice responsible for the entire data archival lifecycle. It is designed to consume archival events from the `database_service`, process and extract data from TimescaleDB, and store it efficiently in a long-term lakehouse solution (Azure Data Lake). The service is architecturally consistent with other backend services, featuring a scalable, asynchronous design, comprehensive observability, and a well-defined API for management and monitoring.
+Archival Service - Main Application
 
-## 2. Core Architectural Pillars
+This service subscribes to archival events from the Database Service via Redis,
+processes data archival requests, and stores data in a lakehouse format.
 
-The service's architecture is built on the following key principles:
+## Data Models
 
-*   **Event-Driven Architecture**: The service's primary workflow is triggered by `archival.events` consumed from a Redis message bus. This decouples it from the `database_service` and allows for resilient, asynchronous processing of archival tasks.
+### `ArchivalEvent`
 
-*   **Data Lakehouse Integration**: The service is tightly integrated with a data lakehouse (Azure Data Lake), using it as the destination for all archived data. Data is stored in Parquet format, which is optimized for analytics and long-term storage.
+Event model for data archival requests.
 
-*   **Comprehensive Observability**: Every layer of the service is instrumented with OpenTelemetry for distributed tracing and Prometheus for metrics. This provides deep visibility into event processing, data extraction, and storage operations, which is essential for monitoring and debugging.
+**Fields:**
 
-*   **Asynchronous Processing**: The service leverages `asyncio` for all I/O-bound operations, including handling API requests, consuming Redis messages, and interacting with the database and data lake. This ensures high performance and scalability.
+- `event_id`: `str`
+- `table_name`: `str`
+- `chunks`: `List[Dict[str, Any]]`
+- `status`: `ArchivalStatus`
+- `created_at`: `datetime`
+- `error_message`: `Optional[str]`
 
-## 3. Key Components and Their Roles
+### `ArchivalConfirmation`
 
-*   **`main.py` (Service Entrypoint)**: Initializes the FastAPI application, manages the service lifecycle (startup/shutdown), and subscribes to the Redis topic for archival events. It orchestrates the initialization of all other components.
+Confirmation model for completed archival operations.
 
-*   **`archival_processor.py` (Core Logic)**: Contains the `ArchivalProcessor` class, which encapsulates the core business logic. This includes extracting data from TimescaleDB chunks, transforming it into Parquet format, and writing it to the Azure Data Lake.
+**Fields:**
 
-*   **`lakehouse_client.py` (Storage Client)**: Provides a dedicated client for interacting with the Azure Data Lake, abstracting away the details of the Azure SDK.
+- `event_id`: `str`
+- `status`: `ArchivalStatus`
+- `completed_at`: `datetime`
+- `lakehouse_path`: `Optional[str]`
+- `error_message`: `Optional[str]`
 
-*   **`messaging_client.py` (Event Consumer)**: Manages the connection to Redis and handles the consumption of archival events.
+### `ChunkInfo`
 
-*   **`api/` (API Endpoints)**: The API is cleanly separated into modules for `dashboarding`, `management`, and `monitoring`, providing a well-structured interface for interacting with the service.
+TimescaleDB chunk information.
 
-## 4. Architectural Consistency and Best Practices
+**Fields:**
 
-The `archival_service` aligns perfectly with the architectural patterns observed in other services within the ecosystem:
+- `chunk_name`: `str`
+- `chunk_id`: `int`
+- `range_start`: `Optional[datetime]`
+- `range_end`: `Optional[datetime]`
 
-*   **Consistency**: It follows the same patterns of event-driven communication, asynchronous processing, dependency injection, and comprehensive observability as the `database_service`.
-*   **Separation of Concerns**: The codebase is well-organized, with distinct modules for the API, core logic, data models, and infrastructure clients.
-*   **Scalability**: The asynchronous, event-driven design allows the service to scale horizontally to handle a high volume of archival events.
-*   **Maintainability**: The clean architecture and detailed instrumentation make the service easy to understand, maintain, and extend.
+### `ArchivalMetrics`
 
-## 5. Conclusion
+Metrics for archival operations.
 
-The `archival_service` is a well-architected and essential component of the data management strategy. It provides a reliable and scalable solution for moving data from active storage in TimescaleDB to a cost-effective, long-term lakehouse solution. Its design ensures that historical data remains accessible for analysis while reducing the load on the primary database.
+**Fields:**
+
+- `total_events`: `int`
+- `completed_events`: `int`
+- `failed_events`: `int`
+- `processing_events`: `int`
+- `average_processing_time_seconds`: `float`
+- `total_chunks_archived`: `int`
+- `total_bytes_archived`: `int`
+- `timestamp`: `datetime`
+
+### `HealthResponse`
+
+Health check response model.
+
+**Fields:**
+
+- `status`: `str`
+- `messaging_connected`: `bool`
+- `lakehouse_connected`: `bool`
+- `active_archival_events`: `int`
+- `timestamp`: `datetime`
+- `monitoring_health`: `Optional[Dict[str, Any]]`
+- `management_health`: `Optional[Dict[str, Any]]`
+
+### `ArchivalQuery`
+
+Query model for archived data.
+
+**Fields:**
+
+- `table_name`: `str`
+- `time_range_start`: `Optional[datetime]`
+- `time_range_end`: `Optional[datetime]`
+- `filters`: `Optional[Dict[str, Any]]`
+- `limit`: `int`
+
+### `ArchivalQueryResult`
+
+Result model for archived data queries.
+
+**Fields:**
+
+- `query`: `ArchivalQuery`
+- `data_paths`: `List[str]`
+- `record_count`: `int`
+- `execution_time_seconds`: `float`
+- `timestamp`: `datetime`
+

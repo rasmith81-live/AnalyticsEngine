@@ -1,43 +1,276 @@
-# Architectural Analysis Report: `messaging_service`
+# Messaging Service
 
-## 1. Executive Summary
+## Overview
 
-The `messaging_service` is the central nervous system of the microservices ecosystem, providing a centralized and reliable platform for asynchronous communication. Built on Redis pub/sub, it decouples services by managing the entire lifecycle of event publishing and subscriptions. The service is designed for high performance, scalability, and observability, ensuring that inter-service communication is both resilient and transparent.
+Messaging Service - Centralized Redis pub/sub messaging for microservices.
 
-## 2. Core Architectural Pillars
+This service consolidates all messaging functionality:
+- Event publishing and subscription management
+- Redis pub/sub operations
+- Message routing and delivery
+- Webhook notifications
+- Dead letter queue handling
 
-The service's architecture is founded on these key principles:
+## Data Models
 
-*   **Centralized Pub/Sub**: By consolidating all Redis pub/sub logic, the service provides a single, consistent interface for all microservices to publish and consume events. This simplifies the architecture of other services and ensures that messaging patterns are standardized across the ecosystem.
+### `MessageMetadata`
 
-*   **Reliable Delivery**: The service incorporates critical reliability patterns, including webhook-based delivery, message acknowledgments, automatic retries, and a dead-letter queue (DLQ) for messages that fail to be processed. This guarantees that messages are not lost and provides mechanisms for handling failures gracefully.
+Message metadata.
 
-*   **Comprehensive Observability**: Every aspect of the service is instrumented with OpenTelemetry for distributed tracing and Prometheus for metrics. This provides end-to-end visibility into the flow of messages, from publication to delivery and acknowledgment, which is crucial for debugging and monitoring the health of the entire system.
+**Fields:**
 
-*   **Asynchronous and Scalable**: The service is built with `asyncio`, enabling it to handle a large volume of concurrent messages and subscriptions efficiently. Its design allows for horizontal scaling to meet the demands of a growing number of microservices.
+- `message_id`: `str`
+- `correlation_id`: `Optional[str]`
+- `reply_to`: `Optional[str]`
+- `content_type`: `str`
+- `content_encoding`: `Optional[str]`
+- `priority`: `MessagePriority`
+- `ttl`: `Optional[int]`
+- `timestamp`: `datetime`
+- `headers`: `Dict[str, Any]`
 
-## 3. Key Components and Their Roles
+### `PublishMessageRequest`
 
-*   **`main.py` (Service Entrypoint)**: Initializes the FastAPI application and orchestrates the lifecycle of the core components. It exposes the API endpoints for publishing messages and managing subscriptions.
+Request to publish a message.
 
-*   **`event_publisher.py` (Event Publisher)**: The `EventPublisher` class provides a robust interface for publishing messages. It handles serialization (JSON), compression (gzip), and persistence of messages in Redis, ensuring that event data is handled efficiently and reliably.
+**Fields:**
 
-*   **`subscription_manager.py` (Subscription Manager)**: The `SubscriptionManager` is the heart of the service, managing the entire subscription lifecycle. It handles the creation and cancellation of subscriptions, listens for messages on Redis channels, and dispatches them to subscribers via webhooks. It also manages the acknowledgment process and the dead-letter queue.
+- `channel`: `str`
+- `payload`: `Union[Dict[str, Any], str, bytes]`
+- `metadata`: `Optional[MessageMetadata]`
+- `service_name`: `str`
+- `persistent`: `bool`
 
-*   **API Endpoints**: The service exposes a clear and concise API for:
-    *   Publishing individual and bulk messages.
-    *   Creating and canceling subscriptions.
-    *   Retrieving the status and metrics of channels and subscriptions.
-    *   Health checks.
+### `PublishMessageResponse`
 
-## 4. Architectural Consistency and Best Practices
+Response from publishing a message.
 
-The `messaging_service` is a prime example of a well-designed, centralized infrastructure service. It adheres to the same high standards of architectural consistency seen in other services:
+**Fields:**
 
-*   **Standardization**: It enforces a standard approach to asynchronous communication, which promotes consistency and reduces boilerplate code in other services.
-*   **Decoupling**: It effectively decouples services, allowing them to evolve independently without breaking communication pathways.
-*   **Observability**: Its deep integration with tracing and metrics makes it a cornerstone of the ecosystem's overall observability strategy.
+- `success`: `bool`
+- `message_id`: `str`
+- `channel`: `str`
+- `timestamp`: `datetime`
+- `correlation_id`: `str`
+- `error`: `Optional[str]`
 
-## 5. Conclusion
+### `BulkPublishRequest`
 
-The `messaging_service` is a critical piece of infrastructure that enables a scalable and resilient microservices architecture. By providing a centralized, reliable, and observable messaging backbone, it empowers other services to communicate effectively and asynchronously, which is essential for building a complex, distributed system.
+Request to publish multiple messages.
+
+**Fields:**
+
+- `messages`: `List[PublishMessageRequest]`
+- `service_name`: `str`
+- `fail_on_error`: `bool`
+
+### `BulkPublishResponse`
+
+Response from bulk publishing.
+
+**Fields:**
+
+- `success`: `bool`
+- `published_count`: `int`
+- `failed_count`: `int`
+- `results`: `List[PublishMessageResponse]`
+
+### `SubscriptionRequest`
+
+Request to create a subscription.
+
+**Fields:**
+
+- `service_name`: `str`
+- `callback_url`: `str`
+- `channel`: `Optional[str]`
+- `channel_pattern`: `Optional[str]`
+- `filter_criteria`: `Optional[Dict[str, Any]]`
+- `headers`: `Optional[Dict[str, str]]`
+- `max_retries`: `int`
+- `retry_delay`: `int`
+
+### `SubscriptionResponse`
+
+Response from creating a subscription.
+
+**Fields:**
+
+- `success`: `bool`
+- `subscription_id`: `str`
+- `channel`: `Optional[str]`
+- `channel_pattern`: `Optional[str]`
+- `service_name`: `str`
+- `status`: `SubscriptionStatus`
+- `created_at`: `datetime`
+- `error`: `Optional[str]`
+
+### `SubscriptionInfo`
+
+Subscription information.
+
+**Fields:**
+
+- `subscription_id`: `str`
+- `channel_pattern`: `str`
+- `service_name`: `str`
+- `status`: `SubscriptionStatus`
+- `callback_url`: `Optional[str]`
+- `max_delivery_attempts`: `int`
+- `ack_timeout`: `int`
+- `batch_size`: `int`
+- `auto_ack`: `bool`
+- `created_at`: `datetime`
+- `last_activity`: `Optional[datetime]`
+- `message_count`: `int`
+- `error_count`: `int`
+
+### `MessageAcknowledgment`
+
+Message acknowledgment.
+
+**Fields:**
+
+- `message_id`: `str`
+- `subscription_id`: `str`
+- `success`: `bool`
+- `error`: `Optional[str]`
+
+### `MessageDelivery`
+
+Message delivery information.
+
+**Fields:**
+
+- `message_id`: `str`
+- `subscription_id`: `str`
+- `channel`: `str`
+- `payload`: `Union[Dict[str, Any], str]`
+- `metadata`: `MessageMetadata`
+- `delivery_attempt`: `int`
+- `max_attempts`: `int`
+- `delivered_at`: `datetime`
+
+### `ChannelInfo`
+
+Channel information.
+
+**Fields:**
+
+- `name`: `str`
+- `subscriber_count`: `int`
+- `message_count`: `int`
+- `last_activity`: `Optional[datetime]`
+- `created_at`: `datetime`
+
+### `ChannelStats`
+
+Channel statistics.
+
+**Fields:**
+
+- `name`: `str`
+- `messages_published`: `int`
+- `messages_delivered`: `int`
+- `messages_failed`: `int`
+- `active_subscriptions`: `int`
+- `avg_delivery_time`: `float`
+- `last_24h_activity`: `int`
+
+### `EventRequest`
+
+Request to publish an event.
+
+**Fields:**
+
+- `event_type`: `str`
+- `source_service`: `str`
+- `event_data`: `Dict[str, Any]`
+- `correlation_id`: `Optional[str]`
+- `metadata`: `Dict[str, Any]`
+
+### `EventResponse`
+
+Response from publishing an event.
+
+**Fields:**
+
+- `success`: `bool`
+- `event_id`: `str`
+- `event_type`: `str`
+- `published_at`: `datetime`
+- `channels`: `List[str]`
+- `error`: `Optional[str]`
+
+### `PublishCommandRequest`
+
+Request to publish a command.
+
+**Fields:**
+
+- `command_type`: `str`
+- `payload`: `Dict[str, Any]`
+- `service_name`: `str`
+- `correlation_id`: `Optional[str]`
+- `metadata`: `Optional[Dict[str, Any]]`
+
+### `CommandReceipt`
+
+Receipt for a successfully published command.
+
+**Fields:**
+
+- `success`: `bool`
+- `command_id`: `str`
+- `timestamp`: `datetime`
+- `correlation_id`: `str`
+- `error`: `Optional[str]`
+
+### `HealthResponse`
+
+Health check response.
+
+**Fields:**
+
+- `status`: `str`
+- `timestamp`: `datetime`
+- `redis_connected`: `bool`
+- `active_subscriptions`: `int`
+- `active_channels`: `int`
+- `uptime_seconds`: `float`
+- `version`: `str`
+- `environment`: `str`
+- `service_name`: `str`
+- `error`: `Optional[str]`
+- `correlation_id`: `str`
+
+### `MetricsResponse`
+
+Metrics response.
+
+**Fields:**
+
+- `service_name`: `str`
+- `timestamp`: `datetime`
+- `total_messages_published`: `int`
+- `total_messages_delivered`: `int`
+- `total_messages_failed`: `int`
+- `active_subscriptions`: `int`
+- `active_channels`: `int`
+- `redis_memory_usage`: `Optional[int]`
+- `avg_message_size`: `float`
+- `messages_per_second`: `float`
+- `error_rate`: `float`
+
+### `ErrorResponse`
+
+Error response.
+
+**Fields:**
+
+- `error`: `str`
+- `error_code`: `Optional[str]`
+- `timestamp`: `datetime`
+- `request_id`: `Optional[str]`
+- `details`: `Optional[Dict[str, Any]]`
+
