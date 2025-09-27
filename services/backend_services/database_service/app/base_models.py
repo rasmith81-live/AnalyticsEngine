@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypeVar, Generic
 
-from sqlalchemy import Column, DateTime, Integer, String, func
+from sqlalchemy import Column, DateTime, Integer, String, func, Text, Index, Float
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -121,3 +122,17 @@ class ReadBase(Generic[T]):
     def from_entities(cls, entities: List[T]) -> List['ReadBase[T]']:
         """Create read models from entities."""
         return [cls(entity) for entity in entities]
+
+class NewsArticle(BaseModel):
+    __tablename__ = 'news_articles'
+
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    related_tickers: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=True)
+    article_type: Mapped[str] = mapped_column(String(255), nullable=True)
+    sentiment: Mapped[float] = mapped_column(Float, nullable=True)
+
+    __table_args__ = (Index('ix_news_articles_published_at', 'published_at'),)
+

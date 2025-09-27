@@ -254,7 +254,7 @@ class RetentionManager:
             raise
     
     @trace_method(name="retention_manager._identify_chunks_for_archival")
-    async def _identify_chunks_for_archival(self, table_name: str) -> List[Dict[str, Any]]:
+    async def _identify_chunks_for_archival(self, table_name: str, retention_period_days: int) -> List[Dict[str, Any]]:
         """Identify chunks that are ready for archival.
         
         Args:
@@ -273,7 +273,7 @@ class RetentionManager:
         })
         
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=self.retention_period_days)
+            cutoff_date = datetime.utcnow() - timedelta(days=retention_period_days)
             
             async with self.engine.begin() as conn:
                 # Query for chunks older than retention period
@@ -577,7 +577,7 @@ class RetentionManager:
             raise
     
     @trace_method(name="retention_manager.manually_trigger_archival")
-    async def manually_trigger_archival(self, table_name: Optional[str] = None) -> Dict[str, Any]:
+    async def manually_trigger_archival(self, table_name: Optional[str] = None, retention_period_days: Optional[int] = None) -> Dict[str, Any]:
         """Manually trigger the archival process.
         
         Args:
@@ -610,8 +610,10 @@ class RetentionManager:
             total_chunks = 0
             tables_with_chunks = 0
             
+            retention_days = retention_period_days if retention_period_days is not None else self.retention_period_days
+
             for table, policy in hypertables:
-                chunks = await self._identify_chunks_for_archival(table)
+                chunks = await self._identify_chunks_for_archival(table, retention_days)
                 if chunks:
                     event_id = await self._publish_archival_event(table, chunks)
                     

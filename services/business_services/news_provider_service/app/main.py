@@ -36,6 +36,7 @@ from .metrics import (
     track_db_operation, track_domain_event, update_system_metrics,
     update_db_connection_metrics, export_metrics_to_observability
 )
+from .api import endpoints as api_router
 
 # Configure logging
 logging.basicConfig(
@@ -806,6 +807,8 @@ async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -
         logger.error(f"Failed to process Service B event: {e}")
         return False
 
+
+app.include_router(api_router.router, prefix="/api", tags=["News Provider"])
 
 if __name__ == "__main__":
     import uvicorn

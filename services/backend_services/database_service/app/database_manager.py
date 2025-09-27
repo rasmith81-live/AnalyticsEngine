@@ -17,7 +17,7 @@ from sqlalchemy.pool import QueuePool
 import redis.asyncio as redis
 
 from .config import DatabaseServiceSettings
-from .base_models import Base
+from .base_models import Base, NewsArticle
 from .telemetry import trace_method, add_span_attributes, inject_trace_context
 
 logger = logging.getLogger(__name__)
@@ -514,6 +514,38 @@ class DatabaseManager:
             })
             
             logger.error(f"Failed to create hypertable {table_name}: {str(e)}")
+            raise
+
+    async def create_news_articles_hypertable(self, correlation_id: Optional[str] = None):
+        """Create and configure the news_articles hypertable."""
+        try:
+            async with self.async_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all, tables=[NewsArticle.__table__])
+            
+            await self.create_hypertable(
+                table_name='news_articles',
+                time_column='published_at',
+                chunk_interval='1 day',
+                compression_enabled=True,
+                retention_period='30 days',
+                correlation_id=correlation_id
+            )
+            logger.info("Successfully created and configured 'news_articles' hypertable.")
+        except Exception as e:
+            logger.error(f"Failed to create 'news_articles' hypertable: {e}")
+            raise
+
+    async def insert_news_article(self, article_data: Dict[str, Any], correlation_id: Optional[str] = None):
+        """Insert a new news article into the database."""
+        try:
+            async with self.session_factory() as session:
+                async with session.begin():
+                    article = NewsArticle(**article_data)
+                    session.add(article)
+                    await session.commit()
+                logger.info(f"Inserted news article with headline: {article_data.get('headline')}")
+        except Exception as e:
+            logger.error(f"Failed to insert news article: {e}")
             raise
     
     @trace_method(name="run_migrations", kind="CLIENT")
