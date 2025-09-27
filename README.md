@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project extends to base-platforn into an automated trading platform called MarketNovaTrader.
+This project extends the base-platforn into an automated trading platform called MarketNovaTrader.
 
 ## Architecture
 
