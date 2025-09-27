@@ -29,6 +29,7 @@ from .retention_manager import RetentionManager
 from .messaging_client import MessagingClient
 from .telemetry_consumers import TelemetryEventConsumer
 from .command_consumers import CommandConsumer
+from .news_consumer import NewsConsumer
 from .models import (
     QueryRequest, QueryResponse, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
@@ -51,6 +52,7 @@ retention_manager = None
 messaging_client = None
 telemetry_consumer = None
 command_consumer = None
+news_consumer = None
 service_start_time = datetime.utcnow()
 
 # Background task cancellation handles
@@ -128,9 +130,17 @@ async def lifespan(app: FastAPI):
         # Initialize and start command consumers
         command_consumer = CommandConsumer(
             database_manager=database_manager,
-            messaging_client=messaging_client
+            messaging_client=messaging_client,
+            retention_manager=retention_manager
         )
         await command_consumer.start()
+
+        # Initialize and start news consumer
+        news_consumer = NewsConsumer(
+            database_manager=database_manager,
+            messaging_client=messaging_client
+        )
+        await news_consumer.start()
         
         # Start background tasks for metrics
         if settings.enable_prometheus_metrics:
@@ -236,6 +246,10 @@ async def lifespan(app: FastAPI):
         # Stop command event consumers
         if command_consumer:
             await command_consumer.stop()
+
+        # Stop news consumer
+        if news_consumer:
+            await news_consumer.stop()
         
         # Stop retention manager
         if retention_manager:

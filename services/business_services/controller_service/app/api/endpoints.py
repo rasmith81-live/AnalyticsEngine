@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 from ..messaging_client import MessagingClient, get_messaging_client
 from ..models import DataModel, CommandModel, ResponseModel
+from ..config import get_settings
+import httpx
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -142,3 +144,38 @@ async def execute_command(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to execute command: {str(e)}"
         )
+
+async def call_news_provider_api(endpoint: str, method: str = "POST"):
+    settings = get_settings()
+    news_provider_url = f"{settings.news_provider_service_url}/api{endpoint}"
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.request(method, news_provider_url)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error calling news provider service: {e.response.text}")
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=f"Error from news provider service: {e.response.text}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error calling news provider service: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not connect to the news provider service."
+            )
+
+@router.post("/news/stream/start", status_code=status.HTTP_200_OK)
+async def start_news_stream():
+    """
+    Starts the news stream in the news provider service.
+    """
+    return await call_news_provider_api("/stream/start")
+
+@router.post("/news/stream/stop", status_code=status.HTTP_200_OK)
+async def stop_news_stream():
+    """
+    Stops the news stream in the news provider service.
+    """
+    return await call_news_provider_api("/stream/stop")

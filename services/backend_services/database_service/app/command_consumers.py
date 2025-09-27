@@ -9,6 +9,7 @@ import asyncio
 from typing import Dict, Any
 
 from .database_manager import DatabaseManager
+from .retention_manager import RetentionManager
 from .messaging_client import MessagingClient
 from .telemetry import trace_method, add_span_attributes
 
@@ -18,8 +19,9 @@ logger = logging.getLogger(__name__)
 class CommandConsumer:
     """Consumer for processing command events."""
 
-    def __init__(self, database_manager: DatabaseManager, messaging_client: MessagingClient):
+    def __init__(self, database_manager: DatabaseManager, messaging_client: MessagingClient, retention_manager: RetentionManager):
         self.database_manager = database_manager
+        self.retention_manager = retention_manager
         self.messaging_client = messaging_client
         self.running = False
         self.consumer_tasks = []
@@ -34,6 +36,7 @@ class CommandConsumer:
 
         try:
             await self._consume_create_item_commands()
+            await self._consume_archive_commands()
             # Add other command consumers here
             logger.info("Successfully subscribed to all command topics.")
         except Exception as e:
@@ -93,4 +96,27 @@ class CommandConsumer:
         except Exception as e:
             logger.error(f"Failed to handle CreateItemCommand: {e}")
             # Optionally, publish an error event
+            raise
+
+    async def _consume_archive_commands(self):
+        """Subscribe to ArchiveCommand events."""
+        await self.messaging_client.subscribe(
+            topic="command.database_service.archive",
+            callback=self._handle_archive_command
+        )
+
+    async def _handle_archive_command(self, event_data: Dict[str, Any]):
+        """Handle ArchiveCommand event."""
+        try:
+            parameters = event_data.get("parameters", {})
+            age_days = parameters.get("age_days", 1)
+
+            await self.retention_manager.manually_trigger_archival(
+                table_name='news_articles',
+                retention_period_days=age_days
+            )
+
+            logger.info(f"Processed archive command for news_articles older than {age_days} days.")
+        except Exception as e:
+            logger.error(f"Failed to handle archive command: {e}")
             raise
