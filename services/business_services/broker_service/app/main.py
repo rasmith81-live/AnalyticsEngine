@@ -37,6 +37,9 @@ from .metrics import (
     update_db_connection_metrics, export_metrics_to_observability
 )
 from .api import endpoints as api_router
+from .order_manager import OrderManager
+from .position_manager import PositionManager
+from .session_manager import SessionManager
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +50,9 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
+order_manager: Optional[OrderManager] = None
+position_manager: Optional[PositionManager] = None
+session_manager: Optional[SessionManager] = None
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -54,7 +60,7 @@ metrics_export_task: Optional[asyncio.Task] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global messaging_client, metrics_export_task
+    global messaging_client, metrics_export_task, order_manager, position_manager, session_manager
     
     # Startup
     try:
@@ -86,6 +92,15 @@ async def lifespan(app: FastAPI):
             retries=settings.messaging_service_retries
         )
         await messaging_client.initialize()
+
+        # Initialize managers
+        session_manager = SessionManager(messaging_client)
+        await session_manager.start()
+
+        order_manager = OrderManager(messaging_client, session_manager)
+        
+        position_manager = PositionManager(messaging_client)
+        await position_manager.start()
         
         # Set up event subscriptions if enabled
         if settings.subscribe_to_events:
@@ -127,6 +142,12 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        if session_manager:
+            await session_manager.stop()
+
+        if position_manager:
+            await position_manager.stop()
+
         if messaging_client:
             await messaging_client.close()
         logger.info("Service A shutdown complete")
@@ -190,9 +211,9 @@ async def setup_event_subscriptions():
             correlation_id=correlation_id
         )
         
-        # Subscribe to service B events for cross-service communication
+        # Subscribe to broker service events for cross-service communication
         await messaging_client.subscribe_to_service_events(
-            target_service="service_b",
+            target_service="broker_service",
             callback_url=settings.event_callback_url,
             correlation_id=correlation_id
         )
@@ -726,10 +747,10 @@ async def process_event(event: EventCallback) -> bool:
             # Handle different event types
             if event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
-            elif event_type == "HaltBuyOrders":
+            elif event_type in ["HaltBuyOrders", "ExecuteBuyOrder", "HaltTradingAndExitPositions", "HaltTradingAndCrashPositions", "HaltTradingAndWinddownPositions"]:
                 return await process_trading_command(event_type, event_data)
-            elif event_type and event_type.startswith("service_b."):
-                return await process_service_b_event(event_type, event_data)
+            elif event_type and event_type.startswith("broker_service."):
+                return await process_broker_event(event_type, event_data)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
                 return True  # Acknowledge unknown events to avoid reprocessing
@@ -788,6 +809,17 @@ async def process_trading_command(event_type: str, event_data: Dict[str, Any]) -
     if event_type == "HaltBuyOrders":
         logger.info("Received HaltBuyOrders command. Halting all new buy orders.")
         # In a real implementation, you would add logic here to halt buy orders.
+    elif event_type == "ExecuteBuyOrder":
+        await order_manager.handle_buy_order(event_data)
+    elif event_type == "HaltTradingAndExitPositions":
+        logger.info("Received HaltTradingAndExitPositions command. Exiting all open positions.")
+        await position_manager.exit_all_positions()
+    elif event_type == "HaltTradingAndCrashPositions":
+        logger.info("Received HaltTradingAndCrashPositions command. Immediately exiting all open positions.")
+        await position_manager.crash_all_positions()
+    elif event_type == "HaltTradingAndWinddownPositions":
+        logger.info("Received HaltTradingAndWinddownPositions command. Gracefully exiting all open positions.")
+        await position_manager.winddown_all_positions()
     else:
         logger.warning(f"Unknown trading command type: {event_type}")
         return False

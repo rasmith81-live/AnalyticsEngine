@@ -813,8 +813,14 @@ async def stream_market_data():
             }
             
             if messaging_client:
+                # Publish to the general topic
                 await messaging_client.publish_event(
                     event_type="market.data.stream",
+                    event_data=market_data
+                )
+                # Publish to the symbol-specific topic
+                await messaging_client.publish_event(
+                    event_type=f"market.data.stream.{market_data['symbol']}",
                     event_data=market_data
                 )
                 logger.debug(f"Published market data for {market_data['symbol']}")

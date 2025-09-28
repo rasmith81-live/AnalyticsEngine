@@ -147,41 +147,6 @@ async def execute_command(
             detail=f"Failed to execute command: {str(e)}"
         )
 
-async def call_news_provider_api(endpoint: str, method: str = "POST"):
-    settings = get_settings()
-    news_provider_url = f"{settings.news_provider_service_url}/api{endpoint}"
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.request(method, news_provider_url)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error calling news provider service: {e.response.text}")
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"Error from news provider service: {e.response.text}"
-            )
-        except httpx.RequestError as e:
-            logger.error(f"Request error calling news provider service: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not connect to the news provider service."
-            )
-
-
-@router.post("/news/stream/start", status_code=status.HTTP_200_OK)
-async def start_news_stream():
-    """
-    Starts the news stream in the news provider service.
-    """
-    return await call_news_provider_api("/stream/start")
-
-@router.post("/news/stream/stop", status_code=status.HTTP_200_OK)
-async def stop_news_stream():
-    """
-    Stops the news stream in the news provider service.
-    """
-    return await call_news_provider_api("/stream/stop")
 
 def get_session_monitor() -> SessionMonitor:
     """Dependency to get session monitor instance."""
@@ -200,13 +165,13 @@ async def get_session_status(
 
 @router.post("/trading/start", status_code=status.HTTP_202_ACCEPTED)
 async def start_trading(
-    monitor: SessionMonitor = Depends(get_session_monitor),
+    session_monitor: SessionMonitor = Depends(get_session_monitor),
     messaging_client: MessagingClient = Depends(get_messaging_client)
 ):
     """
     Publishes a command to start the market data stream if the market is open.
     """
-    if monitor.current_session == TradingSession.CLOSED:
+    if session_monitor.current_session == TradingSession.CLOSED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Market is closed. Cannot start trading."
@@ -216,14 +181,25 @@ async def start_trading(
         command_type="StartMarketDataStream",
         payload={}
     )
+
+    await messaging_client.publish_command(
+        command_type="StartNewsDataStream",
+        payload={}
+    )
+
+    await messaging_client.publish_command(
+        command_type="DetermineTradingSession",
+        payload={}
+    )
     
-    return {"status": "accepted", "message": "Start market data stream command published."}
+    return {"status": "accepted", "message": "Start market, news, and session determination commands published."}
 
 @router.post("/trading/stop", status_code=status.HTTP_202_ACCEPTED)
 async def stop_trading(messaging_client: MessagingClient = Depends(get_messaging_client)):
     """
     Publishes commands to stop the market data stream and halt buy orders.
     """
+
     await messaging_client.publish_command(
         command_type="StopMarketDataStream",
         payload={}
@@ -235,3 +211,27 @@ async def stop_trading(messaging_client: MessagingClient = Depends(get_messaging
     )
     
     return {"status": "accepted", "message": "Stop trading commands published."}
+
+@router.post("/trading/crashdown", status_code=status.HTTP_202_ACCEPTED)
+async def crashdown_trading(messaging_client: MessagingClient = Depends(get_messaging_client)):
+    """
+    Publishes a command to halt all trading and exit open positions due to deteriorating market conditions.
+    """
+    await messaging_client.publish_command(
+        command_type="HaltTradingAndCrashPositions",
+        payload={}
+    )
+    
+    return {"status": "accepted", "message": "Trading crashdown command published."}
+
+@router.post("/trading/winddown", status_code=status.HTTP_202_ACCEPTED)
+async def winddown_trading(messaging_client: MessagingClient = Depends(get_messaging_client)):
+    """
+    Publishes a command to halt all trading and exit open positions gracefully at end of trading period.
+    """
+    await messaging_client.publish_command(
+        command_type="HaltTradingAndWinddownPositions",
+        payload={}
+    )
+    
+    return {"status": "accepted", "message": "Trading crashdown command published."}

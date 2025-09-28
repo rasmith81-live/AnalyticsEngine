@@ -38,6 +38,7 @@ from .metrics import (
 )
 from .api import endpoints as api_router
 from .session_monitor import SessionMonitor
+from .market_monitor import MarketMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -49,6 +50,7 @@ logger = logging.getLogger(__name__)
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
 session_monitor: Optional[SessionMonitor] = None
+market_monitor: Optional[MarketMonitor] = None
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -56,9 +58,7 @@ metrics_export_task: Optional[asyncio.Task] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global messaging_client, metrics_export_task
-    
-    # Startup
+    global messaging_client, metrics_export_task, session_monitor, market_monitor
     try:
         settings = get_settings()
         
@@ -90,8 +90,12 @@ async def lifespan(app: FastAPI):
         await messaging_client.initialize()
 
         # Initialize and start session monitor
-        session_monitor = SessionMonitor()
+        session_monitor = SessionMonitor(messaging_client)
         await session_monitor.start()
+        
+        # Start market monitor
+        market_monitor = MarketMonitor(messaging_client)
+        await market_monitor.start()
         
         # Set up event subscriptions if enabled
         if settings.subscribe_to_events:
@@ -135,6 +139,9 @@ async def lifespan(app: FastAPI):
         
         if session_monitor:
             await session_monitor.stop()
+
+        if market_monitor:
+            await market_monitor.stop()
 
         if messaging_client:
             await messaging_client.close()
@@ -199,9 +206,9 @@ async def setup_event_subscriptions():
             correlation_id=correlation_id
         )
         
-        # Subscribe to service B events for cross-service communication
+        # Subscribe to broker service events for cross-service communication
         await messaging_client.subscribe_to_service_events(
-            target_service="service_b",
+            target_service="broker_service",
             callback_url=settings.event_callback_url,
             correlation_id=correlation_id
         )

@@ -33,6 +33,7 @@ from app.core.cache import CacheService as GatewayCache
 from app.core.pubsub import pubsub_service
 from app.api.router import api_router
 
+
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
@@ -61,7 +62,8 @@ async def lifespan(app: FastAPI):
     
     # Check service health
     await service_registry.check_all_services_health()
-    
+
+
     # Yield control to FastAPI
     yield
     
@@ -117,7 +119,10 @@ app.add_middleware(
     exclude_prefixes=["/auth/"]
 )
 
-# Include the API router
+
+# The GraphQL app is mounted inside the lifespan, after the service registry is ready.
+
+# Include the existing API router
 app.include_router(api_router)
 
 @app.get("/health")

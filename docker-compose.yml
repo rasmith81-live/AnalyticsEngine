@@ -753,7 +753,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        SERVICE_DIR: services/api_gateway
+        SERVICE_DIR: services/frontend_services/api_gateway
     ports:
       - "8090:8000"
     environment:
