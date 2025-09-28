@@ -187,12 +187,12 @@ async def setup_event_subscriptions():
             correlation_id=correlation_id
         )
         
-        # Subscribe to service A events for cross-service communication
-        await messaging_client.subscribe_to_service_events(
-            target_service="service_a",
-            callback_url=settings.event_callback_url,
-            correlation_id=correlation_id
-        )
+        # # Subscribe to service A events for cross-service communication
+        # await messaging_client.subscribe_to_service_events(
+        #     target_service="service_a",
+        #     callback_url=settings.event_callback_url,
+        #     correlation_id=correlation_id
+        # )
         
         logger.info("Event subscriptions set up successfully")
         
@@ -723,8 +723,8 @@ async def process_event(event: EventCallback) -> bool:
             # Handle different event types
             if event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
-            elif event_type and event_type.startswith("service_b."):
-                return await process_service_b_event(event_type, event_data)
+            # elif event_type and event_type.startswith("service_b."):
+            #     return await process_service_b_event(event_type, event_data)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
                 return True  # Acknowledge unknown events to avoid reprocessing
@@ -777,9 +777,9 @@ async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> boo
         return False
 
 
-@trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
-async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process events from Service B."""
+# @trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
+# async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
+#     """Process events from Service B."""
     try:
         correlation_id = event_data.get("correlation_id")
         

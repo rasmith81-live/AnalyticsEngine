@@ -51,18 +51,6 @@ class Settings(BaseSettings):
     
     # Service Registry
     SERVICE_REGISTRY: Dict[str, Dict[str, Any]] = Field(default_factory=lambda: {
-        # Business Services
-        "business_service_a": {
-            "url": os.getenv("BUSINESS_SERVICE_A_URL"),
-            "timeout": 30.0,
-            "health_endpoint": "/health",
-        },
-        "business_service_b": {
-            "url": os.getenv("BUSINESS_SERVICE_B_URL"),
-            "timeout": 30.0,
-            "health_endpoint": "/health",
-        },
-        
         # Backend Services
         "messaging_service": {
             "url": os.getenv("MESSAGING_SERVICE_URL"),

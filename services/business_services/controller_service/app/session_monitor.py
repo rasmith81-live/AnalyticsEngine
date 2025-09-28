@@ -4,6 +4,7 @@ from enum import Enum
 import pandas_market_calendars as mcal
 import pytz
 import logging
+from .messaging_client import MessagingClient
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,8 @@ class TradingSession(str, Enum):
 class SessionMonitor:
     """Monitors the current NYSE trading session."""
 
-    def __init__(self):
+    def __init__(self, messaging_client: MessagingClient):
+        self.messaging_client = messaging_client
         self.nyse_calendar = mcal.get_calendar('NYSE')
         self.est_tz = pytz.timezone('America/New_York')
         self._current_session = TradingSession.CLOSED
@@ -65,6 +67,11 @@ class SessionMonitor:
                 if session != self._current_session:
                     logger.info(f"Trading session changed to: {session.value}")
                     self._current_session = session
+                    # Publish the session change event
+                    await self.messaging_client.publish_event(
+                        event_type="TradingSessionChanged",
+                        event_data={"session": session.value}
+                    )
                 await asyncio.sleep(60)  # Check every minute
             except Exception as e:
                 logger.error(f"Error in session monitor loop: {e}", exc_info=True)

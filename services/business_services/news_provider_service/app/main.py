@@ -47,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
+streaming_task: Optional[asyncio.Task] = None
+streaming_active = False
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -125,6 +127,17 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        # Stop the streaming task if it's running
+        if streaming_task:
+            logger.info("Stopping news data streaming task...")
+            global streaming_active
+            streaming_active = False
+            streaming_task.cancel()
+            try:
+                await streaming_task
+            except asyncio.CancelledError:
+                logger.info("News data streaming task cancelled.")
+
         if messaging_client:
             await messaging_client.close()
         logger.info("Service B shutdown complete")
@@ -188,12 +201,12 @@ async def setup_event_subscriptions():
             correlation_id=correlation_id
         )
         
-        # Subscribe to service A events for cross-service communication
-        await messaging_client.subscribe_to_service_events(
-            target_service="service_a",
-            callback_url=settings.event_callback_url,
-            correlation_id=correlation_id
-        )
+        # # Subscribe to service A events for cross-service communication
+        # await messaging_client.subscribe_to_service_events(
+        #     target_service="service_a",
+        #     callback_url=settings.event_callback_url,
+        #     correlation_id=correlation_id
+        # )
         
         logger.info("Event subscriptions set up successfully")
         
@@ -722,10 +735,12 @@ async def process_event(event: EventCallback) -> bool:
             logger.info(f"Processing event type: {event_type}")
             
             # Handle different event types
-            if event_type and event_type.startswith("item."):
+            if event_type in ["StartNewsDataStream", "StopNewsDataStream"]:
+                return await process_trading_command(event_type, event_data)
+            elif event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
-            elif event_type and event_type.startswith("service_b."):
-                return await process_service_b_event(event_type, event_data)
+            # elif event_type and event_type.startswith("service_b."):
+            #     return await process_service_b_event(event_type, event_data)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
                 return True  # Acknowledge unknown events to avoid reprocessing
@@ -738,6 +753,68 @@ async def process_event(event: EventCallback) -> bool:
 
 
 @trace_method(name="process_item_event", kind=SpanKind.CONSUMER)
+async def stream_news_data():
+    """
+    Background task to stream news data.
+    """
+    global streaming_active, messaging_client
+    logger.info("News data streaming task started.")
+    while streaming_active:
+        try:
+            # In a real implementation, you would fetch news from a live source.
+            news_data = {
+                "headline": "Market Reaches All-Time High",
+                "source": "MarketNova News",
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+            
+            if messaging_client:
+                await messaging_client.publish_event(
+                    event_type="news.data.published",
+                    event_data=news_data
+                )
+                logger.debug(f"Published news data: {news_data['headline']}")
+            
+            await asyncio.sleep(5)  # Publish every 5 seconds
+            
+        except Exception as e:
+            logger.error(f"Error during news data streaming: {e}")
+            await asyncio.sleep(10)
+            
+    logger.info("News data streaming task stopped.")
+
+async def start_streaming():
+    global streaming_active, streaming_task
+    if not streaming_active:
+        streaming_active = True
+        streaming_task = asyncio.create_task(stream_news_data())
+        logger.info("News data streaming initiated by command.")
+        return True
+    logger.warning("Attempted to start streaming when it was already active.")
+    return False
+
+async def stop_streaming():
+    global streaming_active, streaming_task
+    if streaming_active:
+        streaming_active = False
+        if streaming_task:
+            streaming_task.cancel()
+        logger.info("News data streaming stopped by command.")
+        return True
+    logger.warning("Attempted to stop streaming when it was not active.")
+    return False
+
+async def process_trading_command(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process trading-related commands."""
+    if event_type == "StartNewsDataStream":
+        await start_streaming()
+    elif event_type == "StopNewsDataStream":
+        await stop_streaming()
+    else:
+        logger.warning(f"Unknown trading command type: {event_type}")
+        return False
+    return True
+
 async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> bool:
     """Process item-related events."""
     try:
@@ -778,20 +855,20 @@ async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> boo
         return False
 
 
-@trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
-async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process events from Service B."""
+# @trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
+# async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
+#     """Process events from Service B."""
     try:
         correlation_id = event_data.get("correlation_id")
         
-        # Add span attributes for service B event processing
-        add_span_attributes({
-            "messaging.event_type": event_type,
-            "messaging.source_service": "service_b",
-            "correlation_id": correlation_id
-        })
+        # # Add span attributes for service B event processing
+        # add_span_attributes({
+        #     "messaging.event_type": event_type,
+        #     "messaging.source_service": "service_b",
+        #     "correlation_id": correlation_id
+        # })
         
-        logger.info(f"Processing Service B event: {event_type}")
+        # logger.info(f"Processing Service B event: {event_type}")
         
         # Add cross-service communication logic here
         # This demonstrates how services can react to events from other services

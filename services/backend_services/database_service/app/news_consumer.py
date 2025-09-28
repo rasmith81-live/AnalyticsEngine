@@ -15,15 +15,15 @@ class NewsConsumer:
     async def start(self):
         """Subscribe to the news article topic."""
         await self.messaging_client.subscribe(
-            topic="news.streaming.article",
+            topic="news.data.published",
             callback=self.handle_news_article
         )
-        logger.info("Subscribed to 'news.streaming.article' topic.")
+        logger.info("Subscribed to 'news.data.published' topic.")
 
     async def stop(self):
         """Unsubscribe from the news article topic."""
-        await self.messaging_client.unsubscribe("news.streaming.article")
-        logger.info("Unsubscribed from 'news.streaming.article' topic.")
+        await self.messaging_client.unsubscribe("news.data.published")
+        logger.info("Unsubscribed from 'news.data.published' topic.")
 
     async def handle_news_article(self, article_data: Dict[str, Any]):
         """Handle an incoming news article message."""
@@ -35,12 +35,12 @@ class NewsConsumer:
             # Map the incoming data to the NewsArticle model
             article_to_insert = {
                 'publisher': article_data.get('source'),
-                'title': article_data.get('title'),
-                'content': article_data.get('content'),
-                'published_at': datetime.fromtimestamp(article_data.get('published_at')),
-                'related_tickers': article_data.get('related_symbols'),
-                'article_type': article_data.get('article_type'),
-                'sentiment': article_data.get('sentiment')
+                'title': article_data.get('headline'),
+                'content': article_data.get('content', ''), # Assuming content might not always be present
+                'published_at': datetime.fromtimestamp(article_data.get('timestamp')),
+                'related_tickers': article_data.get('related_symbols', []), # Assuming optional
+                'article_type': article_data.get('article_type', 'General'), # Assuming optional
+                'sentiment': article_data.get('sentiment') # Assuming optional
             }
 
             await self.database_manager.insert_news_article(article_to_insert)

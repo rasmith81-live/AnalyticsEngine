@@ -62,6 +62,7 @@ class BaseModel(Base, IdMixin, TimestampMixin, UUIDMixin):
     
     __abstract__ = True
 
+
 class CommandBase:
     """Base class for CQRS commands."""
     
@@ -122,6 +123,17 @@ class ReadBase(Generic[T]):
     def from_entities(cls, entities: List[T]) -> List['ReadBase[T]']:
         """Create read models from entities."""
         return [cls(entity) for entity in entities]
+
+class MarketData(BaseModel):
+    __tablename__ = 'market_data'
+
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index('ix_market_data_timestamp', 'timestamp'),)
+
 
 class NewsArticle(BaseModel):
     __tablename__ = 'news_articles'

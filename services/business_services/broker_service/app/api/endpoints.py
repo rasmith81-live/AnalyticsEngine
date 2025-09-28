@@ -12,6 +12,12 @@ from pydantic import BaseModel, Field
 
 from ..messaging_client import MessagingClient, get_messaging_client
 from ..models import DataModel, CommandModel, ResponseModel
+from ..main import order_manager
+
+class Order(BaseModel):
+    symbol: str = Field(..., description="The stock symbol to trade.")
+    quantity: int = Field(..., gt=0, description="The number of shares to trade.")
+    order_type: str = Field("market", description="The type of order to place (e.g., 'market' or 'limit').")
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -57,6 +63,29 @@ async def get_service_status(
         status_info["status"] = "degraded"
     
     return status_info
+
+@router.post("/orders/buy", status_code=status.HTTP_202_ACCEPTED)
+async def manual_buy(
+    order: Order,
+    order_manager_instance: "OrderManager" = Depends(lambda: order_manager)
+):
+    """
+    Manually execute a buy order.
+    """
+    await order_manager_instance.handle_buy_order(order.dict())
+    return {"status": "accepted", "message": f"Manual buy order for {order.quantity} shares of {order.symbol} received."}
+
+@router.post("/orders/sell", status_code=status.HTTP_202_ACCEPTED)
+async def manual_sell(
+    order: Order,
+    order_manager_instance: "OrderManager" = Depends(lambda: order_manager)
+):
+    """
+    Manually execute a sell order.
+    """
+    await order_manager_instance.handle_sell_order(order.dict())
+    logger.info(f"Manual sell order for {order.quantity} shares of {order.symbol} received.")
+    return {"status": "accepted", "message": f"Manual sell order for {order.quantity} shares of {order.symbol} received."}
 
 @router.post("/trading/stop-buys", status_code=status.HTTP_200_OK)
 async def stop_buy_orders():

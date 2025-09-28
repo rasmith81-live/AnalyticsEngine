@@ -30,6 +30,7 @@ from .messaging_client import MessagingClient
 from .telemetry_consumers import TelemetryEventConsumer
 from .command_consumers import CommandConsumer
 from .news_consumer import NewsConsumer
+from .market_data_consumer import MarketDataConsumer
 from .models import (
     QueryRequest, QueryResponse, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
@@ -38,6 +39,7 @@ from .models import (
 from .config import get_settings
 from .metrics import metrics, update_system_metrics, update_db_connection_metrics, export_metrics_to_observability, track_endpoint_execution, track_db_operation, track_query, update_timescale_metrics
 from .telemetry import initialize_telemetry, instrument_fastapi, instrument_sqlalchemy, trace_method, add_span_attributes, inject_trace_context, extract_correlation_id_from_headers
+
 
 # Configure logging
 logging.basicConfig(
@@ -53,6 +55,7 @@ messaging_client = None
 telemetry_consumer = None
 command_consumer = None
 news_consumer = None
+market_data_consumer = None
 service_start_time = datetime.utcnow()
 
 # Background task cancellation handles
@@ -63,7 +66,7 @@ system_metrics_task = None
 @trace_method(name="main.lifespan")
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, metrics_export_task, system_metrics_task
+    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, metrics_export_task, system_metrics_task
     
     # Startup
     start_time = datetime.utcnow()
@@ -141,6 +144,13 @@ async def lifespan(app: FastAPI):
             messaging_client=messaging_client
         )
         await news_consumer.start()
+
+        # Initialize and start market data consumer
+        market_data_consumer = MarketDataConsumer(
+            database_manager=database_manager,
+            messaging_client=messaging_client
+        )
+        await market_data_consumer.start()
         
         # Start background tasks for metrics
         if settings.enable_prometheus_metrics:
@@ -250,6 +260,10 @@ async def lifespan(app: FastAPI):
         # Stop news consumer
         if news_consumer:
             await news_consumer.stop()
+
+        # Stop market data consumer
+        if market_data_consumer:
+            await market_data_consumer.stop()
         
         # Stop retention manager
         if retention_manager:
@@ -296,6 +310,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
 
 # Instrument FastAPI with OpenTelemetry if enabled
 if get_settings().enable_distributed_tracing:

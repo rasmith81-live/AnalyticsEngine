@@ -31,6 +31,9 @@ from .models import (
     ErrorResponse, ValidationErrorResponse
 )
 from .config import get_settings
+from .market_data_consumer import MarketDataConsumer
+from .asset_profiler import AssetProfiler
+from .candidate_monitor import CandidateMonitor
 from .metrics import (
     metrics, track_endpoint_execution, track_message_processing, 
     track_db_operation, track_domain_event, update_system_metrics,
@@ -46,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 messaging_client: Optional[MessagingClient] = None
+market_data_consumer: Optional[MarketDataConsumer] = None
+asset_profiler: Optional[AssetProfiler] = None
+candidate_monitor: Optional[CandidateMonitor] = None
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -53,7 +59,7 @@ metrics_export_task: Optional[asyncio.Task] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global messaging_client, metrics_export_task
+    global messaging_client, metrics_export_task, market_data_consumer, asset_profiler, candidate_monitor
     
     # Startup
     try:
@@ -83,6 +89,14 @@ async def lifespan(app: FastAPI):
             retries=settings.messaging_service_retries
         )
         await messaging_client.initialize()
+
+        # Initialize strategy components
+        candidate_monitor = CandidateMonitor(messaging_client)
+        asset_profiler = AssetProfiler(candidate_monitor)
+
+        # Initialize and start market data consumer
+        market_data_consumer = MarketDataConsumer(messaging_client, asset_profiler)
+        await market_data_consumer.start()
         
         # Set up event subscriptions if enabled
         if settings.subscribe_to_events:
@@ -124,6 +138,9 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        if market_data_consumer:
+            await market_data_consumer.stop()
+
         if messaging_client:
             await messaging_client.close()
         logger.info("Service B shutdown complete")
@@ -187,12 +204,12 @@ async def setup_event_subscriptions():
             correlation_id=correlation_id
         )
         
-        # Subscribe to service A events for cross-service communication
-        await messaging_client.subscribe_to_service_events(
-            target_service="service_a",
-            callback_url=settings.event_callback_url,
-            correlation_id=correlation_id
-        )
+        # # Subscribe to service A events for cross-service communication
+        # await messaging_client.subscribe_to_service_events(
+        #     target_service="service_a",
+        #     callback_url=settings.event_callback_url,
+        #     correlation_id=correlation_id
+        # )
         
         logger.info("Event subscriptions set up successfully")
         
@@ -723,8 +740,10 @@ async def process_event(event: EventCallback) -> bool:
             # Handle different event types
             if event_type and event_type.startswith("item."):
                 return await process_item_event(event_type, event_data)
-            elif event_type and event_type.startswith("service_b."):
-                return await process_service_b_event(event_type, event_data)
+            elif event_type == "DetermineTradingSession":
+                return await process_trading_command(event_type, event_data)
+            elif event_type and event_type.startswith("service_a."):
+                return await process_service_a_event(event_type, event_data)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
                 return True  # Acknowledge unknown events to avoid reprocessing
@@ -777,20 +796,31 @@ async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> boo
         return False
 
 
-@trace_method(name="process_service_b_event", kind=SpanKind.CONSUMER)
-async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process events from Service B."""
+@trace_method(name="process_trading_command", kind=SpanKind.CONSUMER)
+async def process_trading_command(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process trading-related commands."""
+    if event_type == "DetermineTradingSession":
+        logger.info("Received DetermineTradingSession command. Determining session strategy...")
+        # In a real implementation, you would load the strategy for the current session here.
+    else:
+        logger.warning(f"Unknown trading command type: {event_type}")
+        return False
+    return True
+
+
+async def process_service_a_event(event_type: str, event_data: Dict[str, Any]) -> bool:
+    """Process events from Service A."""
     try:
         correlation_id = event_data.get("correlation_id")
         
-        # Add span attributes for service B event processing
+        # Add span attributes for service A event processing
         add_span_attributes({
             "messaging.event_type": event_type,
-            "messaging.source_service": "service_b",
+            "messaging.source_service": "service_a",
             "correlation_id": correlation_id
         })
         
-        logger.info(f"Processing Service B event: {event_type}")
+        logger.info(f"Processing Service A event: {event_type}")
         
         # Add cross-service communication logic here
         # This demonstrates how services can react to events from other services
@@ -803,7 +833,7 @@ async def process_service_b_event(event_type: str, event_data: Dict[str, Any]) -
             "error": True,
             "error.message": str(e)
         })
-        logger.error(f"Failed to process Service B event: {e}")
+        logger.error(f"Failed to process Service A event: {e}")
         return False
 
 
