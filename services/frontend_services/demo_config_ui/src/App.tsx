@@ -1,16 +1,16 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Pages
-import DemoPage from '@/pages/DemoPage';
-import ConfigPage from '@/pages/ConfigPage';
-import KPIDetailPage from '@/pages/KPIDetailPage';
-import ObjectModelViewer from '@/pages/ObjectModelViewer';
-import RequiredObjectsViewer from '@/pages/RequiredObjectsViewer';
-import DataSourceConfig from '@/pages/DataSourceConfig';
-import ServiceProposal from '@/pages/ServiceProposal';
-import Layout from '@/components/Layout';
+// Pages - import without @ alias to test
+import DemoPage from './pages/DemoPage';
+import ConfigPage from './pages/ConfigPage';
+import KPIDetailPage from './pages/KPIDetailPage';
+import ObjectModelViewer from './pages/ObjectModelViewer';
+import RequiredObjectsViewer from './pages/RequiredObjectsViewer';
+import DataSourceConfig from './pages/DataSourceConfig';
+import ServiceProposal from './pages/ServiceProposal';
+import Layout from './components/Layout';
 
 // Create theme
 const theme = createTheme({
@@ -41,7 +41,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Router>
+        <BrowserRouter>
           <Layout>
             <Routes>
               <Route path="/" element={<Navigate to="/demo" replace />} />
@@ -54,7 +54,7 @@ function App() {
               <Route path="/proposal" element={<ServiceProposal />} />
             </Routes>
           </Layout>
-        </Router>
+        </BrowserRouter>
       </ThemeProvider>
     </QueryClientProvider>
   );

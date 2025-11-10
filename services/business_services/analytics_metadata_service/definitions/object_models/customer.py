@@ -4,93 +4,12 @@ Customer Object Model
 Represents customers who have completed purchases.
 """
 
-from analytics_models import ObjectModel
-
-CUSTOMER = ObjectModel(
-    name="Customer",
-    code="CUSTOMER",
-    description="Organizations or individuals who have purchased products/services",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "customer",
-        "class_name": "Customer",
-        "columns": [
-            {
-                "name": "customer_name",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "customer_type",
-                "type": "String",
-                "length": 50,
-                "index": True
-            },
-            {
-                "name": "acquisition_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "lifetime_value",
-                "type": "Float"
-            },
-            {
-                "name": "satisfaction_score",
-                "type": "Float"
-            },
-            {
-                "name": "health_score",
-                "type": "Float"
-            },
-            {
-                "name": "churn_risk",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "last_purchase_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "total_purchases",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_customer_customer_type",
-                "columns": ["customer_type"]
-            },
-            {
-                "name": "ix_customer_acquisition_date",
-                "columns": ["acquisition_date"]
-            },
-            {
-                "name": "ix_customer_last_purchase_date",
-                "columns": ["last_purchase_date"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+CUSTOMER = {
+    "code": "CUSTOMER",
+    "name": "Customer",
+    "description": "Organizations or individuals who have purchased products/services",
+    "table_schema": {"table_name": "customer", "class_name": "Customer", "columns": [{"name": "customer_name", "type": "String", "length": 255}, {"name": "customer_type", "type": "String", "length": 50, "index": True}, {"name": "acquisition_date", "type": "DateTime", "index": True}, {"name": "lifetime_value", "type": "Float"}, {"name": "satisfaction_score", "type": "Float"}, {"name": "health_score", "type": "Float"}, {"name": "churn_risk", "type": "String", "length": 255}, {"name": "last_purchase_date", "type": "DateTime", "index": True}, {"name": "total_purchases", "type": "String", "length": 255}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_customer_customer_type", "columns": ["customer_type"]}, {"name": "ix_customer_acquisition_date", "columns": ["acquisition_date"]}, {"name": "ix_customer_last_purchase_date", "columns": ["last_purchase_date"]}]},
+    "schema_definition": """
     @startuml
 ' Business Development & Sales
 ' Channel Sales
@@ -152,32 +71,5 @@ Customer "1" -- "*" Proposal : relates to
 Customer "1" -- "*" RevenueForecast : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "INSIDE_SALES", "OUTSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT"],
-        "related_kpis": [
-            "CUSTOMER_ACQUISITION_COST_CAC",
-            "CUSTOMER_LIFETIME_VALUE_CLV",
-            "CUSTOMER_RETENTION_RATE",
-            "CUSTOMER_SATISFACTION_INDEX",
-            "CHURN_RATE",
-            "REPEAT_PURCHASE_RATE",
-            "CUSTOMER_ENGAGEMENT_LEVEL",
-            "CUSTOMER_EFFORT_SCORE_CES",
-            "CUSTOMER_ONBOARDING_EFFICACY",
-            "VOICE_OF_THE_CUSTOMER_VOC_SCORE"
-        ],
-        "key_attributes": [
-            "customer_name",
-            "customer_type",
-            "acquisition_date",
-            "lifetime_value",
-            "satisfaction_score",
-            "health_score",
-            "churn_risk",
-            "last_purchase_date",
-            "total_purchases"
-        ],
-        "related_objects": ["Account", "Assessment", "Call", "Channel Partner", "Coaching Session", "Contract", "Deal", "Goal", "Lead", "Meeting", "Opportunity", "Performance Scorecard", "Product", "Proposal", "Revenue Forecast"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "INSIDE_SALES", "OUTSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT"], "related_kpis": ["CUSTOMER_ACQUISITION_COST_CAC", "CUSTOMER_LIFETIME_VALUE_CLV", "CUSTOMER_RETENTION_RATE", "CUSTOMER_SATISFACTION_INDEX", "CHURN_RATE", "REPEAT_PURCHASE_RATE", "CUSTOMER_ENGAGEMENT_LEVEL", "CUSTOMER_EFFORT_SCORE_CES", "CUSTOMER_ONBOARDING_EFFICACY", "VOICE_OF_THE_CUSTOMER_VOC_SCORE"], "key_attributes": ["customer_name", "customer_type", "acquisition_date", "lifetime_value", "satisfaction_score", "health_score", "churn_risk", "last_purchase_date", "total_purchases"], "related_objects": ["Account", "Assessment", "Call", "Channel Partner", "Coaching Session", "Contract", "Deal", "Goal", "Lead", "Meeting", "Opportunity", "Performance Scorecard", "Product", "Proposal", "Revenue Forecast"]},
+}

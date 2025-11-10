@@ -93,14 +93,17 @@ async def get_value_chain_modules(value_chain_code: str):
             detail=f"Value chain not found: {value_chain_code}"
         )
     
-    # Get module codes from value chain
-    module_codes = vc.get("associated_modules", [])
-    
-    # Get full module definitions
+    # Get all modules and filter by value chain
+    all_modules = loader.get_all_modules()
     modules = []
-    for module_code in module_codes:
-        module = loader.get_module(module_code)
-        if module:
+    
+    for module_code, module in all_modules.items():
+        # Check if module belongs to this value chain
+        module_value_chains = module.get("value_chains", [])
+        if isinstance(module_value_chains, list):
+            if value_chain_code in module_value_chains:
+                modules.append(module)
+        elif module.get("value_chain_code") == value_chain_code:
             modules.append(module)
     
     return {

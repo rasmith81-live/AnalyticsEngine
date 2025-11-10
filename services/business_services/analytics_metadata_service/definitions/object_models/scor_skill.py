@@ -28,116 +28,16 @@ Example Skills:
 - "Lean Six Sigma" (Operational, Level 3 required)
 """
 
-from analytics_models import ObjectModel
-
-SCOR_SKILL = ObjectModel(
-    name="SCOR Skill",
-    code="SCOR_SKILL",
-    description="SCOR skills and competencies with proficiency levels required for supply chain excellence",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "scor_skill",
-        "class_name": "SCOR Skill",
-        "columns": [
-            {
-                "name": "id",
-                "type": "String",
-                "length": 50,
-                "primary_key": True,
-                "autoincrement": True
-            },
-            {
-                "name": "code",
-                "type": "String",
-                "length": 50,
-                "unique": True
-            },
-            {
-                "name": "name",
-                "type": "String",
-                "length": 200
-            },
-            {
-                "name": "description",
-                "type": "String",
-                "length": 1000
-            },
-            {
-                "name": "category",
-                "type": "String",
-                "length": 50
-            },
-            {
-                "name": "required_competency",
-                "type": "Enum"
-            },
-            {
-                "name": "experience_codes",
-                "type": "String",
-                "length": 500
-            },
-            {
-                "name": "training_codes",
-                "type": "String",
-                "length": 500
-            },
-            {
-                "name": "certification_available",
-                "type": "Boolean"
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime"
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime"
-            },
-            {
-                "name": "practices",
-                "type": "List"
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_scor_skill_code",
-                "columns": ["code"],
-                "unique": True
-            },
-            {
-                "name": "ix_scor_skill_created_at",
-                "columns": ["created_at"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+SCOR_SKILL = {
+    "code": "SCOR_SKILL",
+    "name": "SCOR Skill",
+    "description": "SCOR skills and competencies with proficiency levels required for supply chain excellence",
+    "table_schema": {"table_name": "scor_skill", "class_name": "SCOR Skill", "columns": [{"name": "id", "type": "String", "length": 50, "primary_key": True, "autoincrement": True}, {"name": "code", "type": "String", "length": 50, "unique": True}, {"name": "name", "type": "String", "length": 200}, {"name": "description", "type": "String", "length": 1000}, {"name": "category", "type": "String", "length": 50}, {"name": "required_competency", "type": "Enum"}, {"name": "experience_codes", "type": "String", "length": 500}, {"name": "training_codes", "type": "String", "length": 500}, {"name": "certification_available", "type": "Boolean"}, {"name": "created_at", "type": "DateTime"}, {"name": "updated_at", "type": "DateTime"}, {"name": "practices", "type": "List"}], "indexes": [{"name": "ix_scor_skill_code", "columns": ["code"], "unique": True}, {"name": "ix_scor_skill_created_at", "columns": ["created_at"]}]},
+    "schema_definition": """
     @startuml
     SCORSkill "0..*" -- "0..*" SCORPractice : supports
     note right of SCORSkill
 @enduml
     """,
-
-    metadata_={
-        "is_reference_only": True,
-        "creates_layer_2_table": False,
-        "stored_in_layer_1": True,
-        "implementation_note": "SCOR skills are framework references, not data records",
-        "modules": ["ASCM_SCOR"],
-        "competency_levels": {
-            "1": {
-                "name": "Novice",
-                "description": "Basic awareness and understanding",
-                "characteristics": [
-                    "Limited or no experience",
-                    "Requires close supervision",
-                    "Follows prescribed procedures",
-                    "Learning fundamental concepts"
-                ],
-                "typical_role": "Entry-level, trainee"
-            }
-        }
-    }
-)
+    "metadata_": {"is_reference_only": True, "creates_layer_2_table": False, "stored_in_layer_1": True, "implementation_note": "SCOR skills are framework references, not data records", "modules": ["ASCM_SCOR"], "competency_levels": {"1": {"name": "Novice", "description": "Basic awareness and understanding", "characteristics": ["Limited or no experience", "Requires close supervision", "Follows prescribed procedures", "Learning fundamental concepts"], "typical_role": "Entry-level, trainee"}}},
+}

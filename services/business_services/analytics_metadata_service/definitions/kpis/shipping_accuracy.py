@@ -1,4 +1,4 @@
-from analytics_models.definitions.kpis.base_kpi import BaseKPI
+import sys; from pathlib import Path; sys.path.insert(0, str(Path(__file__).parent)); from base_kpi import BaseKPI
 
 class ShippingAccuracy(BaseKPI):
     def __init__(self):

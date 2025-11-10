@@ -4,71 +4,12 @@ Market Segment Object Model
 Represents market segments for strategic analysis and targeting.
 """
 
-from analytics_models import ObjectModel
-
-MARKET_SEGMENT = ObjectModel(
-    name="Market Segment",
-    code="MARKET_SEGMENT",
-    description="Market segments for strategic analysis and targeting",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "market_segment",
-        "class_name": "Market Segment",
-        "columns": [
-            {
-                "name": "segment_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "name",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "size",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "growth_rate",
-                "type": "Float"
-            },
-            {
-                "name": "penetration",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "strategy",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_market_segment_segment_id",
-                "columns": ["segment_id"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+MARKET_SEGMENT = {
+    "code": "MARKET_SEGMENT",
+    "name": "Market Segment",
+    "description": "Market segments for strategic analysis and targeting",
+    "table_schema": {"table_name": "market_segment", "class_name": "Market Segment", "columns": [{"name": "segment_id", "type": "Integer", "index": True}, {"name": "name", "type": "String", "length": 255}, {"name": "size", "type": "String", "length": 255}, {"name": "growth_rate", "type": "Float"}, {"name": "penetration", "type": "String", "length": 255}, {"name": "strategy", "type": "String", "length": 255}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_market_segment_segment_id", "columns": ["segment_id"]}]},
+    "schema_definition": """
     @startuml
 ' Relationships
 StrategyTeam "1" -- "0..*" MarketSegment : analyzes >
@@ -99,22 +40,5 @@ MarketSegment "1" -- "*" CustomerOnboarding : relates to
 MarketSegment "1" -- "*" CustomerSegment : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_SUCCESS", "INSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "OUTSIDE_SALES", "SALES_DEVELOPMENT", "SALES_ENABLEMENT", "SALES_OPERATIONS", "SALES_PERFORMANCE", "SALES_STRATEGY", "SALES_TRAINING_COACHING"],
-        "related_kpis": [
-            "MARKET_SHARE",
-            "PRODUCT_PENETRATION_RATE",
-            "SALES_TERRITORY_PERFORMANCE"
-        ],
-        "key_attributes": [
-            "segment_id",
-            "name",
-            "size",
-            "growth_rate",
-            "penetration",
-            "strategy"
-        ],
-        "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Competitive Analysis", "Customer", "Customer Advocacy Program", "Customer Cohort", "Customer Community", "Customer Education", "Customer Feedback", "Customer Goal", "Customer Health Record", "Customer Journey", "Customer Onboarding", "Customer Segment"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_SUCCESS", "INSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "OUTSIDE_SALES", "SALES_DEVELOPMENT", "SALES_ENABLEMENT", "SALES_OPERATIONS", "SALES_PERFORMANCE", "SALES_STRATEGY", "SALES_TRAINING_COACHING"], "related_kpis": ["MARKET_SHARE", "PRODUCT_PENETRATION_RATE", "SALES_TERRITORY_PERFORMANCE"], "key_attributes": ["segment_id", "name", "size", "growth_rate", "penetration", "strategy"], "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Competitive Analysis", "Customer", "Customer Advocacy Program", "Customer Cohort", "Customer Community", "Customer Education", "Customer Feedback", "Customer Goal", "Customer Health Record", "Customer Journey", "Customer Onboarding", "Customer Segment"]},
+}

@@ -4,81 +4,12 @@ Partnership Object Model
 Represents strategic business partnerships and alliances.
 """
 
-from analytics_models import ObjectModel
-
-PARTNERSHIP = ObjectModel(
-    name="Partnership",
-    code="PARTNERSHIP",
-    description="Strategic partnerships and business alliances",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "partnership",
-        "class_name": "Partnership",
-        "columns": [
-            {
-                "name": "partner_name",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "partnership_type",
-                "type": "String",
-                "length": 50,
-                "index": True
-            },
-            {
-                "name": "start_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "status",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "revenue_contribution",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "opportunities_generated",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "effectiveness_score",
-                "type": "Float"
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_partnership_partnership_type",
-                "columns": ["partnership_type"]
-            },
-            {
-                "name": "ix_partnership_start_date",
-                "columns": ["start_date"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+PARTNERSHIP = {
+    "code": "PARTNERSHIP",
+    "name": "Partnership",
+    "description": "Strategic partnerships and business alliances",
+    "table_schema": {"table_name": "partnership", "class_name": "Partnership", "columns": [{"name": "partner_name", "type": "String", "length": 255}, {"name": "partnership_type", "type": "String", "length": 50, "index": True}, {"name": "start_date", "type": "DateTime", "index": True}, {"name": "status", "type": "String", "length": 255}, {"name": "revenue_contribution", "type": "String", "length": 255}, {"name": "opportunities_generated", "type": "String", "length": 255}, {"name": "effectiveness_score", "type": "Float"}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_partnership_partnership_type", "columns": ["partnership_type"]}, {"name": "ix_partnership_start_date", "columns": ["start_date"]}]},
+    "schema_definition": """
     @startuml
 ' Relationships
 Partnership "0..*" -- "1" Account : with >
@@ -107,21 +38,5 @@ Partnership "1" -- "*" StrategicInitiative : relates to
 Partnership "1" -- "*" StrategicReview : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV", "CHANNEL_SALES"],
-        "related_kpis": [
-            "STRATEGIC_PARTNER_DEVELOPMENT_INDEX"
-        ],
-        "key_attributes": [
-            "partner_name",
-            "partnership_type",
-            "start_date",
-            "status",
-            "revenue_contribution",
-            "opportunities_generated",
-            "effectiveness_score"
-        ],
-        "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Assessment", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Enablement Feedback", "Key Account", "Key Account Manager", "Partner Agreement", "Partner Incentive", "Partner Performance Scorecard", "Partner Portal", "Partner Training", "Revenue Forecast", "Strategic Initiative", "Strategic Review"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV", "CHANNEL_SALES"], "related_kpis": ["STRATEGIC_PARTNER_DEVELOPMENT_INDEX"], "key_attributes": ["partner_name", "partnership_type", "start_date", "status", "revenue_contribution", "opportunities_generated", "effectiveness_score"], "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Assessment", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Enablement Feedback", "Key Account", "Key Account Manager", "Partner Agreement", "Partner Incentive", "Partner Performance Scorecard", "Partner Portal", "Partner Training", "Revenue Forecast", "Strategic Initiative", "Strategic Review"]},
+}

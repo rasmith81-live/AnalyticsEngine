@@ -4,67 +4,51 @@ Number of Deals Closed KPI
 The number of deals closed by the sales team over a specific period. A higher number of deals indicates effective training and coaching.
 """
 
-from analytics_models import KPI
-
-NUMBER_OF_DEALS_CLOSED = KPI(
-    name="Number of Deals Closed",
-    code="NUMBER_OF_DEALS_CLOSED",
-    category="Sales Training and Coaching",
-    
-    # Core Definition
-    description="The number of deals closed by the sales team over a specific period. A higher number of deals indicates effective training and coaching.",
-    kpi_definition="The number of deals closed by the sales team over a specific period. A higher number of deals indicates effective training and coaching.",
-    expected_business_insights="Represents direct sales performance and can indicate the effectiveness of sales skills and training.",
-    measurement_approach="The total number of sales deals closed by reps within a specific period.",
-    
-    # Formula
-    formula="Total Number of Deals Closed",
-    calculation_formula="Total Number of Deals Closed",
-    
-    # Analysis
-    trend_analysis="""
+NUMBER_OF_DEALS_CLOSED = {
+    "code": "NUMBER_OF_DEALS_CLOSED",
+    "name": "Number of Deals Closed",
+    "description": "The number of deals closed by the sales team over a specific period. A higher number of deals indicates effective training and coaching.",
+    "formula": "Total Number of Deals Closed",
+    "calculation_formula": "Total Number of Deals Closed",
+    "category": "Sales Training and Coaching",
+    "is_active": True,
+    "kpi_definition": "The number of deals closed by the sales team over a specific period. A higher number of deals indicates effective training and coaching.",
+    "expected_business_insights": "Represents direct sales performance and can indicate the effectiveness of sales skills and training.",
+    "measurement_approach": "The total number of sales deals closed by reps within a specific period.",
+    "trend_analysis": """
     * An increasing number of deals closed may indicate effective sales training and coaching, leading to improved performance.
     * A decreasing trend in the number of deals closed could signal a need for reevaluation of the training and coaching methods or a decline in market demand.
     """,
-    diagnostic_questions="""
+    "diagnostic_questions": """
     * Are there specific products or services that consistently contribute to the closed deals, or is the success evenly distributed?
     * How does the number of deals closed compare to industry benchmarks or seasonal fluctuations?
     """,
-    
-    # Action & Visualization
-    actionable_tips="""
+    "actionable_tips": """
     * Regularly review and update sales training materials to ensure relevance and effectiveness.
     * Provide ongoing coaching and mentorship to sales team members to enhance their skills and confidence.
     * Implement a structured feedback mechanism to gather insights from the sales team on the effectiveness of the training and coaching programs.
     """,
-    visualization_suggestions="""
+    "visualization_suggestions": """
     * Line charts showing the trend in the number of deals closed over time.
     * Pie charts to compare the contribution of different sales team members to the total number of deals closed.
     """,
-    
-    # Risk & Integration
-    risk_warnings="""
+    "risk_warnings": """
     * A low number of deals closed may lead to missed revenue targets and decreased market share.
     * An excessively high number of deals closed without proper qualification may result in increased customer churn and decreased customer satisfaction.
     """,
-    tracking_tools="""
-    * Customer Relationship Management (CRM) software to track and analyze the sales team\'s activities and performance.
+    "tracking_tools": """
+    * Customer Relationship Management (CRM) software to track and analyze the sales team's activities and performance.
     * Sales enablement platforms to provide the team with the necessary resources and support for effective selling.
     """,
-    integration_points="""
+    "integration_points": """
     * Integrate the number of deals closed with customer feedback systems to understand the impact of sales efforts on customer satisfaction.
-    * Link the KPI with the marketing team\'s lead generation and qualification processes to ensure alignment and efficiency in the sales pipeline.
+    * Link the KPI with the marketing team's lead generation and qualification processes to ensure alignment and efficiency in the sales pipeline.
     """,
-    change_impact_analysis="""
+    "change_impact_analysis": """
     * An increase in the number of deals closed may lead to higher revenue and market expansion, but it could also strain operational resources if not managed effectively.
     * A decrease in the number of deals closed may indicate the need for strategic adjustments in sales and marketing strategies to maintain competitiveness.
     """,
-    
-    is_active=True,
-    metadata_={
-        "modules": ["SALES_TRAINING_COACHING"],
-        "source": "kpidepot.com",
-        "import_date": "2025-11-07",
-        "required_objects": ["Coaching Session", "Deal", "Opportunity", "Partner Training", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program", "Training Program"]
-    }
-)
+    "metadata_": {"modules": ["SALES_TRAINING_COACHING"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Coaching Session", "Deal", "Opportunity", "Partner Training", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program", "Training Program"]},
+    "modules": ["SALES_TRAINING_COACHING"],
+    "module_code": "SALES_TRAINING_COACHING",
+}

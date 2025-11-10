@@ -4,17 +4,16 @@ Supply Chain Management Value Chain
 Used by: Retail, Manufacturing, Healthcare
 """
 
-from analytics_models import ValueChain
-
-SUPPLY_CHAIN = ValueChain(
-    name="Supply Chain Management",
-    code="SUPPLY_CHAIN",
-    description="End-to-end supply chain operations and optimization",
-    display_order=3,
-    is_active=True,
-    metadata_={
+SUPPLY_CHAIN = {
+    "code": "SUPPLY_CHAIN",
+    "name": "Supply Chain Management",
+    "display_name": "Supply Chain",
+    "description": "End-to-end supply chain operations and optimization",
+    "associated_modules": ["INVENTORY_MGMT", "LOGISTICS", "PROCUREMENT"],
+    "metadata_": {
         "category": "cross_industry",
-        "industries": ["RETAIL", "MANUFACTURING"],
-        "modules": ["INVENTORY_MGMT", "LOGISTICS", "PROCUREMENT"]
+        "industries": ["RETAIL", "MANUFACTURING", "HEALTHCARE"],
+        "display_order": 3,
+        "is_active": True
     }
-)
+}
