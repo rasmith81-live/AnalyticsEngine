@@ -30,135 +30,17 @@ Example Practices:
 - "Cross-functional Supply Chain Teams" (Organizational, Enablement, Parity)
 """
 
-from analytics_models import ObjectModel
-
-SCOR_PRACTICE = ObjectModel(
-    name="SCOR Practice",
-    code="SCOR_PRACTICE",
-    description="SCOR best practices for supply chain excellence, categorized by type, pillar, and classification",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "scor_practice",
-        "class_name": "SCOR Practice",
-        "columns": [
-            {
-                "name": "id",
-                "type": "String",
-                "length": 50,
-                "primary_key": True,
-                "autoincrement": True
-            },
-            {
-                "name": "name",
-                "type": "String",
-                "length": 200
-            },
-            {
-                "name": "description",
-                "type": "String",
-                "length": 1000
-            },
-            {
-                "name": "type",
-                "type": "String",
-                "length": 50
-            },
-            {
-                "name": "pillar",
-                "type": "String",
-                "length": 50
-            },
-            {
-                "name": "classification",
-                "type": "String",
-                "length": 50
-            },
-            {
-                "name": "implementation_complexity",
-                "type": "String",
-                "length": 20
-            },
-            {
-                "name": "expected_benefits",
-                "type": "String",
-                "length": 1000
-            },
-            {
-                "name": "prerequisites",
-                "type": "String",
-                "length": 500
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime"
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime"
-            },
-            {
-                "name": "processes",
-                "type": "List"
-            },
-            {
-                "name": "skills",
-                "type": "List"
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_scor_practice_created_at",
-                "columns": ["created_at"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+SCOR_PRACTICE = {
+    "code": "SCOR_PRACTICE",
+    "name": "SCOR Practice",
+    "description": "SCOR best practices for supply chain excellence, categorized by type, pillar, and classification",
+    "table_schema": {"table_name": "scor_practice", "class_name": "SCOR Practice", "columns": [{"name": "id", "type": "String", "length": 50, "primary_key": True, "autoincrement": True}, {"name": "name", "type": "String", "length": 200}, {"name": "description", "type": "String", "length": 1000}, {"name": "type", "type": "String", "length": 50}, {"name": "pillar", "type": "String", "length": 50}, {"name": "classification", "type": "String", "length": 50}, {"name": "implementation_complexity", "type": "String", "length": 20}, {"name": "expected_benefits", "type": "String", "length": 1000}, {"name": "prerequisites", "type": "String", "length": 500}, {"name": "created_at", "type": "DateTime"}, {"name": "updated_at", "type": "DateTime"}, {"name": "processes", "type": "List"}, {"name": "skills", "type": "List"}], "indexes": [{"name": "ix_scor_practice_created_at", "columns": ["created_at"]}]},
+    "schema_definition": """
     @startuml
     SCORPractice "0..*" -- "0..*" SCORProcess : supports
     SCORPractice "0..*" -- "0..*" SCORSkill : requires
     note right of SCORPractice
 @enduml
     """,
-
-    metadata_={
-        "is_reference_only": True,
-        "creates_layer_2_table": False,
-        "stored_in_layer_1": True,
-        "implementation_note": "SCOR practices are framework references, not data records",
-        "modules": ["ASCM_SCOR"],
-        "practice_types": [
-            "TECHNOLOGY",
-            "PROCESS",
-            "ORGANIZATIONAL"
-        ],
-        "practice_pillars": [
-            "PLANNING",
-            "EXECUTION",
-            "ENABLEMENT"
-        ],
-        "practice_classifications": [
-            "EMERGING",
-            "PARITY",
-            "ADVANTAGE"
-        ],
-        "implementation_complexity_levels": [
-            "LOW",
-            "MEDIUM",
-            "HIGH"
-        ],
-        "example_practices": {
-            "technology": [
-                {
-                    "name": "Advanced Planning and Scheduling (APS) Systems",
-                    "pillar": "PLANNING",
-                    "classification": "PARITY",
-                    "complexity": "HIGH",
-                    "benefits": "Optimized production schedules, reduced lead times, improved resource utilization"
-                }
-            ]
-        }
-    }
-)
+    "metadata_": {"is_reference_only": True, "creates_layer_2_table": False, "stored_in_layer_1": True, "implementation_note": "SCOR practices are framework references, not data records", "modules": ["ASCM_SCOR"], "practice_types": ["TECHNOLOGY", "PROCESS", "ORGANIZATIONAL"], "practice_pillars": ["PLANNING", "EXECUTION", "ENABLEMENT"], "practice_classifications": ["EMERGING", "PARITY", "ADVANTAGE"], "implementation_complexity_levels": ["LOW", "MEDIUM", "HIGH"], "example_practices": {"technology": [{"name": "Advanced Planning and Scheduling (APS) Systems", "pillar": "PLANNING", "classification": "PARITY", "complexity": "HIGH", "benefits": "Optimized production schedules, reduced lead times, improved resource utilization"}]}},
+}

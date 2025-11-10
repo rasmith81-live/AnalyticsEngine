@@ -4,95 +4,12 @@ Sales Email Object Model
 Represents emails sent by inside sales representatives.
 """
 
-from analytics_models import ObjectModel
-
-SALES_EMAIL = ObjectModel(
-    name="Sales Email",
-    code="SALES_EMAIL",
-    description="Emails sent by inside sales representatives",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "sales_email",
-        "class_name": "Sales Email",
-        "columns": [
-            {
-                "name": "email_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "rep_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "lead_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "date",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "subject",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "opened",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "clicked",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "replied",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "bounce_flag",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_sales_email_email_id",
-                "columns": ["email_id"]
-            },
-            {
-                "name": "ix_sales_email_rep_id",
-                "columns": ["rep_id"]
-            },
-            {
-                "name": "ix_sales_email_lead_id",
-                "columns": ["lead_id"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+SALES_EMAIL = {
+    "code": "SALES_EMAIL",
+    "name": "Sales Email",
+    "description": "Emails sent by inside sales representatives",
+    "table_schema": {"table_name": "sales_email", "class_name": "Sales Email", "columns": [{"name": "email_id", "type": "Integer", "index": True}, {"name": "rep_id", "type": "Integer", "index": True}, {"name": "lead_id", "type": "Integer", "index": True}, {"name": "date", "type": "String", "length": 255}, {"name": "subject", "type": "String", "length": 255}, {"name": "opened", "type": "String", "length": 255}, {"name": "clicked", "type": "String", "length": 255}, {"name": "replied", "type": "String", "length": 255}, {"name": "bounce_flag", "type": "String", "length": 255}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_sales_email_email_id", "columns": ["email_id"]}, {"name": "ix_sales_email_rep_id", "columns": ["rep_id"]}, {"name": "ix_sales_email_lead_id", "columns": ["lead_id"]}]},
+    "schema_definition": """
     @startuml
 ' Relationships
 SalesRepresentative "1" -- "0..*" SalesEmail : sends >
@@ -121,24 +38,5 @@ SalesEmail "1" -- "*" CustomerAdvocacyProgram : relates to
 SalesEmail "1" -- "*" CustomerCohort : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "INSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "OUTSIDE_SALES", "SALES_DEVELOPMENT", "SALES_ENABLEMENT", "SALES_OPERATIONS", "SALES_PERFORMANCE", "SALES_STRATEGY", "SALES_TRAINING_COACHING"],
-        "related_kpis": [
-            "EMAIL_OPEN_RATE",
-            "EMAIL_CLICK_THROUGH_RATE_CTR"
-        ],
-        "key_attributes": [
-            "email_id",
-            "rep_id",
-            "lead_id",
-            "date",
-            "subject",
-            "opened",
-            "clicked",
-            "replied",
-            "bounce_flag"
-        ],
-        "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Appointment", "Assessment", "Call", "Certification", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Churn Event", "Co-Marketing Campaign", "Coaching Session", "Competitive Analysis", "Contract", "Customer", "Customer Advocacy Program", "Customer Cohort"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV", "CHANNEL_SALES", "CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "INSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "OUTSIDE_SALES", "SALES_DEVELOPMENT", "SALES_ENABLEMENT", "SALES_OPERATIONS", "SALES_PERFORMANCE", "SALES_STRATEGY", "SALES_TRAINING_COACHING"], "related_kpis": ["EMAIL_OPEN_RATE", "EMAIL_CLICK_THROUGH_RATE_CTR"], "key_attributes": ["email_id", "rep_id", "lead_id", "date", "subject", "opened", "clicked", "replied", "bounce_flag"], "related_objects": ["Account", "Account Penetration", "Account Plan", "Account Risk", "Appointment", "Assessment", "Call", "Certification", "Channel Conflict", "Channel Deal", "Channel Market", "Channel Partner", "Churn Event", "Co-Marketing Campaign", "Coaching Session", "Competitive Analysis", "Contract", "Customer", "Customer Advocacy Program", "Customer Cohort"]},
+}

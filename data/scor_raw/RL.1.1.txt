@@ -1,0 +1,34 @@
+RL.1.1 Perfect Customer Order Fulfillment
+
+Definition
+The percentage of orders meeting delivery performance expectations, including complete and accurate documentation and no delivery damage. According to the APICS Dictionary, a perfect order satisfies the seven R's: the right product and/or service, the right quantity, the right condition, the right place, the right time (which should be measured by the customer's definition of on time), the right customer and the right cost. Perfect Order Fulfillment addresses all of these and considers the presence of all proper documentation, including packing slips, bills of lading, invoices and more.
+
+Right product and/or service and right quantity are grouped into the level-2 metric Percentage of Orders Delivered in Full to the Customer (RL.2.1). Right time, right location and right customer are grouped into the level-2 metric Delivery Performance to Original Customer Commit Date (RL.2.2). Right condition is measured by the level-2 metric Customer Order Perfect Condition (RL.2.4). Right cost is measured by the overall Cost strategic attribute. Lastly, proper documentation is measured by Customer Order Documentation Accuracy (RL.2.3).
+
+Calculation
+(Total perfect orders / Total number of orders) x 100%
+
+Note: An order is perfect if the individual line items making up that order are all perfect.
+
+The Perfect Order Fulfillment calculation is based on the performance of each level-2 component of the order line to be calculated (product and quantity; date, time and customer; documentation; and condition). For an order line to be perfect, all of the individual components must be perfect:
+
+An order is considered perfect if the products ordered are the products provided and the quantities ordered match the quantities provided. (See Percentage of Orders Delivered In Full to the Customer (RL.2.1).)
+A delivery is considered perfect if the product or service is given to the right customer at the right place and at the right time. (See Delivery Performance to Original Customer Commit Date (RL.2.2).)
+Documentation supporting the order line is considered perfect if it is all accurate, complete and on time. (See Customer Order Accurate Documentation (RL.2.3).)
+The product condition is considered perfect if the product is not damaged, meets customer specifications, is in the right configuration, is faultlessly installed (if applicable) and is accepted by the customer. (See Customer Order Perfect Condition (RL.2.4).) Each component receives a score of 1 if it is judged to be perfect. Otherwise, it receives a score of zero. If the sum of the scores equals the number of components (in this case, four), the order line is perfectly fulfilled.
+
+Data collection
+Data for the components that are used to drive the calculation of supply chain performance are primarily taken from Order.
+
+Discussion
+The performance of the supply chain is considered perfect if the original commitment made to a customer is met through the supply chain.
+
+An order is defined as a collection of one or more order lines representing a request to deliver specified quantities of goods or to render specific services. The order can further be defined as a request (with a specific identifier as a reference) to deliver specified items or to render specific services with specific prices, on specific dates and in specific quantities. Commitments are made to a customer at the order line level. An order line is defined as a line representing a commitment on a sales order, and it always references a product or service.
+
+Orders canceled by the customer are excluded from this metric. Order changes initiated by the customer and agreed to by the supplier supersede initial commitments and form a new comparative basis for the metric.
+
+Often for date and quantity issues (and occasionally for product issues), a range rather than a strict value is used. This is acknowledged as a standard practice, In those situations, the standard measured is considered to be met perfectly if the range specified is satisfied.
+
+The term customer ready for the perfect condition standard may imply a subjective component based on the customer's satisfaction. Although condition may not be as rigorously measured as time or quantity, it should be considered as a component if it is available, especially because this attribute measures performance of the supply chain which is, of course, ultimately measured by its customers.
+
+It should also be noted that a corresponding evaluation of suppliers' performances could be determined by extending these standards to each supplier's ability to source products.

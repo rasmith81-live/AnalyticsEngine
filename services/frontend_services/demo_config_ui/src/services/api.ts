@@ -105,6 +105,38 @@ export const metadataApi = {
     return data.object_models;
   },
 
+  getValueChainModules: async (code: string) => {
+    const { data } = await apiClient.get<{ modules: Module[] }>(`/value-chains/${code}/modules`);
+    return data.modules;
+  },
+
+  // Helper methods for tree navigation
+  getModulesByValueChain: async (valueChainCode: string) => {
+    const { data } = await apiClient.get<{ modules: Module[] }>(`/value-chains/${valueChainCode}/modules`);
+    return data.modules;
+  },
+
+  getKPIsByModule: async (moduleCode: string) => {
+    const { data } = await apiClient.get<{ kpis: KPI[] }>(`/modules/${moduleCode}/kpis`);
+    return data.kpis;
+  },
+
+  // Industries
+  getIndustries: async () => {
+    const { data } = await apiClient.get<{ industries: Industry[] }>('/industries');
+    return data.industries;
+  },
+
+  getIndustry: async (code: string) => {
+    const { data } = await apiClient.get<Industry>(`/industries/${code}`);
+    return data;
+  },
+
+  getIndustryValueChains: async (code: string) => {
+    const { data } = await apiClient.get<{ value_chains: ValueChain[] }>(`/industries/${code}/value-chains`);
+    return data.value_chains;
+  },
+
   // Stats
   getStats: async () => {
     const { data } = await apiClient.get('/stats');

@@ -1,0 +1,161 @@
+{
+  "timestamp": "2025-11-08T09:34:43.746685",
+  "dry_run": false,
+  "summary": {
+    "consolidated": 21,
+    "files_deleted": 21,
+    "errors": 0
+  },
+  "consolidations": [
+    {
+      "primary": "first_contact_resolution_rate.py",
+      "secondary": "first_contact_resolution_fcr.py",
+      "modules_merged": 3,
+      "secondary_code": "FIRST_CONTACT_RESOLUTION_FCR"
+    },
+    {
+      "primary": "year_over_year_yoy_sales_growth.py",
+      "secondary": "year_over_year_growth.py",
+      "modules_merged": 3,
+      "secondary_code": "YEAR_OVER_YEAR_GROWTH"
+    },
+    {
+      "primary": "sales_enablement_feedback_response_time.py",
+      "secondary": "sales_enablement_team_response_time.py",
+      "modules_merged": 1,
+      "secondary_code": "SALES_ENABLEMENT_TEAM_RESPONSE_TIME"
+    },
+    {
+      "primary": "customer_retention_cost.py",
+      "secondary": "account_retention_costs.py",
+      "modules_merged": 3,
+      "secondary_code": "ACCOUNT_RETENTION_COSTS"
+    },
+    {
+      "primary": "sales_meeting_conversion_rate.py",
+      "secondary": "meeting_conversion_rate.py",
+      "modules_merged": 4,
+      "secondary_code": "MEETING_CONVERSION_RATE"
+    },
+    {
+      "primary": "customer_issue_resolution_rate.py",
+      "secondary": "customer_problem_resolution_rate.py",
+      "modules_merged": 2,
+      "secondary_code": "CUSTOMER_PROBLEM_RESOLUTION_RATE"
+    },
+    {
+      "primary": "opportunity_win_rate.py",
+      "secondary": "opportunity_to_sale_ratio.py",
+      "modules_merged": 3,
+      "secondary_code": "OPPORTUNITY_TO_SALE_RATIO"
+    },
+    {
+      "primary": "customer_lifetime_value_clv.py",
+      "secondary": "client_lifetime_value.py",
+      "modules_merged": 7,
+      "secondary_code": "CLIENT_LIFETIME_VALUE"
+    },
+    {
+      "primary": "sales_target_achievement.py",
+      "secondary": "sales_quota_achievement.py",
+      "modules_merged": 3,
+      "secondary_code": "SALES_QUOTA_ACHIEVEMENT"
+    },
+    {
+      "primary": "cross_selling_rate.py",
+      "secondary": "up_selling_rate.py",
+      "modules_merged": 1,
+      "secondary_code": "UP_SELLING_RATE"
+    },
+    {
+      "primary": "customer_retention_rate.py",
+      "secondary": "retention_rate.py",
+      "modules_merged": 8,
+      "secondary_code": "RETENTION_RATE"
+    },
+    {
+      "primary": "demo_to_close_ratio.py",
+      "secondary": "demo_to_closing_rate.py",
+      "modules_merged": 3,
+      "secondary_code": "DEMO_TO_CLOSING_RATE"
+    },
+    {
+      "primary": "repeat_purchase_rate.py",
+      "secondary": "repeat_customer_rate.py",
+      "modules_merged": 7,
+      "secondary_code": "REPEAT_CUSTOMER_RATE"
+    },
+    {
+      "primary": "outbound_call_conversion_rate.py",
+      "secondary": "cold_call_conversion_rate.py",
+      "modules_merged": 4,
+      "secondary_code": "COLD_CALL_CONVERSION_RATE"
+    },
+    {
+      "primary": "sales_forecast_accuracy.py",
+      "secondary": "revenue_forecast_accuracy.py",
+      "modules_merged": 10,
+      "secondary_code": "REVENUE_FORECAST_ACCURACY"
+    },
+    {
+      "primary": "lead_response_time.py",
+      "secondary": "sales_team_response_time.py",
+      "modules_merged": 10,
+      "secondary_code": "SALES_TEAM_RESPONSE_TIME"
+    },
+    {
+      "primary": "follow_up_contact_rate.py",
+      "secondary": "rate_of_follow_up_contact.py",
+      "modules_merged": 3,
+      "secondary_code": "RATE_OF_FOLLOW_UP_CONTACT"
+    },
+    {
+      "primary": "customer_support_ticket_resolution_time.py",
+      "secondary": "sales_support_ticket_resolution_time.py",
+      "modules_merged": 2,
+      "secondary_code": "SALES_SUPPORT_TICKET_RESOLUTION_TIME"
+    },
+    {
+      "primary": "revenue_per_sales_representative.py",
+      "secondary": "sales_per_representative.py",
+      "modules_merged": 5,
+      "secondary_code": "SALES_PER_REPRESENTATIVE"
+    },
+    {
+      "primary": "customer_education_engagement_rate.py",
+      "secondary": "customer_education_completion_rate.py",
+      "modules_merged": 2,
+      "secondary_code": "CUSTOMER_EDUCATION_COMPLETION_RATE"
+    },
+    {
+      "primary": "sales_by_region.py",
+      "secondary": "sales_by_regionarea.py",
+      "modules_merged": 3,
+      "secondary_code": "SALES_BY_REGIONAREA"
+    }
+  ],
+  "files_deleted": [
+    "first_contact_resolution_fcr.py",
+    "year_over_year_growth.py",
+    "sales_enablement_team_response_time.py",
+    "account_retention_costs.py",
+    "meeting_conversion_rate.py",
+    "customer_problem_resolution_rate.py",
+    "opportunity_to_sale_ratio.py",
+    "client_lifetime_value.py",
+    "sales_quota_achievement.py",
+    "up_selling_rate.py",
+    "retention_rate.py",
+    "demo_to_closing_rate.py",
+    "repeat_customer_rate.py",
+    "cold_call_conversion_rate.py",
+    "revenue_forecast_accuracy.py",
+    "sales_team_response_time.py",
+    "rate_of_follow_up_contact.py",
+    "sales_support_ticket_resolution_time.py",
+    "sales_per_representative.py",
+    "customer_education_completion_rate.py",
+    "sales_by_regionarea.py"
+  ],
+  "errors": []
+}

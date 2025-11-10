@@ -13,6 +13,7 @@ import logging
 from .config import get_settings
 from .loader import get_loader
 from .api import kpis, object_models, modules, value_chains
+from fastapi import APIRouter
 
 # Configure logging
 logging.basicConfig(
@@ -115,6 +116,20 @@ async def get_stats():
     """Get statistics about loaded definitions."""
     loader = get_loader()
     return loader.get_stats()
+
+
+@app.post("/admin/reload")
+async def reload_definitions():
+    """Reload all definitions from disk without restarting the service."""
+    loader = get_loader()
+    loader.load_all()
+    stats = loader.get_stats()
+    logger.info(f"Reloaded definitions: {stats}")
+    return {
+        "status": "success",
+        "message": "Definitions reloaded successfully",
+        "definitions": stats
+    }
 
 
 if __name__ == "__main__":

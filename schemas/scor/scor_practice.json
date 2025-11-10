@@ -1,0 +1,77 @@
+{
+  "table_name": "scor_practice",
+  "class_name": "SCOR Practice",
+  "columns": [
+    {
+      "name": "id",
+      "type": "String",
+      "length": 50,
+      "primary_key": true,
+      "autoincrement": true
+    },
+    {
+      "name": "name",
+      "type": "String",
+      "length": 200
+    },
+    {
+      "name": "description",
+      "type": "String",
+      "length": 1000
+    },
+    {
+      "name": "type",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "pillar",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "classification",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "implementation_complexity",
+      "type": "String",
+      "length": 20
+    },
+    {
+      "name": "expected_benefits",
+      "type": "String",
+      "length": 1000
+    },
+    {
+      "name": "prerequisites",
+      "type": "String",
+      "length": 500
+    },
+    {
+      "name": "created_at",
+      "type": "DateTime"
+    },
+    {
+      "name": "updated_at",
+      "type": "DateTime"
+    },
+    {
+      "name": "processes",
+      "type": "List"
+    },
+    {
+      "name": "skills",
+      "type": "List"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "ix_scor_practice_created_at",
+      "columns": [
+        "created_at"
+      ]
+    }
+  ]
+}

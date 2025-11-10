@@ -4,80 +4,12 @@ Deal Object Model
 Represents active sales negotiations and proposals.
 """
 
-from analytics_models import ObjectModel
-
-DEAL = ObjectModel(
-    name="Deal",
-    code="DEAL",
-    description="Active sales negotiations with specific terms and pricing",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "deal",
-        "class_name": "Deal",
-        "columns": [
-            {
-                "name": "deal_value",
-                "type": "Float"
-            },
-            {
-                "name": "discount_percentage",
-                "type": "Float"
-            },
-            {
-                "name": "proposed_terms",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "close_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "status",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "win_probability",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "competitor",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "loss_reason",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_deal_close_date",
-                "columns": ["close_date"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+DEAL = {
+    "code": "DEAL",
+    "name": "Deal",
+    "description": "Active sales negotiations with specific terms and pricing",
+    "table_schema": {"table_name": "deal", "class_name": "Deal", "columns": [{"name": "deal_value", "type": "Float"}, {"name": "discount_percentage", "type": "Float"}, {"name": "proposed_terms", "type": "String", "length": 255}, {"name": "close_date", "type": "DateTime", "index": True}, {"name": "status", "type": "String", "length": 255}, {"name": "win_probability", "type": "String", "length": 255}, {"name": "competitor", "type": "String", "length": 255}, {"name": "loss_reason", "type": "String", "length": 255}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_deal_close_date", "columns": ["close_date"]}]},
+    "schema_definition": """
     @startuml
 ' Relationships
 Opportunity "1" -- "0..1" Deal : becomes >
@@ -104,27 +36,5 @@ Deal "1" -- "*" Opportunity : relates to
 Deal "1" -- "*" PerformanceScorecard : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV"],
-        "related_kpis": [
-            "DEAL_SIZE",
-            "AVERAGE_DEAL_DISCOUNT",
-            "LOST_DEAL_ANALYSIS",
-            "TIME_TO_CLOSE",
-            "WIN_RATE",
-            "COMPETITIVE_WIN_RATE"
-        ],
-        "key_attributes": [
-            "deal_value",
-            "discount_percentage",
-            "proposed_terms",
-            "close_date",
-            "status",
-            "win_probability",
-            "competitor",
-            "loss_reason"
-        ],
-        "related_objects": ["Account", "Appointment", "Assessment", "Benchmark", "Call", "Channel Partner", "Coaching Session", "Contract", "Customer", "Demo", "Goal", "Lead", "Meeting", "Opportunity", "Performance Scorecard"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV"], "related_kpis": ["DEAL_SIZE", "AVERAGE_DEAL_DISCOUNT", "LOST_DEAL_ANALYSIS", "TIME_TO_CLOSE", "WIN_RATE", "COMPETITIVE_WIN_RATE"], "key_attributes": ["deal_value", "discount_percentage", "proposed_terms", "close_date", "status", "win_probability", "competitor", "loss_reason"], "related_objects": ["Account", "Appointment", "Assessment", "Benchmark", "Call", "Channel Partner", "Coaching Session", "Contract", "Customer", "Demo", "Goal", "Lead", "Meeting", "Opportunity", "Performance Scorecard"]},
+}

@@ -4,102 +4,12 @@ Opportunity Object Model
 Represents qualified sales prospects in the pipeline.
 """
 
-from analytics_models import ObjectModel
-
-OPPORTUNITY = ObjectModel(
-    name="Opportunity",
-    code="OPPORTUNITY",
-    description="Qualified sales prospects that have been vetted and are actively being pursued",
-
-    # Table Schema - For CQRS table creation
-    table_schema={
-        "table_name": "opportunity",
-        "class_name": "Opportunity",
-        "columns": [
-            {
-                "name": "opportunity_name",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "stage",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "probability",
-                "type": "String",
-                "length": 255
-            },
-            {
-                "name": "expected_value",
-                "type": "Float"
-            },
-            {
-                "name": "expected_close_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "account_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "owner_id",
-                "type": "Integer",
-                "index": True
-            },
-            {
-                "name": "created_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "last_activity_date",
-                "type": "DateTime",
-                "index": True
-            },
-            {
-                "name": "created_at",
-                "type": "DateTime",
-                "default": "now()",
-                "nullable": False
-            },
-            {
-                "name": "updated_at",
-                "type": "DateTime",
-                "default": "now()",
-                "onupdate": "now()",
-                "nullable": False
-            }
-        ],
-        "indexes": [
-            {
-                "name": "ix_opportunity_expected_close_date",
-                "columns": ["expected_close_date"]
-            },
-            {
-                "name": "ix_opportunity_account_id",
-                "columns": ["account_id"]
-            },
-            {
-                "name": "ix_opportunity_owner_id",
-                "columns": ["owner_id"]
-            },
-            {
-                "name": "ix_opportunity_created_date",
-                "columns": ["created_date"]
-            },
-            {
-                "name": "ix_opportunity_last_activity_date",
-                "columns": ["last_activity_date"]
-            }
-        ]
-    },
-
-    # UML Relationships - For documentation
-    schema_definition="""
+OPPORTUNITY = {
+    "code": "OPPORTUNITY",
+    "name": "Opportunity",
+    "description": "Qualified sales prospects that have been vetted and are actively being pursued",
+    "table_schema": {"table_name": "opportunity", "class_name": "Opportunity", "columns": [{"name": "opportunity_name", "type": "String", "length": 255}, {"name": "stage", "type": "String", "length": 255}, {"name": "probability", "type": "String", "length": 255}, {"name": "expected_value", "type": "Float"}, {"name": "expected_close_date", "type": "DateTime", "index": True}, {"name": "account_id", "type": "Integer", "index": True}, {"name": "owner_id", "type": "Integer", "index": True}, {"name": "created_date", "type": "DateTime", "index": True}, {"name": "last_activity_date", "type": "DateTime", "index": True}, {"name": "created_at", "type": "DateTime", "default": "now()", "nullable": False}, {"name": "updated_at", "type": "DateTime", "default": "now()", "onupdate": "now()", "nullable": False}], "indexes": [{"name": "ix_opportunity_expected_close_date", "columns": ["expected_close_date"]}, {"name": "ix_opportunity_account_id", "columns": ["account_id"]}, {"name": "ix_opportunity_owner_id", "columns": ["owner_id"]}, {"name": "ix_opportunity_created_date", "columns": ["created_date"]}, {"name": "ix_opportunity_last_activity_date", "columns": ["last_activity_date"]}]},
+    "schema_definition": """
     @startuml
 ' Sales Development Specific
 ' Relationships - Core
@@ -131,28 +41,5 @@ Opportunity "1" -- "*" Meeting : relates to
 Opportunity "1" -- "*" PerformanceScorecard : relates to
 @enduml
     """,
-
-    metadata_={
-        "modules": ["BUS_DEV", "INSIDE_SALES", "OUTSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "SALES_DEVELOPMENT"],
-        "related_kpis": [
-            "COST_PER_OPPORTUNITY",
-            "OPPORTUNITY_PIPELINE",
-            "OPPORTUNITY_TO_CLOSE_RATE",
-            "LEAD_TO_OPPORTUNITY_CONVERSION_RATE",
-            "NEW_BUSINESS_OPPORTUNITIES_IDENTIFIED",
-            "PIPELINE_GROWTH_RATE"
-        ],
-        "key_attributes": [
-            "opportunity_name",
-            "stage",
-            "probability",
-            "expected_value",
-            "expected_close_date",
-            "account_id",
-            "owner_id",
-            "created_date",
-            "last_activity_date"
-        ],
-        "related_objects": ["Account", "Appointment", "Assessment", "Benchmark", "Call", "Channel Partner", "Coaching Session", "Contract", "Customer", "Deal", "Demo", "Goal", "Lead", "Meeting", "Performance Scorecard"]}
-
-)
+    "metadata_": {"modules": ["BUS_DEV", "INSIDE_SALES", "OUTSIDE_SALES", "KEY_ACCOUNT_MANAGEMENT", "SALES_DEVELOPMENT"], "related_kpis": ["COST_PER_OPPORTUNITY", "OPPORTUNITY_PIPELINE", "OPPORTUNITY_TO_CLOSE_RATE", "LEAD_TO_OPPORTUNITY_CONVERSION_RATE", "NEW_BUSINESS_OPPORTUNITIES_IDENTIFIED", "PIPELINE_GROWTH_RATE"], "key_attributes": ["opportunity_name", "stage", "probability", "expected_value", "expected_close_date", "account_id", "owner_id", "created_date", "last_activity_date"], "related_objects": ["Account", "Appointment", "Assessment", "Benchmark", "Call", "Channel Partner", "Coaching Session", "Contract", "Customer", "Deal", "Demo", "Goal", "Lead", "Meeting", "Performance Scorecard"]},
+}

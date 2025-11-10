@@ -1,0 +1,154 @@
+{
+  "table_name": "scor_metric",
+  "class_name": "SCOR Metric",
+  "columns": [
+    {
+      "name": "id",
+      "type": "String",
+      "length": 50,
+      "primary_key": true,
+      "autoincrement": true
+    },
+    {
+      "name": "name",
+      "type": "String",
+      "length": 200
+    },
+    {
+      "name": "description",
+      "type": "String",
+      "length": 1000
+    },
+    {
+      "name": "attribute",
+      "type": "Enum"
+    },
+    {
+      "name": "level",
+      "type": "Enum"
+    },
+    {
+      "name": "unit",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "calculation",
+      "type": "String",
+      "length": 1000
+    },
+    {
+      "name": "parent_metric_id",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "created_at",
+      "type": "DateTime"
+    },
+    {
+      "name": "updated_at",
+      "type": "DateTime"
+    },
+    {
+      "name": "parent_metric",
+      "type": "SCORMetric"
+    },
+    {
+      "name": "child_metrics",
+      "type": "List"
+    },
+    {
+      "name": "processes",
+      "type": "List"
+    },
+    {
+      "name": "observations",
+      "type": "List"
+    },
+    {
+      "name": "benchmarks",
+      "type": "List"
+    },
+    {
+      "name": "id",
+      "type": "String",
+      "length": 50,
+      "primary_key": true,
+      "autoincrement": true
+    },
+    {
+      "name": "metric_id",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "process_id",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "value",
+      "type": "Float"
+    },
+    {
+      "name": "unit",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "observation_date",
+      "type": "DateTime"
+    },
+    {
+      "name": "observation_start",
+      "type": "DateTime"
+    },
+    {
+      "name": "observation_end",
+      "type": "DateTime"
+    },
+    {
+      "name": "id",
+      "type": "String",
+      "length": 50,
+      "primary_key": true,
+      "autoincrement": true
+    },
+    {
+      "name": "metric_id",
+      "type": "String",
+      "length": 50
+    },
+    {
+      "name": "group_name",
+      "type": "String",
+      "length": 200
+    },
+    {
+      "name": "min_value",
+      "type": "Float"
+    },
+    {
+      "name": "max_value",
+      "type": "Float"
+    },
+    {
+      "name": "target_value",
+      "type": "Float"
+    },
+    {
+      "name": "unit",
+      "type": "String",
+      "length": 50
+    }
+  ],
+  "indexes": [
+    {
+      "name": "ix_scor_metric_created_at",
+      "columns": [
+        "created_at"
+      ]
+    }
+  ]
+}

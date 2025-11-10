@@ -93,14 +93,13 @@ async def get_module_kpis(module_code: str):
             detail=f"Module not found: {module_code}"
         )
     
-    # Get KPI codes from module
-    kpi_codes = module.get("associated_kpis", [])
-    
-    # Get full KPI definitions
+    # Get all KPIs and filter by module_code
+    all_kpis = loader.get_all_kpis()
     kpis = []
-    for kpi_code in kpi_codes:
-        kpi = loader.get_kpi(kpi_code)
-        if kpi:
+    
+    for kpi_code, kpi in all_kpis.items():
+        # Check if this KPI belongs to this module
+        if kpi.get("module_code") == module_code or module_code in kpi.get("modules", []):
             kpis.append(kpi)
     
     return {
