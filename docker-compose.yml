@@ -747,6 +747,142 @@ services:
       retries: 3
       start_period: 40s
       
+  # Analytics Metadata Service - KPI and Object Model definitions
+  analytics_metadata_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/analytics_metadata_service
+    ports:
+      - "8020:8000"
+    environment:
+      - SERVICE_NAME=analytics_metadata_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_PUSH_INTERVAL=15
+      - ENABLE_CACHE=true
+      - CACHE_TTL=3600
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Calculation Engine Service - KPI calculation orchestration
+  calculation_engine_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/calculation_engine_service
+    ports:
+      - "8021:8000"
+    environment:
+      - SERVICE_NAME=calculation_engine_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - METADATA_SERVICE_URL=http://analytics_metadata_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_PUSH_INTERVAL=15
+      - CACHE_ENABLED=true
+      - CACHE_TTL=3600
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      analytics_metadata_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Demo/Config Service - Client configuration and service proposals
+  demo_config_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/demo_config_service
+    ports:
+      - "8022:8000"
+    environment:
+      - SERVICE_NAME=demo_config_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - METADATA_SERVICE_URL=http://analytics_metadata_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_PUSH_INTERVAL=15
+      - DEFAULT_HOURLY_RATE=150.0
+      - BATCH_INTEGRATION_HOURS_PER_OBJECT=8
+      - REALTIME_INTEGRATION_HOURS_PER_OBJECT=16
+      - PYTHONPATH=.
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      analytics_metadata_service:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # API Gateway - Unified interface for all services
   api_gateway:
     build:
@@ -793,6 +929,9 @@ services:
       - ASSESSMENT_SERVICE_URL=http://assessment_service:8006
       - ALLOCATION_SERVICE_URL=http://allocation_service:8007
       - MARKET_MONITOR_URL=http://market_monitor:8008
+      - ANALYTICS_METADATA_SERVICE_URL=http://analytics_metadata_service:8000
+      - CALCULATION_ENGINE_SERVICE_URL=http://calculation_engine_service:8000
+      - DEMO_CONFIG_SERVICE_URL=http://demo_config_service:8000
     depends_on:
       redis:
         condition: service_healthy
@@ -831,6 +970,12 @@ services:
       archival_service:
         condition: service_healthy
       observability_service:
+        condition: service_healthy
+      analytics_metadata_service:
+        condition: service_healthy
+      calculation_engine_service:
+        condition: service_healthy
+      demo_config_service:
         condition: service_healthy
     volumes:
       - .:/app

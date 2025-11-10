@@ -6,9 +6,11 @@ This project extends the base-platforn into an automated trading platform called
 
 ## Architecture
 
-The project consists of 4 core services:
+The project uses a microservices architecture with clear separation of concerns:
 
-### 1. **Database Service** (`database_service`)
+### Backend Services (Infrastructure)
+
+#### 1. **Database Service** (`database_service`)
 - **Purpose**: Centralized database operations, schema management, and TimescaleDB functionality
 - **Port**: 8000
 - **Features**:
@@ -18,7 +20,7 @@ The project consists of 4 core services:
   - Schema validation and discovery
   - Real-time read model projections
 
-### 2. **Messaging Service** (`messaging_service`)
+#### 2. **Messaging Service** (`messaging_service`)
 - **Purpose**: Centralized Redis operations, pub/sub management, and inter-service communication
 - **Port**: 8001
 - **Features**:
@@ -28,23 +30,73 @@ The project consists of 4 core services:
   - Subscription management
   - Dead letter queue handling
 
-### 3. **Service A** (`service_a`)
-- **Purpose**: Business functionality demonstrating database and messaging integration
-- **Port**: 8002
+#### 3. **Archival Service** (`archival_service`)
+- **Purpose**: TimescaleDB data archival to lakehouse
+- **Port**: 8004
 - **Features**:
-  - Business logic implementation
-  - CQRS pattern usage via Database Service
-  - Event publishing via Messaging Service
-  - Real-time analytics with TimescaleDB
+  - Automated data retention policies
+  - Lakehouse integration (Azure Storage)
+  - Chunk compression and archival
 
-### 4. **Service B** (`service_b`)
-- **Purpose**: Business functionality demonstrating cross-service communication
-- **Port**: 8003
+#### 4. **Observability Service** (`observability_service`)
+- **Purpose**: Centralized monitoring, metrics, and distributed tracing
+- **Port**: 8080, 4317 (OTLP)
 - **Features**:
-  - Business logic implementation
-  - Cross-service communication patterns
-  - Event consumption from Service A
-  - Coordinated transactions
+  - OpenTelemetry trace collection
+  - Prometheus metrics aggregation
+  - Service health monitoring
+  - Performance analytics
+
+#### 5. **Calculation Engine Service** (`calculation_engine_service`)
+- **Purpose**: Generic KPI calculation orchestration
+- **Port**: 8021
+- **Features**:
+  - Value chain calculation routing
+  - Parallel KPI execution
+  - Result caching and aggregation
+  - Dashboard calculation support
+
+### Business Services (Domain Logic)
+
+#### 1. **Analytics Metadata Service** (`analytics_metadata_service`)
+- **Purpose**: Single source of truth for KPI, Object Model, Module, and Value Chain definitions
+- **Port**: 8020
+- **Features**:
+  - 500+ KPI definitions via REST API
+  - Object model schemas for dynamic table creation
+  - Module and value chain registry
+  - Industry standards integration (SCOR, etc.)
+
+#### 2. **Systems Monitor** (`systems_monitor`)
+- **Port**: 8010
+- **Purpose**: System health and performance monitoring
+
+#### 3. **Controller Service** (`controller_service`)
+- **Port**: 8011
+- **Purpose**: Orchestration and workflow management
+
+#### 4. **Entity Resolution Service** (`entity_resolution_service`)
+- **Port**: 8012
+- **Purpose**: Entity matching and deduplication
+
+#### 5. **Data Governance Service** (`data_governance_service`)
+- **Port**: 8013
+- **Purpose**: Data quality and compliance management
+
+#### 6. **Machine Learning Service** (`machine_learning_service`)
+- **Port**: 8014
+- **Purpose**: ML model training and inference
+
+### Frontend Services
+
+#### **API Gateway** (`api_gateway`)
+- **Purpose**: Unified interface for all services
+- **Port**: 8090
+- **Features**:
+  - Request routing and aggregation
+  - Rate limiting and circuit breaking
+  - CORS and authentication
+  - Service health checks
 
 ## Key Improvements Over Traditional Architecture
 
