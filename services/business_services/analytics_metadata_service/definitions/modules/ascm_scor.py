@@ -1,0 +1,254 @@
+"""
+ASCM SCOR Framework Module
+
+The Supply Chain Operations Reference (SCOR) model is a process reference model 
+developed by ASCM (Association for Supply Chain Management) that provides a 
+standardized framework for supply chain processes, metrics, practices, and skills.
+
+Version: SCOR Digital Standard v14.0
+Source: ASCM (Association for Supply Chain Management)
+URL: https://www.ascm.org/corporate-transformation/standards-and-frameworks/scor/
+
+The SCOR model provides:
+- Hierarchical process structure (Levels 0-4)
+- Performance metrics (Strategic L1, Diagnostic L2, Operational L3)
+- Performance attributes (Reliability, Responsiveness, Agility, Costs, Profit, Assets, Environmental, Social)
+- Best practices categorized by type and pillar
+- Skills and competencies with proficiency levels
+- Industry benchmarks for comparison
+
+This module serves as the foundation for SCOR framework integration, enabling:
+- Standardized supply chain process definitions
+- Industry-recognized performance metrics
+- Benchmarking against SCOR standards
+- Gap analysis and compliance tracking
+- Skills and competency mapping
+"""
+
+from analytics_models import Module
+
+ASCM_SCOR = Module(
+    name="ASCM SCOR Framework",
+    code="ASCM_SCOR",
+    description="ASCM Supply Chain Operations Reference Model v14.0 - Standardized framework for supply chain processes, metrics, practices, and skills",
+    display_order=1,
+    is_active=True,
+    metadata_={
+        "value_chains": ["SUPPLY_CHAIN"],
+        "industries": [
+            "RETAIL",
+            "MANUFACTURING",
+            "DISTRIBUTION",
+            "LOGISTICS",
+            "WHOLESALE",
+            "CONSUMER_GOODS",
+            "AUTOMOTIVE",
+            "AEROSPACE",
+            "PHARMACEUTICALS"
+        ],
+        "framework_version": "14.0",
+        "framework_source": "ASCM",
+        "framework_url": "https://www.ascm.org/corporate-transformation/standards-and-frameworks/scor/",
+        "certification_available": True,
+        "associated_kpis": [
+            "PERFECT_ORDER_FULFILLMENT",
+            "ORDER_FULFILLMENT_CYCLE_TIME",
+            "UPSIDE_SUPPLY_CHAIN_FLEXIBILITY",
+            "DOWNSIDE_SUPPLY_CHAIN_ADAPTABILITY",
+            "TOTAL_SUPPLY_CHAIN_MANAGEMENT_COST",
+            "COST_OF_GOODS_SOLD",
+            "RETURN_ON_SUPPLY_CHAIN_FIXED_ASSETS",
+            "CASH_TO_CASH_CYCLE_TIME",
+            "RETURN_ON_WORKING_CAPITAL",
+            "CARBON_EMISSIONS_PER_UNIT",
+            "WORKER_SAFETY_INCIDENT_RATE"
+        ],
+        "associated_object_models": [
+            # SCOR Reference Objects (Layer 1 - Metadata)
+            "SCOR_PROCESS",
+            "SCOR_METRIC",
+            "SCOR_PRACTICE",
+            "SCOR_SKILL",
+            "SCOR_METRIC_OBSERVATION",
+            # HIGH Priority - Core Supply Chain (Phase 2)
+            "ORDER",
+            "ORDER_LINE",
+            "SHIPMENT",
+            "DELIVERY",
+            "INVENTORY",
+            "SUPPLIER",
+            "COST",
+            "REVENUE",
+            # MEDIUM Priority - Financial & Operational (Phase 3)
+            "INVOICE",
+            "PAYMENT",
+            "RECEIPT",
+            "ACCOUNTS_PAYABLE",
+            "ACCOUNTS_RECEIVABLE",
+            "PRODUCTION",
+            "MATERIAL",
+            "ASSET",
+            "COST_CENTER",
+            "ACTIVITY",
+            # LOW Priority - Environmental & Social (Phase 4)
+            "CAPACITY",
+            "ENERGY",
+            "EMISSION",
+            "TRANSPORTATION",
+            "EMPLOYEE",
+            "WORK_HOURS",
+            "SAFETY_INCIDENT"
+        ],
+        "performance_attributes": {
+            "RL": {
+                "name": "Reliability",
+                "description": "The ability to perform tasks as expected. Reliability focuses on the predictability of the outcome of a process.",
+                "example_metrics": ["Perfect Order Fulfillment", "Delivery Performance"]
+            },
+            "RS": {
+                "name": "Responsiveness",
+                "description": "The speed at which tasks are performed. The velocity at which a supply chain provides products to the customer.",
+                "example_metrics": ["Order Fulfillment Cycle Time", "Lead Time"]
+            },
+            "AG": {
+                "name": "Agility",
+                "description": "The ability to respond to external influences, the ability to respond to marketplace changes to gain or maintain competitive advantage.",
+                "example_metrics": ["Upside Supply Chain Flexibility", "Downside Supply Chain Adaptability"]
+            },
+            "CO": {
+                "name": "Costs",
+                "description": "The cost of operating the supply chain processes. This includes labor costs, material costs, management and transportation costs.",
+                "example_metrics": ["Total Supply Chain Management Cost", "Cost of Goods Sold"]
+            },
+            "PR": {
+                "name": "Profit",
+                "description": "The profit margin and return on assets. The value generated by the supply chain.",
+                "example_metrics": ["Return on Supply Chain Fixed Assets", "Return on Working Capital"]
+            },
+            "AM": {
+                "name": "Asset Management",
+                "description": "The ability to efficiently utilize assets. Asset management strategies in a supply chain include inventory reduction and in-sourcing vs. outsourcing.",
+                "example_metrics": ["Cash-to-Cash Cycle Time", "Return on Fixed Assets"]
+            },
+            "EV": {
+                "name": "Environmental",
+                "description": "Environmental sustainability metrics including emissions, waste, and resource consumption.",
+                "example_metrics": ["Carbon Emissions", "Waste Reduction", "Energy Efficiency"]
+            },
+            "SC": {
+                "name": "Social",
+                "description": "Social responsibility metrics including labor practices, safety, and community impact.",
+                "example_metrics": ["Worker Safety", "Fair Labor Practices", "Community Investment"]
+            }
+        },
+        "process_types": {
+            "OE": {
+                "name": "Orchestrate",
+                "description": "Strategic planning and governance of the supply chain",
+                "focus": "Aligning supply chain strategy with business strategy"
+            },
+            "P": {
+                "name": "Plan",
+                "description": "Demand and supply planning processes",
+                "focus": "Balancing aggregate demand and supply to develop a course of action"
+            },
+            "S": {
+                "name": "Source",
+                "description": "Procurement and supplier management processes",
+                "focus": "Procuring goods and services to meet planned or actual demand"
+            },
+            "T": {
+                "name": "Transform",
+                "description": "Manufacturing and production processes",
+                "focus": "Transforming product to a finished state to meet planned or actual demand"
+            },
+            "F": {
+                "name": "Fulfill",
+                "description": "Order management and delivery processes",
+                "focus": "Providing finished goods and services to meet planned or actual demand"
+            },
+            "R": {
+                "name": "Return",
+                "description": "Returns and reverse logistics processes",
+                "focus": "Returning or receiving returned products for any reason"
+            }
+        },
+        "metric_levels": {
+            "LEVEL_1": {
+                "name": "Strategic",
+                "description": "Top-level performance metrics that measure overall supply chain performance",
+                "characteristics": [
+                    "Cross-functional",
+                    "Customer-facing",
+                    "Aggregate view",
+                    "Board-level reporting"
+                ],
+                "example_count": "~15 metrics"
+            },
+            "LEVEL_2": {
+                "name": "Diagnostic",
+                "description": "Decomposition of Level 1 metrics into component metrics",
+                "characteristics": [
+                    "Process-specific",
+                    "Diagnostic capability",
+                    "Management reporting",
+                    "Identifies improvement areas"
+                ],
+                "example_count": "~50 metrics"
+            },
+            "LEVEL_3": {
+                "name": "Operational",
+                "description": "Detailed process-level metrics for operational management",
+                "characteristics": [
+                    "Activity-specific",
+                    "Operational control",
+                    "Daily/weekly tracking",
+                    "Frontline management"
+                ],
+                "example_count": "~150+ metrics"
+            }
+        },
+        "process_levels": {
+            "LEVEL_0": {
+                "name": "Framework",
+                "description": "Top-level SCOR framework",
+                "scope": "Overall supply chain"
+            },
+            "LEVEL_1": {
+                "name": "Process Type",
+                "description": "Process types (Plan, Source, Make, Deliver, Return)",
+                "scope": "6 process types",
+                "example": "P (Plan)"
+            },
+            "LEVEL_2": {
+                "name": "Process Category",
+                "description": "Process categories within each type",
+                "scope": "~30 process categories",
+                "example": "P1 (Plan Supply Chain)"
+            },
+            "LEVEL_3": {
+                "name": "Process Element",
+                "description": "Process elements that decompose categories",
+                "scope": "~200 process elements",
+                "example": "P1.1 (Identify, Prioritize, and Aggregate Supply Chain Requirements)"
+            },
+            "LEVEL_4": {
+                "name": "Activity",
+                "description": "Implementation-specific activities",
+                "scope": "Company-specific",
+                "example": "P1.1.1 (Collect and Validate Supply Chain Data)"
+            }
+        },
+        "implementation_notes": [
+            "SCOR provides a standardized language for supply chain processes",
+            "Enables benchmarking against industry standards",
+            "Supports gap analysis and continuous improvement",
+            "Integrates with existing supply chain KPIs through metadata",
+            "Alignment analyzer automatically maps custom KPIs to SCOR metrics"
+        ],
+        "integration_approach": "Hybrid - Dedicated SCOR module + metadata enrichment in existing supply chain KPIs",
+        "coverage_tracking": True,
+        "automatic_mapping": True,
+        "benchmarking_enabled": True
+    }
+)
