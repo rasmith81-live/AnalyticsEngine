@@ -7,17 +7,63 @@ export interface KPI {
   name: string;
   display_name?: string;
   formula: string;
-  unit: string;
+  calculation_formula?: string;
+  unit?: string;
   description?: string;
+  category?: string;
+  is_active?: boolean;
+  full_kpi_definition?: string;
+  trend_analysis?: string;
+  diagnostic_questions?: string;
+  actionable_tips?: string;
+  visualization_suggestions?: string;
+  risk_warnings?: string;
+  tracking_tools?: string;
+  integration_points?: string;
+  change_impact_analysis?: string;
   calculation_logic?: string;
   required_objects: string[];
   benchmarks?: Record<string, any>;
+  modules?: string[];
+  module_code?: string;
   metadata_: {
     modules: string[];
-    value_chains: string[];
+    value_chains?: string[];
     industries?: string[];
     level?: number;
     category?: string;
+    last_validated?: string;
+  };
+  sample_data?: {
+    time_series: {
+      dates: string[];
+      values: number[];
+      unit: string;
+    };
+    current: {
+      value: number;
+      unit: string;
+      change: number;
+      change_percent: number;
+      trend: string;
+    };
+    statistics: {
+      average: number;
+      min: number;
+      max: number;
+      unit: string;
+    };
+    breakdown: Array<{
+      category: string;
+      value: number;
+      percentage: number;
+    }>;
+    metadata: {
+      generated_date: string;
+      data_points: number;
+      kpi_type: string;
+      kpi_name: string;
+    };
   };
 }
 

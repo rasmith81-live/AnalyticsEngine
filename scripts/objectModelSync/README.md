@@ -732,3 +732,101 @@ xcopy /E /I /Y backups\definitions_backup_YYYYMMDD_HHMMSS\* ..\..\services\busin
 | Rollback | `xcopy /E /I /Y backups\[backup_folder]\* ..\..\...\definitions\` |
 | View logs | `type logs\sync_*.log` |
 | Schedule weekly | `schtasks /create /tn "ObjectModelSync" /tr "python [path]\run_full_sync.py" /sc weekly /d SUN /st 02:00` |
+| **Generate SQLAlchemy models** | `.\run_generate_models.ps1` |
+| **KPI validation** | `python validate_and_enhance_kpis.py` or menu option 6 |
+| **Regenerate sample data** | `python regenerate_sample_data.py` or menu option 7 |
+
+---
+
+## SQLAlchemy Model Generation
+
+### Purpose
+Generate SQLAlchemy model classes in `base_models.py` from object model dictionary definitions.
+
+### Usage
+```powershell
+.\run_generate_models.ps1
+```
+
+### What It Does
+- ✅ Reads object model definitions from metadata service
+- ✅ Generates SQLAlchemy model classes
+- ✅ Creates proper type mappings and indexes
+- ✅ Backs up existing base_models.py
+
+### What It Does NOT Do
+- ❌ Create TimescaleDB hypertables (handled by `scripts/utils/`)
+- ❌ Apply database migrations (use Alembic)
+- ❌ Modify existing database tables
+
+### Workflow
+1. Define object model → `definitions/object_models/my_model.py`
+2. Generate SQLAlchemy → `.\run_generate_models.ps1`
+3. Create migration → `alembic revision --autogenerate`
+4. Apply migration → `alembic upgrade head`
+5. TimescaleDB setup → Use `scripts/utils/run_migration_reset.ps1`
+
+### Important Notes
+- **TimescaleDB hypertables** are created separately using `scripts/utils/` utilities
+- **Do NOT** manually add `create_hypertable` calls to Alembic migrations
+- See `OBJECT_MODEL_TO_SQLALCHEMY_SYNC.md` for complete documentation
+
+---
+
+## KPI Validation and Enhancement (NEW)
+
+### Purpose
+Ensure all KPIs have complete, standardized definitions with formula-aware sample data for robust visualizations.
+
+### Usage via Governance Menu
+```powershell
+.\run_governance.bat
+# Select option 6 for KPI Validation
+# Select option 7 for Sample Data Regeneration
+```
+
+### Direct Usage
+```powershell
+# Validate and enhance all KPIs
+python validate_and_enhance_kpis.py
+
+# Regenerate sample data only
+python regenerate_sample_data.py
+```
+
+### What It Does
+- ✅ Validates all 21 required KPI fields
+- ✅ Adds missing fields with sensible defaults
+- ✅ Generates formula-aware sample data
+- ✅ Creates smart category names based on context
+- ✅ Analyzes formulas for realistic value ranges
+- ✅ Creates automatic backups
+- ✅ Produces detailed validation reports
+
+### Required KPI Fields (21 Total)
+**Core**: code, name, description, formula, calculation_formula, category, is_active  
+**Details**: full_kpi_definition, trend_analysis, diagnostic_questions, actionable_tips, visualization_suggestions, risk_warnings, tracking_tools, integration_points, change_impact_analysis  
+**Metadata**: metadata_, required_objects, modules, module_code  
+**Visualization**: sample_data (time_series, current, statistics, breakdown)
+
+### Formula-Aware Sample Data
+The system analyzes KPI formulas to generate realistic data:
+- **Percentage KPIs** (with division): 50-75% range
+- **Count KPIs**: Integer values
+- **Currency KPIs**: Appropriate decimal values
+- **Smart Categories**: Based on formula context (accounts, customers, products, sales, regions)
+
+### Example
+**Formula**: `(Number of Accounts Managed / Total Target Accounts) * 100`  
+**Generated Categories**: Enterprise Accounts, Mid-Market, Small Business, Strategic Partners, Other  
+**Value Range**: 50-75% (realistic for account coverage)
+
+### Workflow
+1. **After KPI Creation/Import** → Run validation
+2. **Before Frontend Testing** → Ensure sample data exists
+3. **After Formula Changes** → Regenerate sample data
+4. **Monthly Maintenance** → Validate all KPIs
+
+### Documentation
+- See `KPI_VALIDATION_AND_ENHANCEMENT.md` for complete documentation
+- See `KPI_ENHANCEMENT_EXAMPLE.md` for before/after examples

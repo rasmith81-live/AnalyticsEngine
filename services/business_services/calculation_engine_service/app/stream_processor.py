@@ -1,0 +1,437 @@
+"""
+Stream Processor for Calculation Engine
+Subscribes to data streams and calculates KPIs in real-time
+"""
+import asyncio
+import logging
+import json
+from typing import Dict, Optional, Set, Callable, Any
+from datetime import datetime
+import httpx
+
+from .base_handler import CalculationParams, CalculationResult
+from .orchestrator import CalculationOrchestrator
+
+logger = logging.getLogger(__name__)
+
+
+class StreamProcessor:
+    """
+    Processes incoming data streams and calculates KPIs in real-time
+    
+    Responsibilities:
+    - Subscribe to data streams from database service
+    - Listen for stream updates via messaging service
+    - Calculate KPIs when new data arrives
+    - Publish calculation results back to messaging service
+    - Manage stream subscriptions lifecycle
+    """
+    
+    def __init__(
+        self,
+        orchestrator: CalculationOrchestrator,
+        database_service_url: str,
+        messaging_service_url: str,
+        subscriber_id: Optional[str] = None
+    ):
+        """
+        Initialize stream processor
+        
+        Args:
+            orchestrator: Calculation orchestrator for KPI calculations
+            database_service_url: URL of database service
+            messaging_service_url: URL of messaging service
+            subscriber_id: Optional subscriber ID (generated if not provided)
+        """
+        self.orchestrator = orchestrator
+        self.database_service_url = database_service_url
+        self.messaging_service_url = messaging_service_url
+        self.subscriber_id = subscriber_id or f"calc_engine_{id(self)}"
+        
+        # Track active subscriptions: stream_key -> subscription_info
+        self._active_subscriptions: Dict[str, Dict] = {}
+        
+        # Track message consumers: channel -> consumer_task
+        self._message_consumers: Dict[str, asyncio.Task] = {}
+        
+        # Control flag
+        self._running = False
+        
+        # HTTP client for API calls
+        self._http_client: Optional[httpx.AsyncClient] = None
+        
+        # Heartbeat task
+        self._heartbeat_task: Optional[asyncio.Task] = None
+        
+        logger.info(f"StreamProcessor initialized with subscriber_id: {self.subscriber_id}")
+    
+    async def start(self):
+        """Start the stream processor"""
+        self._running = True
+        
+        # Initialize HTTP client
+        self._http_client = httpx.AsyncClient(timeout=30.0)
+        
+        # Start heartbeat task
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        
+        logger.info("StreamProcessor started")
+    
+    async def stop(self):
+        """Stop the stream processor and cleanup all subscriptions"""
+        self._running = False
+        
+        # Unsubscribe from all streams
+        for stream_key in list(self._active_subscriptions.keys()):
+            await self.unsubscribe_from_stream(stream_key)
+        
+        # Cancel all message consumers
+        for channel, task in self._message_consumers.items():
+            logger.info(f"Cancelling consumer for channel: {channel}")
+            task.cancel()
+        
+        if self._message_consumers:
+            await asyncio.gather(*self._message_consumers.values(), return_exceptions=True)
+        
+        # Cancel heartbeat task
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Close HTTP client
+        if self._http_client:
+            await self._http_client.aclose()
+        
+        logger.info("StreamProcessor stopped")
+    
+    async def subscribe_to_stream(
+        self,
+        kpi_code: str,
+        entity_id: str,
+        period: str,
+        calculation_params: Optional[Dict[str, Any]] = None
+    ) -> Dict:
+        """
+        Subscribe to a KPI data stream
+        
+        Args:
+            kpi_code: KPI code to calculate
+            entity_id: Entity ID for the KPI
+            period: Time period ('minute', 'hour', 'day')
+            calculation_params: Optional additional parameters for calculation
+            
+        Returns:
+            Subscription details
+        """
+        stream_key = f"{kpi_code}:{entity_id}:{period}"
+        
+        if stream_key in self._active_subscriptions:
+            logger.warning(f"Already subscribed to stream: {stream_key}")
+            return self._active_subscriptions[stream_key]
+        
+        try:
+            # Subscribe to stream via database service
+            response = await self._http_client.post(
+                f"{self.database_service_url}/stream/subscribe",
+                params={
+                    "kpi_code": kpi_code,
+                    "entity_id": entity_id,
+                    "period": period,
+                    "subscriber_id": self.subscriber_id
+                }
+            )
+            response.raise_for_status()
+            subscription_info = response.json()
+            
+            # Store subscription info
+            self._active_subscriptions[stream_key] = {
+                **subscription_info,
+                "calculation_params": calculation_params or {},
+                "subscribed_at": datetime.utcnow().isoformat()
+            }
+            
+            # Start message consumer for this stream
+            channel = subscription_info["channel"]
+            await self._start_message_consumer(channel, kpi_code, entity_id, period, calculation_params)
+            
+            logger.info(f"Subscribed to stream: {stream_key} on channel: {channel}")
+            
+            return subscription_info
+        
+        except Exception as e:
+            logger.error(f"Failed to subscribe to stream {stream_key}: {e}")
+            raise
+    
+    async def unsubscribe_from_stream(self, stream_key: str) -> bool:
+        """
+        Unsubscribe from a KPI data stream
+        
+        Args:
+            stream_key: Stream key (kpi_code:entity_id:period)
+            
+        Returns:
+            True if unsubscribed successfully
+        """
+        if stream_key not in self._active_subscriptions:
+            logger.warning(f"Not subscribed to stream: {stream_key}")
+            return False
+        
+        subscription = self._active_subscriptions[stream_key]
+        channel = subscription["channel"]
+        
+        try:
+            # Stop message consumer
+            if channel in self._message_consumers:
+                task = self._message_consumers[channel]
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                del self._message_consumers[channel]
+            
+            # Unsubscribe via database service
+            parts = stream_key.split(":")
+            if len(parts) == 3:
+                kpi_code, entity_id, period = parts
+                response = await self._http_client.post(
+                    f"{self.database_service_url}/stream/unsubscribe",
+                    params={
+                        "subscriber_id": self.subscriber_id,
+                        "kpi_code": kpi_code,
+                        "entity_id": entity_id,
+                        "period": period
+                    }
+                )
+                response.raise_for_status()
+            
+            # Remove from active subscriptions
+            del self._active_subscriptions[stream_key]
+            
+            logger.info(f"Unsubscribed from stream: {stream_key}")
+            return True
+        
+        except Exception as e:
+            logger.error(f"Failed to unsubscribe from stream {stream_key}: {e}")
+            return False
+    
+    async def _start_message_consumer(
+        self,
+        channel: str,
+        kpi_code: str,
+        entity_id: str,
+        period: str,
+        calculation_params: Optional[Dict[str, Any]]
+    ):
+        """
+        Start a message consumer for a specific channel
+        
+        Args:
+            channel: Redis channel to subscribe to
+            kpi_code: KPI code
+            entity_id: Entity ID
+            period: Time period
+            calculation_params: Additional calculation parameters
+        """
+        if channel in self._message_consumers:
+            logger.warning(f"Consumer already exists for channel: {channel}")
+            return
+        
+        # Create consumer task
+        task = asyncio.create_task(
+            self._consume_messages(channel, kpi_code, entity_id, period, calculation_params)
+        )
+        self._message_consumers[channel] = task
+        
+        logger.info(f"Started message consumer for channel: {channel}")
+    
+    async def _consume_messages(
+        self,
+        channel: str,
+        kpi_code: str,
+        entity_id: str,
+        period: str,
+        calculation_params: Optional[Dict[str, Any]]
+    ):
+        """
+        Consume messages from a Redis channel and calculate KPIs
+        
+        This is a simplified implementation. In production, you would use
+        the messaging service's subscribe functionality with Redis pub/sub.
+        """
+        logger.info(f"Message consumer started for channel: {channel}")
+        
+        try:
+            # Subscribe to channel via messaging service
+            # Note: This is a placeholder - actual implementation would use
+            # Redis pub/sub or WebSocket connection to messaging service
+            
+            while self._running:
+                try:
+                    # In production, this would receive messages from Redis pub/sub
+                    # For now, we'll poll the messaging service
+                    # TODO: Implement actual Redis pub/sub subscription
+                    
+                    await asyncio.sleep(1)  # Placeholder polling interval
+                    
+                    # When a message is received, process it
+                    # message = await receive_from_channel(channel)
+                    # await self._process_stream_update(message, kpi_code, entity_id, period, calculation_params)
+                
+                except asyncio.CancelledError:
+                    logger.info(f"Consumer cancelled for channel: {channel}")
+                    raise
+                
+                except Exception as e:
+                    logger.error(f"Error consuming messages from {channel}: {e}")
+                    await asyncio.sleep(5)  # Back off on error
+        
+        except asyncio.CancelledError:
+            logger.info(f"Message consumer stopped for channel: {channel}")
+            raise
+        
+        except Exception as e:
+            logger.error(f"Message consumer failed for channel {channel}: {e}")
+    
+    async def _process_stream_update(
+        self,
+        message: Dict,
+        kpi_code: str,
+        entity_id: str,
+        period: str,
+        calculation_params: Optional[Dict[str, Any]]
+    ):
+        """
+        Process a stream update message and calculate KPI
+        
+        Args:
+            message: Stream update message
+            kpi_code: KPI code to calculate
+            entity_id: Entity ID
+            period: Time period
+            calculation_params: Additional calculation parameters
+        """
+        try:
+            logger.debug(f"Processing stream update for {kpi_code}:{entity_id}:{period}")
+            
+            # Extract data from message
+            timestamp = message.get("timestamp")
+            avg_value = message.get("avg_value")
+            
+            # Create calculation parameters
+            params = CalculationParams(
+                kpi_code=kpi_code,
+                entity_id=entity_id,
+                start_date=timestamp,
+                end_date=timestamp,
+                filters=calculation_params.get("filters", {}),
+                aggregation=calculation_params.get("aggregation", "average")
+            )
+            
+            # Calculate KPI
+            result = await self.orchestrator.calculate_single(params)
+            
+            # Publish result to messaging service
+            await self._publish_calculation_result(result, kpi_code, entity_id, period)
+            
+            logger.debug(f"Calculated {kpi_code} for {entity_id}: {result.value}")
+        
+        except Exception as e:
+            logger.error(f"Failed to process stream update: {e}")
+    
+    async def _publish_calculation_result(
+        self,
+        result: CalculationResult,
+        kpi_code: str,
+        entity_id: str,
+        period: str
+    ):
+        """
+        Publish calculation result to messaging service
+        
+        Args:
+            result: Calculation result
+            kpi_code: KPI code
+            entity_id: Entity ID
+            period: Time period
+        """
+        try:
+            # Publish to messaging service
+            channel = f"kpi.calculated.{kpi_code}.{entity_id}.{period}"
+            
+            message = {
+                "kpi_code": kpi_code,
+                "entity_id": entity_id,
+                "period": period,
+                "value": result.value,
+                "unit": result.unit,
+                "timestamp": result.timestamp.isoformat() if result.timestamp else None,
+                "calculated_at": datetime.utcnow().isoformat(),
+                "metadata": result.metadata
+            }
+            
+            response = await self._http_client.post(
+                f"{self.messaging_service_url}/publish",
+                json={
+                    "channel": channel,
+                    "message": message,
+                    "message_type": "kpi_calculation_result"
+                }
+            )
+            response.raise_for_status()
+            
+            logger.debug(f"Published calculation result to {channel}")
+        
+        except Exception as e:
+            logger.error(f"Failed to publish calculation result: {e}")
+    
+    async def _heartbeat_loop(self):
+        """Send periodic heartbeats to keep subscriptions alive"""
+        logger.info("Heartbeat loop started")
+        
+        try:
+            while self._running:
+                await asyncio.sleep(60)  # Send heartbeat every minute
+                
+                try:
+                    response = await self._http_client.post(
+                        f"{self.database_service_url}/stream/heartbeat",
+                        params={"subscriber_id": self.subscriber_id}
+                    )
+                    response.raise_for_status()
+                    logger.debug(f"Heartbeat sent for subscriber: {self.subscriber_id}")
+                
+                except Exception as e:
+                    logger.error(f"Failed to send heartbeat: {e}")
+        
+        except asyncio.CancelledError:
+            logger.info("Heartbeat loop cancelled")
+            raise
+        
+        except Exception as e:
+            logger.error(f"Heartbeat loop failed: {e}")
+    
+    async def get_status(self) -> Dict:
+        """
+        Get status of stream processor
+        
+        Returns:
+            Status information
+        """
+        return {
+            "running": self._running,
+            "subscriber_id": self.subscriber_id,
+            "active_subscriptions": len(self._active_subscriptions),
+            "active_consumers": len(self._message_consumers),
+            "subscriptions": {
+                stream_key: {
+                    "channel": sub["channel"],
+                    "subscriber_count": sub.get("subscriber_count", 0),
+                    "subscribed_at": sub["subscribed_at"]
+                }
+                for stream_key, sub in self._active_subscriptions.items()
+            }
+        }

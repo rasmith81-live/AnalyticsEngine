@@ -31,6 +31,8 @@ from .telemetry_consumers import TelemetryEventConsumer
 from .command_consumers import CommandConsumer
 from .news_consumer import NewsConsumer
 from .market_data_consumer import MarketDataConsumer
+from .subscriber_manager import SubscriberManager
+from .stream_publisher import StreamPublisher
 from .models import (
     QueryRequest, QueryResponse, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
@@ -56,6 +58,8 @@ telemetry_consumer = None
 command_consumer = None
 news_consumer = None
 market_data_consumer = None
+subscriber_manager = None
+stream_publisher = None
 service_start_time = datetime.utcnow()
 
 # Background task cancellation handles
@@ -66,7 +70,7 @@ system_metrics_task = None
 @trace_method(name="main.lifespan")
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, metrics_export_task, system_metrics_task
+    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, subscriber_manager, stream_publisher, metrics_export_task, system_metrics_task
     
     # Startup
     start_time = datetime.utcnow()
@@ -151,6 +155,19 @@ async def lifespan(app: FastAPI):
             messaging_client=messaging_client
         )
         await market_data_consumer.start()
+        
+        # Initialize subscriber manager for stream publishing
+        subscriber_manager = SubscriberManager(timeout_seconds=300)
+        
+        # Initialize stream publisher
+        stream_publisher = StreamPublisher(
+            db_session_factory=database_manager.get_session,
+            messaging_client=messaging_client,
+            subscriber_manager=subscriber_manager,
+            poll_interval_seconds=30
+        )
+        await stream_publisher.start()
+        logger.info("Stream publisher initialized and started")
         
         # Start background tasks for metrics
         if settings.enable_prometheus_metrics:
@@ -264,6 +281,11 @@ async def lifespan(app: FastAPI):
         # Stop market data consumer
         if market_data_consumer:
             await market_data_consumer.stop()
+        
+        # Stop stream publisher
+        if stream_publisher:
+            await stream_publisher.stop()
+            logger.info("Stream publisher stopped")
         
         # Stop retention manager
         if retention_manager:
@@ -393,6 +415,18 @@ def get_messaging_client() -> MessagingClient:
     if messaging_client is None:
         raise HTTPException(status_code=503, detail="Messaging client not initialized")
     return messaging_client
+
+def get_subscriber_manager() -> SubscriberManager:
+    """Dependency to get subscriber manager instance."""
+    if subscriber_manager is None:
+        raise HTTPException(status_code=503, detail="Subscriber manager not initialized")
+    return subscriber_manager
+
+def get_stream_publisher() -> StreamPublisher:
+    """Dependency to get stream publisher instance."""
+    if stream_publisher is None:
+        raise HTTPException(status_code=503, detail="Stream publisher not initialized")
+    return stream_publisher
 
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
@@ -1000,6 +1034,267 @@ async def get_connection_status(db_manager: DatabaseManager = Depends(get_databa
     except Exception as e:
         logger.error(f"Failed to get connection status: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Connection status failed: {str(e)}")
+
+# ============================================================================
+# KPI STREAMING ENDPOINTS
+# ============================================================================
+
+@app.post("/stream/subscribe")
+@trace_method(name="database_service.stream_subscribe", kind="SERVER")
+async def subscribe_to_stream(
+    request: Request,
+    kpi_code: str,
+    entity_id: str,
+    period: str,
+    subscriber_id: Optional[str] = None,
+    sub_mgr: SubscriberManager = Depends(get_subscriber_manager),
+    pub: StreamPublisher = Depends(get_stream_publisher)
+):
+    """
+    Subscribe to a KPI stream
+    
+    Args:
+        kpi_code: KPI code to subscribe to
+        entity_id: Entity ID for the KPI
+        period: Time period ('minute', 'hour', 'day')
+        subscriber_id: Optional subscriber ID (generated if not provided)
+    
+    Returns:
+        Subscription details including subscriber_id and stream_key
+    """
+    correlation_id = extract_correlation_id_from_headers(request.headers) or str(uuid.uuid4())
+    start_time = datetime.utcnow()
+    
+    # Validate period
+    if period not in ['minute', 'hour', 'day']:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid period: {period}. Must be 'minute', 'hour', or 'day'"
+        )
+    
+    # Generate subscriber ID if not provided
+    if not subscriber_id:
+        subscriber_id = str(uuid.uuid4())
+    
+    add_span_attributes({
+        "correlation_id": correlation_id,
+        "endpoint": "/stream/subscribe",
+        "kpi_code": kpi_code,
+        "entity_id": entity_id,
+        "period": period,
+        "subscriber_id": subscriber_id,
+        "timestamp.start": start_time.isoformat()
+    })
+    
+    try:
+        # Add subscriber
+        is_first_subscriber = await sub_mgr.add_subscriber(
+            subscriber_id=subscriber_id,
+            kpi_code=kpi_code,
+            entity_id=entity_id,
+            period=period
+        )
+        
+        # Start publishing if this is the first subscriber
+        if is_first_subscriber:
+            await pub.start_stream(kpi_code, entity_id, period)
+            logger.info(f"Started stream for {kpi_code}:{entity_id}:{period}")
+        
+        stream_key = f"{kpi_code}:{entity_id}:{period}"
+        subscriber_count = await sub_mgr.get_subscriber_count(kpi_code, entity_id, period)
+        
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "is_first_subscriber": is_first_subscriber,
+            "subscriber_count": subscriber_count,
+            "success": True
+        })
+        
+        return {
+            "subscriber_id": subscriber_id,
+            "stream_key": stream_key,
+            "kpi_code": kpi_code,
+            "entity_id": entity_id,
+            "period": period,
+            "subscriber_count": subscriber_count,
+            "channel": f"kpi.stream.{kpi_code}.{entity_id}.{period}",
+            "subscribed_at": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "error.type": e.__class__.__name__,
+            "error.message": str(e),
+            "success": False
+        })
+        logger.error(f"Failed to subscribe to stream: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Subscription failed: {str(e)}")
+
+@app.post("/stream/unsubscribe")
+@trace_method(name="database_service.stream_unsubscribe", kind="SERVER")
+async def unsubscribe_from_stream(
+    request: Request,
+    subscriber_id: str,
+    kpi_code: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    period: Optional[str] = None,
+    sub_mgr: SubscriberManager = Depends(get_subscriber_manager),
+    pub: StreamPublisher = Depends(get_stream_publisher)
+):
+    """
+    Unsubscribe from KPI stream(s)
+    
+    Args:
+        subscriber_id: Subscriber ID to unsubscribe
+        kpi_code: Optional - specific KPI to unsubscribe from
+        entity_id: Optional - specific entity to unsubscribe from
+        period: Optional - specific period to unsubscribe from
+    
+    If kpi_code, entity_id, and period are provided, unsubscribes from that specific stream.
+    Otherwise, unsubscribes from all streams.
+    
+    Returns:
+        Unsubscription details
+    """
+    correlation_id = extract_correlation_id_from_headers(request.headers) or str(uuid.uuid4())
+    start_time = datetime.utcnow()
+    
+    add_span_attributes({
+        "correlation_id": correlation_id,
+        "endpoint": "/stream/unsubscribe",
+        "subscriber_id": subscriber_id,
+        "timestamp.start": start_time.isoformat()
+    })
+    
+    try:
+        # Remove subscriber
+        streams_to_stop = await sub_mgr.remove_subscriber(
+            subscriber_id=subscriber_id,
+            kpi_code=kpi_code,
+            entity_id=entity_id,
+            period=period
+        )
+        
+        # Stop publishing for streams with no subscribers
+        for stream_key in streams_to_stop:
+            details = await sub_mgr.get_stream_details(stream_key)
+            if details:
+                k_code, e_id, p = details
+                await pub.stop_stream(k_code, e_id, p)
+                logger.info(f"Stopped stream for {stream_key}")
+        
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "streams_stopped": len(streams_to_stop),
+            "success": True
+        })
+        
+        return {
+            "subscriber_id": subscriber_id,
+            "streams_stopped": len(streams_to_stop),
+            "stopped_streams": list(streams_to_stop),
+            "unsubscribed_at": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "error.type": e.__class__.__name__,
+            "error.message": str(e),
+            "success": False
+        })
+        logger.error(f"Failed to unsubscribe from stream: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unsubscription failed: {str(e)}")
+
+@app.get("/stream/status")
+@trace_method(name="database_service.stream_status", kind="SERVER")
+async def get_stream_status(
+    request: Request,
+    pub: StreamPublisher = Depends(get_stream_publisher),
+    sub_mgr: SubscriberManager = Depends(get_subscriber_manager)
+):
+    """
+    Get status of all active streams
+    
+    Returns:
+        Status information for all active streams including subscriber counts
+    """
+    correlation_id = extract_correlation_id_from_headers(request.headers) or str(uuid.uuid4())
+    start_time = datetime.utcnow()
+    
+    add_span_attributes({
+        "correlation_id": correlation_id,
+        "endpoint": "/stream/status",
+        "timestamp.start": start_time.isoformat()
+    })
+    
+    try:
+        # Get publisher status
+        pub_status = await pub.get_status()
+        
+        # Get subscriber stats
+        sub_stats = await sub_mgr.get_stats()
+        
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "active_streams": pub_status.get("active_stream_count", 0),
+            "total_subscribers": sub_stats.get("total_subscribers", 0),
+            "success": True
+        })
+        
+        return {
+            "publisher": pub_status,
+            "subscribers": sub_stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    except Exception as e:
+        end_time = datetime.utcnow()
+        add_span_attributes({
+            "timestamp.end": end_time.isoformat(),
+            "duration_ms": (end_time - start_time).total_seconds() * 1000,
+            "error.type": e.__class__.__name__,
+            "error.message": str(e),
+            "success": False
+        })
+        logger.error(f"Failed to get stream status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Status retrieval failed: {str(e)}")
+
+@app.post("/stream/heartbeat")
+@trace_method(name="database_service.stream_heartbeat", kind="SERVER")
+async def stream_heartbeat(
+    subscriber_id: str,
+    sub_mgr: SubscriberManager = Depends(get_subscriber_manager)
+):
+    """
+    Send heartbeat to keep subscription alive
+    
+    Args:
+        subscriber_id: Subscriber ID to update activity for
+    
+    Returns:
+        Heartbeat acknowledgment
+    """
+    try:
+        await sub_mgr.update_activity(subscriber_id)
+        return {
+            "subscriber_id": subscriber_id,
+            "heartbeat_received": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Failed to process heartbeat: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Heartbeat failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

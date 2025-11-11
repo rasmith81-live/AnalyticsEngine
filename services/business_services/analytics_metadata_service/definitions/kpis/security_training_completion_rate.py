@@ -1,15 +1,128 @@
-import sys; from pathlib import Path; sys.path.insert(0, str(Path(__file__).parent)); from base_kpi import BaseKPI
+"""
+Security Training Completion Rate
 
-class SecurityTrainingCompletionRate(BaseKPI):
-    def __init__(self):
-        super().__init__(
-            code="SECURITY_TRAINING_COMPLETION_RATE",
-            name_="Security Training Completion Rate",
-            description_="The percentage of employees who have completed mandatory security training, reflecting the organization's commitment to staff education on supply chain security.",
-            category_="Iso 28000",
-            modules_=["ISO_28000"],
-            required_objects=['Employee'],
-            formula_="(Number of Employees Who Completed Security Training / Total Number of Employees) * 100",
-            aggregation_methods=['sum', 'count'],
-            time_periods=['daily', 'weekly', 'monthly', 'quarterly', 'annually']
-        )
+The percentage of employees who have completed mandatory security training, reflecting the organization
+"""
+
+SECURITY_TRAINING_COMPLETION_RATE = {
+    "code": "SECURITY_TRAINING_COMPLETION_RATE",
+    "name": "Security Training Completion Rate",
+    "description": "The percentage of employees who have completed mandatory security training, reflecting the organization",
+    "formula": "To be defined",
+    "calculation_formula": "To be defined",
+    "category": "Iso 28000",
+    "is_active": True,
+    "full_kpi_definition": "Complete definition for Security Training Completion Rate to be added.",
+    "trend_analysis": "Trend analysis to be defined.",
+    "diagnostic_questions": """
+
+
+* What factors are influencing this metric?
+* Are there any anomalies in the data?
+    
+    
+    """,
+    "actionable_tips": """
+
+
+* Monitor this KPI regularly
+* Set appropriate targets and thresholds
+    
+    
+    """,
+    "visualization_suggestions": """
+
+
+* Line chart for time series analysis
+* Bar chart for comparisons
+    
+    
+    """,
+    "risk_warnings": "* Monitor for significant deviations from expected values",
+    "tracking_tools": "* CRM or analytics platform",
+    "integration_points": "* Integrate with related business metrics",
+    "change_impact_analysis": "Changes in this KPI may impact related business processes.",
+    "metadata_": {"modules": ["ISO_28000"], "required_objects": ["Employee"], "last_validated": "2025-11-10T13:49:33.562875"},
+    "required_objects": [],
+    "modules": ["ISO_28000"],
+    "module_code": "ISO_28000",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        63.69,
+                        62.64,
+                        68.96,
+                        80.99,
+                        68.07,
+                        80.09,
+                        65.27,
+                        79.45,
+                        64.27,
+                        81.15,
+                        72.05,
+                        70.3
+                ],
+                "unit": "%"
+        },
+        "current": {
+                "value": 70.3,
+                "unit": "%",
+                "change": -1.75,
+                "change_percent": -2.4,
+                "trend": "increasing"
+        },
+        "statistics": {
+                "average": 71.41,
+                "min": 62.64,
+                "max": 81.15,
+                "unit": "%"
+        },
+        "breakdown": [
+                {
+                        "category": "Segment A",
+                        "value": 20.63,
+                        "percentage": 29.3
+                },
+                {
+                        "category": "Segment B",
+                        "value": 12.54,
+                        "percentage": 17.8
+                },
+                {
+                        "category": "Segment C",
+                        "value": 9.74,
+                        "percentage": 13.9
+                },
+                {
+                        "category": "Segment D",
+                        "value": 4.37,
+                        "percentage": 6.2
+                },
+                {
+                        "category": "Other",
+                        "value": 23.02,
+                        "percentage": 32.7
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:13.354974",
+                "data_points": 12,
+                "kpi_type": "percentage",
+                "kpi_name": "Security Training Completion Rate"
+        }
+    },
+}

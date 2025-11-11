@@ -31,7 +31,9 @@ from app.services.health import HealthService
 from app.services.registry import service_registry
 from app.core.cache import CacheService as GatewayCache
 from app.core.pubsub import pubsub_service
+from app.core.websocket_manager import websocket_manager
 from app.api.router import api_router
+from app.api.v1 import dashboard_ws
 
 
 # Setup logging
@@ -60,6 +62,10 @@ async def lifespan(app: FastAPI):
     # Start PubSub service
     await pubsub_service.start()
     
+    # Start WebSocket manager
+    await websocket_manager.start()
+    logger.info("WebSocket manager started")
+    
     # Check service health
     await service_registry.check_all_services_health()
 
@@ -69,6 +75,10 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info(f"Shutting down {settings.SERVICE_NAME}")
+    
+    # Stop WebSocket manager
+    await websocket_manager.stop()
+    logger.info("WebSocket manager stopped")
     
     # Stop PubSub service
     await pubsub_service.stop()
@@ -124,6 +134,9 @@ app.add_middleware(
 
 # Include the existing API router
 app.include_router(api_router)
+
+# Include dashboard WebSocket router
+app.include_router(dashboard_ws.router, prefix="/ws", tags=["websocket"])
 
 @app.get("/health")
 async def health_check(detailed: bool = False):

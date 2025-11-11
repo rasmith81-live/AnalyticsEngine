@@ -1,72 +1,162 @@
-import { Typography, Box, Grid, Paper, Chip } from '@mui/material';
+import { Typography, Box, Alert, Snackbar, Paper, AppBar, Toolbar } from '@mui/material';
 import { useState } from 'react';
 import MetricTreeTabs from '../components/MetricTreeTabs';
+import KPIDetailPreview from '../components/KPIDetailPreview';
+import KPISampleVisualization from '../components/KPISampleVisualization';
+import DeriveCustomKPIModal from '../components/DeriveCustomKPIModal';
+import ResizableSplitPanel from '../components/ResizableSplitPanel';
+import KPICartBadge from '../components/KPICartBadge';
+import { useCart } from '../contexts/CartContext';
+import type { KPI } from '../types';
 
 export default function ConfigPage() {
-  const [selectedKPIs, setSelectedKPIs] = useState<string[]>([]);
+  const { selectedKPIs, toggleCart, addToCart, removeFromCart, clearCart, currentViewKPI, setCurrentViewKPI } = useCart();
+  const [deriveModalOpen, setDeriveModalOpen] = useState(false);
+  const [deriveBaseKPI, setDeriveBaseKPI] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const handleKPISelect = (kpiCode: string) => {
-    setSelectedKPIs(prev =>
-      prev.includes(kpiCode)
-        ? prev.filter(code => code !== kpiCode)
-        : [...prev, kpiCode]
-    );
+  const handleKPIToggleCart = (kpiCode: string) => {
+    // Toggle KPI in cart via checkbox
+    toggleCart(kpiCode);
+  };
+
+  const handleKPIViewDetails = (kpiCode: string) => {
+    // Show KPI details in the right panel preview
+    setCurrentViewKPI(kpiCode);
+  };
+
+  const handleAddToCart = (kpiCode: string) => {
+    // Add to cart from detail view button
+    addToCart(kpiCode);
   };
 
   const handleRemoveKPI = (kpiCode: string) => {
-    setSelectedKPIs(prev => prev.filter(code => code !== kpiCode));
+    removeFromCart(kpiCode);
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm(`Are you sure you want to clear all ${selectedKPIs.length} selected KPIs?`)) {
+      clearCart();
+    }
+  };
+
+  const handleSaveConfiguration = () => {
+    // TODO: Implement save to backend via configApi
+    // For now, just save to localStorage
+    const config = {
+      selectedKPIs,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem('kpi_configuration', JSON.stringify(config));
+    setSaveSuccess(true);
+    console.log('Configuration saved:', config);
+  };
+
+  const handleDeriveCustomKPI = (kpiCode: string) => {
+    setDeriveBaseKPI(kpiCode);
+    setDeriveModalOpen(true);
+  };
+
+  const handleSaveCustomKPI = (customKPI: Partial<KPI>) => {
+    // TODO: Save to backend via configApi
+    console.log('Custom KPI created:', customKPI);
+    // Add to cart
+    if (customKPI.code) {
+      handleAddToCart(customKPI.code);
+    }
   };
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        KPI Configuration
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Browse and select KPIs for your analytics configuration
-      </Typography>
-
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        {/* Left: Metric Tree */}
-        <Grid item xs={12} md={8}>
-          <MetricTreeTabs
-            onKPISelect={handleKPISelect}
-            selectedKPIs={selectedKPIs}
-          />
-        </Grid>
-
-        {/* Right: Selected KPIs */}
-        <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 2, position: 'sticky', top: 16 }}>
-            <Typography variant="h6" gutterBottom>
-              Selected KPIs
+    <Box sx={{ 
+      height: 'calc(100vh - 100px)', 
+      width: '100vw',
+      maxWidth: '100%',
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'
+    }}>
+      {/* Page Header with Cart Badge */}
+      <AppBar position="static" color="default" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
+        <Toolbar sx={{ minWidth: 0, px: 2 }}>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
+              KPI Configuration
             </Typography>
-            
-            {selectedKPIs.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No KPIs selected yet. Browse the tree on the left to select KPIs.
-              </Typography>
-            ) : (
-              <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {selectedKPIs.length} KPI{selectedKPIs.length !== 1 ? 's' : ''} selected
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {selectedKPIs.map((kpiCode) => (
-                    <Chip
-                      key={kpiCode}
-                      label={kpiCode}
-                      onDelete={() => handleRemoveKPI(kpiCode)}
-                      color="primary"
-                      size="small"
-                    />
-                  ))}
-                </Box>
+            <Typography variant="body2" color="text.secondary">
+              Browse KPIs, view details, and add to your cart
+            </Typography>
+          </Box>
+          <KPICartBadge
+            selectedKPIs={selectedKPIs}
+            onRemoveKPI={handleRemoveKPI}
+            onClearAll={handleClearAll}
+            onSaveConfiguration={handleSaveConfiguration}
+            onViewKPI={setCurrentViewKPI}
+            currentViewKPI={currentViewKPI}
+          />
+        </Toolbar>
+      </AppBar>
+
+      {/* Resizable Split Panel */}
+      <Box sx={{ flex: 1, minHeight: 0, mt: 2, px: 2, overflow: 'hidden' }}>
+        <ResizableSplitPanel
+          defaultLeftWidth={50}
+          minLeftWidth={30}
+          minRightWidth={30}
+          leftPanel={
+            <Paper elevation={2} sx={{ height: '100%', p: 2, overflow: 'hidden' }}>
+              <Box sx={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
+                <MetricTreeTabs
+                  onKPIToggleCart={handleKPIToggleCart}
+                  onKPIViewDetails={handleKPIViewDetails}
+                  selectedKPIs={selectedKPIs}
+                  currentViewKPI={currentViewKPI}
+                />
               </Box>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+            </Paper>
+          }
+          rightPanel={
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2, pl: 2, overflow: 'hidden', minWidth: 0 }}>
+              {/* Top: KPI Details */}
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <KPIDetailPreview
+                  kpiCode={currentViewKPI}
+                  onAddToCart={handleAddToCart}
+                  onDeriveCustomKPI={handleDeriveCustomKPI}
+                  isInCart={currentViewKPI ? selectedKPIs.includes(currentViewKPI) : false}
+                />
+              </Box>
+              
+              {/* Bottom: Sample Visualization */}
+              {currentViewKPI && (
+                <Box sx={{ height: 280 }}>
+                  <KPISampleVisualization kpiCode={currentViewKPI} />
+                </Box>
+              )}
+            </Box>
+          }
+        />
+      </Box>
+
+      {/* Custom KPI Derivation Modal */}
+      <DeriveCustomKPIModal
+        open={deriveModalOpen}
+        baseKPICode={deriveBaseKPI}
+        onClose={() => setDeriveModalOpen(false)}
+        onSave={handleSaveCustomKPI}
+      />
+
+      {/* Success Notification */}
+      <Snackbar
+        open={saveSuccess}
+        autoHideDuration={3000}
+        onClose={() => setSaveSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" onClose={() => setSaveSuccess(false)}>
+          Configuration saved successfully!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
