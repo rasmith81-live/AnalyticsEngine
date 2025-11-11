@@ -12,15 +12,19 @@ import type { Module } from '../types/metricTree';
 
 interface ModuleNodeProps {
   module: Module;
-  onKPISelect: (kpiCode: string) => void;
+  onKPIToggleCart: (kpiCode: string) => void;
+  onKPIViewDetails: (kpiCode: string) => void;
   selectedKPIs: string[];
+  currentViewKPI: string | null;
   searchQuery?: string;
 }
 
 export default function ModuleNode({
   module,
-  onKPISelect,
+  onKPIToggleCart,
+  onKPIViewDetails,
   selectedKPIs,
+  currentViewKPI,
   searchQuery = ''
 }: ModuleNodeProps) {
   const [expanded, setExpanded] = useState(false);
@@ -30,15 +34,20 @@ export default function ModuleNode({
   };
 
   // Filter KPIs based on search
-  const filteredKPIs = module.kpis?.filter(kpi =>
-    searchQuery === '' ||
-    kpi.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    kpi.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    kpi.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredKPIs = module.kpis?.filter(kpi => {
+    if (searchQuery === '') return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      kpi.name?.toLowerCase().includes(query) ||
+      kpi.display_name?.toLowerCase().includes(query) ||
+      kpi.description?.toLowerCase().includes(query) ||
+      kpi.code?.toLowerCase().includes(query)
+    );
+  }) || [];
 
   // Auto-expand if search matches
-  const shouldExpand = searchQuery && filteredKPIs.length > 0;
+  const shouldExpand = Boolean(searchQuery && filteredKPIs.length > 0);
 
   return (
     <Box sx={{ mb: 1 }}>
@@ -63,7 +72,7 @@ export default function ModuleNode({
           {module.display_name || module.name}
         </Typography>
         <Chip
-          label={`${module.kpi_count || 0} KPIs`}
+          label={`${filteredKPIs.length} KPIs`}
           size="small"
           variant="outlined"
         />
@@ -77,8 +86,10 @@ export default function ModuleNode({
               <KPINode
                 key={kpi.code}
                 kpi={kpi}
-                selected={selectedKPIs.includes(kpi.code)}
-                onSelect={() => onKPISelect(kpi.code)}
+                selected={currentViewKPI === kpi.code}
+                inCart={selectedKPIs.includes(kpi.code)}
+                onToggleCart={() => onKPIToggleCart(kpi.code)}
+                onViewDetails={() => onKPIViewDetails(kpi.code)}
               />
             ))
           ) : (

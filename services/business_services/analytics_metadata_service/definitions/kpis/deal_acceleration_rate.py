@@ -1,5 +1,5 @@
 """
-Deal Acceleration Rate KPI
+Deal Acceleration Rate
 
 The rate at which sales enablement tools and strategies help to shorten the sales cycle for deals in the pipeline.
 """
@@ -12,43 +12,169 @@ DEAL_ACCELERATION_RATE = {
     "calculation_formula": "(Previous Average Sales Cycle Time - Current Average Sales Cycle Time) / Previous Average Sales Cycle Time",
     "category": "Sales Enablement",
     "is_active": True,
-    "kpi_definition": "The rate at which sales enablement tools and strategies help to shorten the sales cycle for deals in the pipeline.",
-    "expected_business_insights": "Reflects the efficiency and effectiveness of sales processes and sales enablement tools in shortening the sales cycle.",
-    "measurement_approach": "Evaluates the change in the average time taken to close deals after implementing sales enablement strategies.",
+    "full_kpi_definition": "Complete definition for Deal Acceleration Rate to be added.",
     "trend_analysis": """
+
+
+
     * Increasing deal acceleration rate may indicate the effectiveness of new sales enablement tools or strategies.
     * A decreasing rate could signal a need for reevaluation of current sales enablement methods or a shift in customer behavior.
+    
+    
+    
     """,
     "diagnostic_questions": """
+
+
+
     * Are there specific stages in the sales cycle where deals tend to get stuck or delayed?
     * How do our deal acceleration rates compare with industry benchmarks or with competitors?
+    
+    
+    
     """,
     "actionable_tips": """
+
+
+
     * Provide targeted training for sales teams on how to effectively use sales enablement tools to move deals forward.
     * Analyze customer feedback to identify potential pain points in the sales process and address them with relevant enablement resources.
     * Regularly review and update the sales enablement toolkit to ensure it aligns with the evolving needs of the sales team and customers.
+    
+    
+    
     """,
     "visualization_suggestions": """
+
+
+
     * Line charts showing the trend of deal acceleration rates over time.
     * Funnel charts to visualize the progression of deals through different stages of the sales cycle.
+    
+    
+    
     """,
     "risk_warnings": """
+
+
+
     * A consistently low deal acceleration rate may lead to missed revenue targets and decreased sales team motivation.
     * A sudden spike in deal acceleration rate could indicate a potential issue with deal quality or customer satisfaction.
+    
+    
+    
     """,
     "tracking_tools": """
+
+
+
     * CRM systems with built-in sales enablement features to track the impact of enablement tools on deal acceleration.
     * Data analytics platforms to identify patterns and correlations between enablement strategies and deal acceleration rates.
+    
+    
+    
     """,
     "integration_points": """
+
+
+
     * Integrate deal acceleration rate tracking with performance management systems to align sales team incentives with the goal of shortening the sales cycle.
     * Link sales enablement platforms with customer relationship management systems to understand the impact of enablement tools on customer interactions and deal progression.
+    
+    
+    
     """,
     "change_impact_analysis": """
+
+
+
     * Improving deal acceleration rates can lead to increased sales efficiency and potentially higher revenue generation.
     * However, a focus solely on accelerating deals may impact the quality of customer interactions and long-term customer relationships.
+    
+    
+    
     """,
-    "metadata_": {"modules": ["SALES_ENABLEMENT"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Channel Deal", "Deal", "Enablement Feedback", "Enablement Platform", "Lead", "Opportunity", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Pipeline", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"]},
+    "metadata_": {"modules": ["SALES_ENABLEMENT"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Channel Deal", "Deal", "Enablement Feedback", "Enablement Platform", "Lead", "Opportunity", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Pipeline", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"], "last_validated": "2025-11-10T13:49:32.901830"},
+    "required_objects": [],
     "modules": ["SALES_ENABLEMENT"],
     "module_code": "SALES_ENABLEMENT",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        51.37,
+                        47.77,
+                        58.07,
+                        41.19,
+                        51.41,
+                        51.94,
+                        59.01,
+                        42.77,
+                        42.99,
+                        49.87,
+                        58.43,
+                        55.56
+                ],
+                "unit": "%"
+        },
+        "current": {
+                "value": 55.56,
+                "unit": "%",
+                "change": -2.87,
+                "change_percent": -4.9,
+                "trend": "stable"
+        },
+        "statistics": {
+                "average": 50.86,
+                "min": 41.19,
+                "max": 59.01,
+                "unit": "%"
+        },
+        "breakdown": [
+                {
+                        "category": "Direct Sales",
+                        "value": 12.71,
+                        "percentage": 22.9
+                },
+                {
+                        "category": "Channel Sales",
+                        "value": 14.89,
+                        "percentage": 26.8
+                },
+                {
+                        "category": "Online Sales",
+                        "value": 5.56,
+                        "percentage": 10.0
+                },
+                {
+                        "category": "Enterprise Sales",
+                        "value": 5.4,
+                        "percentage": 9.7
+                },
+                {
+                        "category": "Other",
+                        "value": 17.0,
+                        "percentage": 30.6
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:11.869938",
+                "data_points": 12,
+                "kpi_type": "percentage",
+                "kpi_name": "Deal Acceleration Rate"
+        }
+    },
 }

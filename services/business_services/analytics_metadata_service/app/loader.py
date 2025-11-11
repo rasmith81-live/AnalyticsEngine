@@ -67,7 +67,8 @@ class DefinitionLoader:
             logger.warning(f"KPIs directory not found: {kpis_path}")
             return
         
-        for file_path in kpis_path.glob("*.py"):
+        # Recursively load KPIs from all subdirectories
+        for file_path in kpis_path.rglob("*.py"):
             if file_path.name.startswith("_"):
                 continue
             

@@ -1,5 +1,5 @@
 """
-Sales Growth Year-to-Date (YTD) KPI
+Sales Growth Year-to-Date (YTD)
 
 The increase in sales revenue from the beginning of the current fiscal year up to the present date, compared against the same period in the prior year.
 """
@@ -12,43 +12,169 @@ SALES_GROWTH_YEAR_TO_DATE_YTD = {
     "calculation_formula": "(Current YTD Sales - Previous YTD Sales) / Previous YTD Sales",
     "category": "Sales Performance",
     "is_active": True,
-    "kpi_definition": "The increase in sales revenue from the beginning of the current fiscal year up to the present date, compared against the same period in the prior year.",
-    "expected_business_insights": "Provides a snapshot of sales performance and trends within the current year.",
-    "measurement_approach": "Measures the cumulative sales revenue growth since the beginning of the year.",
+    "full_kpi_definition": "Complete definition for Sales Growth Year-to-Date (YTD) to be added.",
     "trend_analysis": """
+
+
+
     * Sales growth tends to follow seasonal patterns, with higher performance during certain times of the year.
     * Changes in market conditions, such as new competitors or economic downturns, can significantly impact sales growth.
+    
+    
+    
     """,
     "diagnostic_questions": """
+
+
+
     * What factors have historically driven sales growth during certain periods?
     * How does our sales growth compare to industry averages and benchmarks?
+    
+    
+    
     """,
     "actionable_tips": """
+
+
+
     * Invest in targeted marketing and promotional campaigns during peak sales periods.
     * Regularly analyze and adjust pricing strategies to maximize revenue.
     * Explore new sales channels or geographic markets to expand customer reach.
+    
+    
+    
     """,
     "visualization_suggestions": """
+
+
+
     * Line charts showing year-over-year sales growth by month or quarter.
     * Comparative bar graphs illustrating sales growth performance against industry averages.
+    
+    
+    
     """,
     "risk_warnings": """
+
+
+
     * Over-reliance on a small number of key clients or products can make sales growth vulnerable to sudden changes.
     * Rapid sales growth may strain operational capacity and lead to service or quality issues.
+    
+    
+    
     """,
     "tracking_tools": """
+
+
+
     * Customer relationship management (CRM) software to track and manage customer interactions and sales opportunities.
     * Business intelligence and analytics tools to identify sales trends and opportunities for growth.
+    
+    
+    
     """,
     "integration_points": """
+
+
+
     * Integrate sales growth data with financial systems to understand the impact on revenue and profitability.
     * Link sales growth metrics with inventory and supply chain systems to ensure adequate stock levels to meet demand.
+    
+    
+    
     """,
     "change_impact_analysis": """
+
+
+
     * Increasing sales growth may require additional investment in sales and marketing resources.
     * Significant changes in sales growth can impact cash flow and working capital requirements.
+    
+    
+    
     """,
-    "metadata_": {"modules": ["SALES_PERFORMANCE"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Partner Performance Scorecard", "Performance Benchmark", "Performance Scorecard", "Revenue Forecast", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"]},
+    "metadata_": {"modules": ["SALES_PERFORMANCE"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Partner Performance Scorecard", "Performance Benchmark", "Performance Scorecard", "Revenue Forecast", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"], "last_validated": "2025-11-10T13:49:33.434337"},
+    "required_objects": [],
     "modules": ["SALES_PERFORMANCE"],
     "module_code": "SALES_PERFORMANCE",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        695.04,
+                        644.66,
+                        699.55,
+                        633.97,
+                        711.08,
+                        749.45,
+                        660.21,
+                        657.92,
+                        721.51,
+                        679.1,
+                        651.45,
+                        693.11
+                ],
+                "unit": "units"
+        },
+        "current": {
+                "value": 693.11,
+                "unit": "units",
+                "change": 41.66,
+                "change_percent": 6.4,
+                "trend": "stable"
+        },
+        "statistics": {
+                "average": 683.09,
+                "min": 633.97,
+                "max": 749.45,
+                "unit": "units"
+        },
+        "breakdown": [
+                {
+                        "category": "Direct Sales",
+                        "value": 234.87,
+                        "percentage": 33.9
+                },
+                {
+                        "category": "Channel Sales",
+                        "value": 144.44,
+                        "percentage": 20.8
+                },
+                {
+                        "category": "Online Sales",
+                        "value": 98.87,
+                        "percentage": 14.3
+                },
+                {
+                        "category": "Enterprise Sales",
+                        "value": 54.73,
+                        "percentage": 7.9
+                },
+                {
+                        "category": "Other",
+                        "value": 160.2,
+                        "percentage": 23.1
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:13.015966",
+                "data_points": 12,
+                "kpi_type": "metric",
+                "kpi_name": "Sales Growth Year-to-Date (YTD)"
+        }
+    },
 }

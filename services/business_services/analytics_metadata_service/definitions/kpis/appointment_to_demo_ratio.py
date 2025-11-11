@@ -1,5 +1,5 @@
 """
-Appointment-to-Demo Ratio KPI
+Appointment-to-Demo Ratio
 
 The ratio of sales appointments to the number of product or service demos given.
 """
@@ -12,43 +12,169 @@ APPOINTMENT_TO_DEMO_RATIO = {
     "calculation_formula": "Number of Demos Conducted / Number of Appointments Scheduled * 100",
     "category": "Outside Sales",
     "is_active": True,
-    "kpi_definition": "The ratio of sales appointments to the number of product or service demos given.",
-    "expected_business_insights": "Indicates the effectiveness of the appointment setting process and sales team’s ability to advance leads in the sales funnel.",
-    "measurement_approach": "Compares the number of appointments scheduled to the number of product demonstrations conducted.",
+    "full_kpi_definition": "Complete definition for Appointment-to-Demo Ratio to be added.",
     "trend_analysis": """
+
+
+
     * An increasing appointment-to-demo ratio may indicate a lack of qualified leads or ineffective sales prospecting.
     * A decreasing ratio could signal improved lead quality or more efficient sales processes.
+    
+    
+    
     """,
     "diagnostic_questions": """
+
+
+
     * Are there specific sales channels or sources that consistently lead to higher appointment-to-demo ratios?
     * How does our appointment-to-demo ratio compare with industry benchmarks or with different sales teams within the organization?
+    
+    
+    
     """,
     "actionable_tips": """
+
+
+
     * Implement lead scoring to prioritize high-quality leads for appointments.
     * Provide additional sales training to improve the effectiveness of product or service demos.
     * Regularly review and refine the sales prospecting process to attract more qualified leads.
+    
+    
+    
     """,
     "visualization_suggestions": """
+
+
+
     * Line charts showing the trend of appointment-to-demo ratios over time.
     * Comparison bar charts to visualize the appointment-to-demo ratios across different sales channels or teams.
+    
+    
+    
     """,
     "risk_warnings": """
+
+
+
     * A consistently low appointment-to-demo ratio may lead to wasted resources and inefficiencies in the sales process.
     * A high ratio may indicate a lack of proactive sales prospecting and lead generation.
+    
+    
+    
     """,
     "tracking_tools": """
+
+
+
     * Customer Relationship Management (CRM) software to track and analyze lead sources and appointment outcomes.
     * Sales enablement platforms to streamline the demo process and provide sales reps with the necessary tools and materials.
+    
+    
+    
     """,
     "integration_points": """
+
+
+
     * Integrate appointment-to-demo ratio tracking with marketing automation systems to align lead generation efforts with sales activities.
     * Link with customer feedback systems to gather insights on the quality of demos and potential areas for improvement.
+    
+    
+    
     """,
     "change_impact_analysis": """
+
+
+
     * Improving the appointment-to-demo ratio can lead to more efficient use of sales resources and potentially higher conversion rates.
     * However, a significant increase in the ratio may also indicate a need for more aggressive lead generation efforts to maintain a healthy pipeline.
+    
+    
+    
     """,
-    "metadata_": {"modules": ["OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Appointment", "Demo", "Product", "Product Adoption", "Product Usage", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program", "Service Level Agreement"]},
+    "metadata_": {"modules": ["OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Appointment", "Demo", "Product", "Product Adoption", "Product Usage", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program", "Service Level Agreement"], "last_validated": "2025-11-10T13:49:32.644046"},
+    "required_objects": [],
     "modules": ["OUTSIDE_SALES"],
     "module_code": "OUTSIDE_SALES",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        41.26,
+                        57.37,
+                        48.03,
+                        45.5,
+                        41.71,
+                        59.22,
+                        56.67,
+                        51.09,
+                        49.63,
+                        48.49,
+                        47.72,
+                        40.51
+                ],
+                "unit": "%"
+        },
+        "current": {
+                "value": 40.51,
+                "unit": "%",
+                "change": -7.21,
+                "change_percent": -15.1,
+                "trend": "decreasing"
+        },
+        "statistics": {
+                "average": 48.93,
+                "min": 40.51,
+                "max": 59.22,
+                "unit": "%"
+        },
+        "breakdown": [
+                {
+                        "category": "Segment A",
+                        "value": 7.57,
+                        "percentage": 18.7
+                },
+                {
+                        "category": "Segment B",
+                        "value": 8.51,
+                        "percentage": 21.0
+                },
+                {
+                        "category": "Segment C",
+                        "value": 5.68,
+                        "percentage": 14.0
+                },
+                {
+                        "category": "Segment D",
+                        "value": 3.69,
+                        "percentage": 9.1
+                },
+                {
+                        "category": "Other",
+                        "value": 15.06,
+                        "percentage": 37.2
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:11.360318",
+                "data_points": 12,
+                "kpi_type": "percentage",
+                "kpi_name": "Appointment-to-Demo Ratio"
+        }
+    },
 }

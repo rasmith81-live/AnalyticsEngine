@@ -3,46 +3,83 @@
  * Main tree component that renders either Industry or Value Chain mode
  */
 
-import { Box, CircularProgress, Alert, TextField, InputAdornment } from '@mui/material';
+import { Box, CircularProgress, Alert, TextField, InputAdornment, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { useState } from 'react';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useValueChainTree } from '../hooks/useValueChainTree';
+import { useCart } from '../contexts/CartContext';
 import ValueChainNode from './ValueChainNode';
 import type { TreeMode } from '../types/metricTree';
 
 interface MetricTreeProps {
   mode: TreeMode;
-  onKPISelect?: (kpiCode: string) => void;
+  onKPIToggleCart?: (kpiCode: string) => void;
+  onKPIViewDetails?: (kpiCode: string) => void;
   selectedKPIs?: string[];
+  currentViewKPI?: string | null;
 }
 
-export default function MetricTree({ mode, onKPISelect, selectedKPIs = [] }: MetricTreeProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
+export default function MetricTree({ 
+  mode, 
+  onKPIToggleCart, 
+  onKPIViewDetails, 
+  selectedKPIs = [],
+  currentViewKPI = null 
+}: MetricTreeProps) {
+  const { treeExpandedNodes, setTreeExpandedNodes, treeSearchQuery, setTreeSearchQuery } = useCart();
 
   // Fetch data based on mode
   const { data: valueChains, isLoading, error } = useValueChainTree();
 
   const handleNodeToggle = (nodeId: string) => {
-    setExpandedNodes(prev =>
-      prev.includes(nodeId)
-        ? prev.filter(id => id !== nodeId)
-        : [...prev, nodeId]
+    setTreeExpandedNodes(
+      treeExpandedNodes.includes(nodeId)
+        ? treeExpandedNodes.filter((id: string) => id !== nodeId)
+        : [...treeExpandedNodes, nodeId]
     );
   };
 
-  const handleKPISelect = (kpiCode: string) => {
-    if (onKPISelect) {
-      onKPISelect(kpiCode);
+  const handleKPIToggleCart = (kpiCode: string) => {
+    if (onKPIToggleCart) {
+      onKPIToggleCart(kpiCode);
     }
   };
 
-  // Filter value chains based on search
-  const filteredValueChains = valueChains?.filter(vc =>
-    searchQuery === '' ||
-    vc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    vc.display_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleKPIViewDetails = (kpiCode: string) => {
+    if (onKPIViewDetails) {
+      onKPIViewDetails(kpiCode);
+    }
+  };
+
+  // Filter value chains based on search - search through all levels
+  const filteredValueChains = valueChains?.filter(vc => {
+    if (treeSearchQuery === '') return true;
+    
+    const query = treeSearchQuery.toLowerCase();
+    
+    // Check value chain name
+    if (vc.name?.toLowerCase().includes(query) || 
+        vc.display_name?.toLowerCase().includes(query)) {
+      return true;
+    }
+    
+    // Check modules and KPIs
+    return vc.modules?.some(module => {
+      // Check module name
+      if (module.name?.toLowerCase().includes(query) ||
+          module.display_name?.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Check KPIs in module
+      return module.kpis?.some(kpi =>
+        kpi.name?.toLowerCase().includes(query) ||
+        kpi.display_name?.toLowerCase().includes(query) ||
+        kpi.description?.toLowerCase().includes(query) ||
+        kpi.code?.toLowerCase().includes(query)
+      );
+    });
+  });
 
   if (isLoading) {
     return (
@@ -75,12 +112,24 @@ export default function MetricTree({ mode, onKPISelect, selectedKPIs = [] }: Met
         fullWidth
         size="small"
         placeholder={mode === 'industry' ? 'Search industries, value chains, modules, or KPIs...' : 'Search value chains, modules, or KPIs...'}
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        value={treeSearchQuery}
+        onChange={(e) => setTreeSearchQuery(e.target.value)}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
               <SearchIcon />
+            </InputAdornment>
+          ),
+          endAdornment: treeSearchQuery && (
+            <InputAdornment position="end">
+              <IconButton
+                size="small"
+                onClick={() => setTreeSearchQuery('')}
+                edge="end"
+                aria-label="clear search"
+              >
+                <ClearIcon fontSize="small" />
+              </IconButton>
             </InputAdornment>
           ),
         }}
@@ -95,11 +144,13 @@ export default function MetricTree({ mode, onKPISelect, selectedKPIs = [] }: Met
               <ValueChainNode
                 key={valueChain.code}
                 valueChain={valueChain}
-                expanded={expandedNodes.includes(valueChain.code)}
+                expanded={treeExpandedNodes.includes(valueChain.code)}
                 onToggle={() => handleNodeToggle(valueChain.code)}
-                onKPISelect={handleKPISelect}
+                onKPIToggleCart={handleKPIToggleCart}
+                onKPIViewDetails={handleKPIViewDetails}
                 selectedKPIs={selectedKPIs}
-                searchQuery={searchQuery}
+                currentViewKPI={currentViewKPI}
+                searchQuery={treeSearchQuery}
               />
             ))}
           </Box>
@@ -117,7 +168,7 @@ export default function MetricTree({ mode, onKPISelect, selectedKPIs = [] }: Met
         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
           <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
             Showing {filteredValueChains.length} value chain{filteredValueChains.length !== 1 ? 's' : ''}
-            {searchQuery && ` matching "${searchQuery}"`}
+            {treeSearchQuery && ` matching "${treeSearchQuery}"`}
           </Box>
         </Box>
       )}

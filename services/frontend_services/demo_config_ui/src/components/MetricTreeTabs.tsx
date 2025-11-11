@@ -4,18 +4,25 @@
  */
 
 import { useState } from 'react';
-import { Box, Tabs, Tab, Paper, Typography } from '@mui/material';
+import { Box, Tabs, Tab, Paper } from '@mui/material';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import BusinessIcon from '@mui/icons-material/Business';
 import MetricTree from './MetricTree';
 import type { TreeMode } from '../types/metricTree';
 
 interface MetricTreeTabsProps {
-  onKPISelect?: (kpiCode: string) => void;
+  onKPIToggleCart?: (kpiCode: string) => void;
+  onKPIViewDetails?: (kpiCode: string) => void;
   selectedKPIs?: string[];
+  currentViewKPI?: string | null;
 }
 
-export default function MetricTreeTabs({ onKPISelect, selectedKPIs = [] }: MetricTreeTabsProps) {
+export default function MetricTreeTabs({ 
+  onKPIToggleCart, 
+  onKPIViewDetails, 
+  selectedKPIs = [],
+  currentViewKPI = null 
+}: MetricTreeTabsProps) {
   const [mode, setMode] = useState<TreeMode>('value-chain');
 
   const handleModeChange = (_event: React.SyntheticEvent, newMode: TreeMode) => {
@@ -24,10 +31,6 @@ export default function MetricTreeTabs({ onKPISelect, selectedKPIs = [] }: Metri
 
   return (
     <Paper elevation={2} sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        Browse KPIs
-      </Typography>
-      
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={mode} onChange={handleModeChange} aria-label="metric tree navigation">
           <Tab
@@ -48,8 +51,10 @@ export default function MetricTreeTabs({ onKPISelect, selectedKPIs = [] }: Metri
       <Box sx={{ mt: 2 }}>
         <MetricTree
           mode={mode}
-          onKPISelect={onKPISelect}
+          onKPIToggleCart={onKPIToggleCart}
+          onKPIViewDetails={onKPIViewDetails}
           selectedKPIs={selectedKPIs}
+          currentViewKPI={currentViewKPI}
         />
       </Box>
     </Paper>

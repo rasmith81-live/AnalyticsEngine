@@ -9,8 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import uuid
-from datetime import datetime
-from typing import List
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
+import httpx
+import random
 
 from .config import get_settings
 from .models import (
@@ -255,29 +257,50 @@ async def analyze_required_objects(request: RequiredObjectsAnalysisRequest):
     """
     Analyze required object models for selected KPIs.
     
-    This would call the metadata service to get KPI definitions
-    and aggregate all required objects.
+    Calls the metadata service to get KPI definitions and aggregates all required objects.
     """
-    # TODO: Call metadata service to get KPI definitions
-    # For now, return mock data
-    
+    settings = get_settings()
     required_objects = set()
+    object_details = {}
     
-    # Mock: Each KPI requires 2-3 objects
-    for kpi_code in request.kpi_codes:
-        # In real implementation, fetch from metadata service
-        required_objects.add("ORDER")
-        required_objects.add("CUSTOMER")
-        if "FULFILLMENT" in kpi_code:
-            required_objects.add("SHIPMENT")
-            required_objects.add("DELIVERY")
+    # Call metadata service for each KPI
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for kpi_code in request.kpi_codes:
+            try:
+                # Fetch KPI definition from metadata service
+                response = await client.get(
+                    f"{settings.metadata_service_url}/kpis/{kpi_code}"
+                )
+                
+                if response.status_code == 200:
+                    kpi_data = response.json()
+                    kpi_required_objects = kpi_data.get("required_objects", [])
+                    
+                    # Add to set
+                    for obj in kpi_required_objects:
+                        required_objects.add(obj)
+                        
+                        # Fetch object model details if not already fetched
+                        if obj not in object_details:
+                            try:
+                                obj_response = await client.get(
+                                    f"{settings.metadata_service_url}/object-models/{obj}"
+                                )
+                                if obj_response.status_code == 200:
+                                    object_details[obj] = obj_response.json()
+                            except Exception as e:
+                                logger.warning(f"Could not fetch object model {obj}: {e}")
+                                
+            except Exception as e:
+                logger.error(f"Error fetching KPI {kpi_code}: {e}")
+                # Continue with other KPIs
     
     return RequiredObjectsAnalysisResponse(
         kpi_codes=request.kpi_codes,
         required_objects=list(required_objects),
-        object_details={},
+        object_details=object_details,
         total_objects=len(required_objects),
-        uml_diagram=None
+        uml_diagram=None  # Could generate UML from object_details if needed
     )
 
 
@@ -355,14 +378,122 @@ async def get_service_proposal(proposal_id: str):
 
 @app.post("/api/demo/generate")
 async def generate_demo_data(request: DemoDataRequest):
-    """Generate demo data for selected KPIs."""
-    # TODO: Generate realistic demo data
+    """
+    Generate realistic demo data for selected KPIs.
+    
+    Creates time-series data with realistic trends and variations.
+    """
+    settings = get_settings()
+    generated_data = {}
+    
+    # Fetch KPI definitions to get units and typical ranges
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for kpi_code in request.kpi_codes:
+            try:
+                # Get KPI definition
+                response = await client.get(
+                    f"{settings.metadata_service_url}/kpis/{kpi_code}"
+                )
+                
+                if response.status_code == 200:
+                    kpi_data = response.json()
+                    
+                    # Generate time series data
+                    time_series = _generate_time_series(
+                        kpi_code=kpi_code,
+                        kpi_data=kpi_data,
+                        data_points=request.data_points
+                    )
+                    
+                    generated_data[kpi_code] = {
+                        "kpi_name": kpi_data.get("name", kpi_code),
+                        "unit": kpi_data.get("unit", ""),
+                        "time_series": time_series,
+                        "statistics": _calculate_statistics(time_series)
+                    }
+                else:
+                    logger.warning(f"Could not fetch KPI {kpi_code}")
+                    
+            except Exception as e:
+                logger.error(f"Error generating data for {kpi_code}: {e}")
     
     return {
         "status": "generated",
         "kpi_codes": request.kpi_codes,
         "data_points": request.data_points,
-        "message": "Demo data generation not yet implemented"
+        "generated_at": datetime.utcnow().isoformat(),
+        "data": generated_data
+    }
+
+
+def _generate_time_series(kpi_code: str, kpi_data: Dict[str, Any], data_points: int) -> List[Dict[str, Any]]:
+    """Generate realistic time series data for a KPI."""
+    unit = kpi_data.get("unit", "")
+    
+    # Determine base value and range based on unit
+    if "%" in unit or "Percentage" in unit:
+        base_value = random.uniform(70, 95)
+        variation = 5
+    elif "$" in unit or "USD" in unit:
+        base_value = random.uniform(100000, 1000000)
+        variation = base_value * 0.1
+    elif "days" in unit.lower():
+        base_value = random.uniform(20, 60)
+        variation = 10
+    else:
+        base_value = random.uniform(50, 100)
+        variation = 15
+    
+    # Generate data points with trend and seasonality
+    time_series = []
+    start_date = datetime.utcnow() - timedelta(days=data_points)
+    
+    trend = random.uniform(-0.1, 0.1)  # Slight upward or downward trend
+    
+    for i in range(data_points):
+        date = start_date + timedelta(days=i)
+        
+        # Add trend
+        trend_value = base_value + (trend * i)
+        
+        # Add seasonality (weekly pattern)
+        seasonal = variation * 0.3 * random.sin(2 * 3.14159 * i / 7)
+        
+        # Add random noise
+        noise = random.uniform(-variation * 0.2, variation * 0.2)
+        
+        value = max(0, trend_value + seasonal + noise)
+        
+        # Round based on unit
+        if "%" in unit:
+            value = round(min(100, value), 2)
+        elif "$" in unit:
+            value = round(value, 2)
+        else:
+            value = round(value, 2)
+        
+        time_series.append({
+            "date": date.strftime("%Y-%m-%d"),
+            "value": value
+        })
+    
+    return time_series
+
+
+def _calculate_statistics(time_series: List[Dict[str, Any]]) -> Dict[str, float]:
+    """Calculate statistics from time series data."""
+    values = [point["value"] for point in time_series]
+    
+    if not values:
+        return {}
+    
+    return {
+        "average": round(sum(values) / len(values), 2),
+        "min": round(min(values), 2),
+        "max": round(max(values), 2),
+        "latest": round(values[-1], 2),
+        "change": round(values[-1] - values[0], 2) if len(values) > 1 else 0,
+        "change_percent": round(((values[-1] - values[0]) / values[0] * 100), 2) if len(values) > 1 and values[0] != 0 else 0
     }
 
 

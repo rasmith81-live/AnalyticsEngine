@@ -42,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', maxWidth: '100%', overflow: 'hidden' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -100,7 +100,7 @@ export default function Layout({ children }: LayoutProps) {
         </Box>
       </Drawer>
       
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, minWidth: 0, overflow: 'hidden' }}>
         <Toolbar />
         {children}
       </Box>

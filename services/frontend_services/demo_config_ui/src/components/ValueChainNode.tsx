@@ -13,8 +13,10 @@ interface ValueChainNodeProps {
   valueChain: ValueChain;
   expanded: boolean;
   onToggle: () => void;
-  onKPISelect: (kpiCode: string) => void;
+  onKPIToggleCart: (kpiCode: string) => void;
+  onKPIViewDetails: (kpiCode: string) => void;
   selectedKPIs: string[];
+  currentViewKPI: string | null;
   searchQuery?: string;
 }
 
@@ -22,11 +24,51 @@ export default function ValueChainNode({
   valueChain,
   expanded,
   onToggle,
-  onKPISelect,
+  onKPIToggleCart,
+  onKPIViewDetails,
   selectedKPIs,
+  currentViewKPI,
   searchQuery = ''
 }: ValueChainNodeProps) {
-  const totalKPIs = valueChain.modules?.reduce((sum, module) => sum + (module.kpi_count || 0), 0) || 0;
+  // Filter modules based on search query
+  const filteredModules = valueChain.modules?.filter(module => {
+    if (!searchQuery) return true;
+    
+    const query = searchQuery.toLowerCase();
+    
+    // Check module name
+    if (module.name?.toLowerCase().includes(query) ||
+        module.display_name?.toLowerCase().includes(query)) {
+      return true;
+    }
+    
+    // Check if any KPI matches
+    return module.kpis?.some(kpi =>
+      kpi.name?.toLowerCase().includes(query) ||
+      kpi.display_name?.toLowerCase().includes(query) ||
+      kpi.description?.toLowerCase().includes(query) ||
+      kpi.code?.toLowerCase().includes(query)
+    );
+  });
+  
+  // Calculate counts based on filtered modules
+  const displayModuleCount = filteredModules?.length || 0;
+  const displayKPICount = filteredModules?.reduce((sum, module) => {
+    if (!searchQuery) {
+      return sum + (module.kpi_count || 0);
+    }
+    // Count only matching KPIs when searching
+    const matchingKPIs = module.kpis?.filter(kpi => {
+      const query = searchQuery.toLowerCase();
+      return (
+        kpi.name?.toLowerCase().includes(query) ||
+        kpi.display_name?.toLowerCase().includes(query) ||
+        kpi.description?.toLowerCase().includes(query) ||
+        kpi.code?.toLowerCase().includes(query)
+      );
+    });
+    return sum + (matchingKPIs?.length || 0);
+  }, 0) || 0;
 
   return (
     <Box sx={{ mb: 1 }}>
@@ -51,12 +93,12 @@ export default function ValueChainNode({
           {valueChain.display_name || valueChain.name}
         </Typography>
         <Chip
-          label={`${valueChain.module_count || 0} modules`}
+          label={`${displayModuleCount} modules`}
           size="small"
           sx={{ mr: 1 }}
         />
         <Chip
-          label={`${totalKPIs} KPIs`}
+          label={`${displayKPICount} KPIs`}
           size="small"
           color="primary"
         />
@@ -65,19 +107,21 @@ export default function ValueChainNode({
       {/* Modules */}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ ml: 4, mt: 1 }}>
-          {valueChain.modules && valueChain.modules.length > 0 ? (
-            valueChain.modules.map((module) => (
+          {filteredModules && filteredModules.length > 0 ? (
+            filteredModules.map((module) => (
               <ModuleNode
                 key={module.code}
                 module={module}
-                onKPISelect={onKPISelect}
+                onKPIToggleCart={onKPIToggleCart}
+                onKPIViewDetails={onKPIViewDetails}
                 selectedKPIs={selectedKPIs}
+                currentViewKPI={currentViewKPI}
                 searchQuery={searchQuery}
               />
             ))
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              No modules found
+              {searchQuery ? 'No matching modules found' : 'No modules found'}
             </Typography>
           )}
         </Box>

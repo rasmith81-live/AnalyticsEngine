@@ -1,5 +1,5 @@
 """
-Sales Efficiency KPI
+Sales Efficiency
 
 The ratio of revenue generated to the cost of sales and marketing efforts.
 """
@@ -12,43 +12,169 @@ SALES_EFFICIENCY = {
     "calculation_formula": "Revenue Generated / Cost of Sales Activities",
     "category": "Outside Sales",
     "is_active": True,
-    "kpi_definition": "The ratio of revenue generated to the cost of sales and marketing efforts.",
-    "expected_business_insights": "Provides insights into the profitability and cost-effectiveness of the sales organization.",
-    "measurement_approach": "Compares the revenue generated to the cost of sales-related activities.",
+    "full_kpi_definition": "Complete definition for Sales Efficiency to be added.",
     "trend_analysis": """
+
+
+
     * Increasing sales efficiency may indicate improved targeting and effectiveness of sales and marketing efforts.
     * Decreasing sales efficiency could signal increased competition, market saturation, or inefficiencies in the sales process.
+    
+    
+    
     """,
     "diagnostic_questions": """
+
+
+
     * What specific sales and marketing activities contribute most to revenue generation?
     * Are there any market or competitive factors impacting the cost-effectiveness of our sales efforts?
+    
+    
+    
     """,
     "actionable_tips": """
+
+
+
     * Regularly review and optimize sales and marketing strategies to ensure maximum impact for the cost incurred.
     * Invest in training and development for sales teams to improve their effectiveness and efficiency.
     * Utilize customer relationship management (CRM) software to better track and manage sales activities and customer interactions.
+    
+    
+    
     """,
     "visualization_suggestions": """
+
+
+
     * Line charts showing the trend of sales efficiency over time.
     * Pie charts comparing the proportion of revenue generated to the cost of different sales and marketing activities.
+    
+    
+    
     """,
     "risk_warnings": """
+
+
+
     * Declining sales efficiency may lead to reduced profitability and financial performance.
     * High sales efficiency without corresponding revenue growth may indicate missed opportunities for investment and expansion.
+    
+    
+    
     """,
     "tracking_tools": """
+
+
+
     * Sales analytics platforms like Tableau or Power BI to track and analyze sales efficiency metrics.
     * Marketing automation tools to streamline and optimize marketing efforts for better cost-effectiveness.
+    
+    
+    
     """,
     "integration_points": """
+
+
+
     * Integrate sales efficiency data with financial reporting systems to understand its impact on overall profitability.
     * Link sales efficiency with customer relationship management (CRM) systems to identify the most cost-effective customer acquisition channels.
+    
+    
+    
     """,
     "change_impact_analysis": """
+
+
+
     * Improving sales efficiency can lead to increased profitability and better resource allocation.
     * However, a singular focus on sales efficiency may neglect the quality of customer interactions and long-term customer relationships.
+    
+    
+    
     """,
-    "metadata_": {"modules": ["OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Revenue Forecast", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"]},
+    "metadata_": {"modules": ["OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Revenue Forecast", "Sale", "Sales Activity", "Sales Appointment", "Sales Assessment", "Sales Call", "Sales Coaching Session", "Sales Content", "Sales Dashboard", "Sales Email", "Sales Forecast", "Sales Playbook", "Sales Process Workflow", "Sales Quota", "Sales Representative", "Sales Team", "Sales Territory", "Sales Training Program"], "last_validated": "2025-11-10T13:49:33.408446"},
+    "required_objects": [],
     "modules": ["OUTSIDE_SALES"],
     "module_code": "OUTSIDE_SALES",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        674.44,
+                        634.8,
+                        651.19,
+                        605.08,
+                        678.21,
+                        676.45,
+                        612.61,
+                        719.05,
+                        642.01,
+                        633.9,
+                        656.6,
+                        638.7
+                ],
+                "unit": "units"
+        },
+        "current": {
+                "value": 638.7,
+                "unit": "units",
+                "change": -17.9,
+                "change_percent": -2.7,
+                "trend": "stable"
+        },
+        "statistics": {
+                "average": 651.92,
+                "min": 605.08,
+                "max": 719.05,
+                "unit": "units"
+        },
+        "breakdown": [
+                {
+                        "category": "Direct Sales",
+                        "value": 132.72,
+                        "percentage": 20.8
+                },
+                {
+                        "category": "Channel Sales",
+                        "value": 145.38,
+                        "percentage": 22.8
+                },
+                {
+                        "category": "Online Sales",
+                        "value": 115.15,
+                        "percentage": 18.0
+                },
+                {
+                        "category": "Enterprise Sales",
+                        "value": 52.99,
+                        "percentage": 8.3
+                },
+                {
+                        "category": "Other",
+                        "value": 192.46,
+                        "percentage": 30.1
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:12.944685",
+                "data_points": 12,
+                "kpi_type": "metric",
+                "kpi_name": "Sales Efficiency"
+        }
+    },
 }

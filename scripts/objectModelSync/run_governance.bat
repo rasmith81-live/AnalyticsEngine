@@ -7,10 +7,11 @@ echo ===========================================================================
 echo Analytics Governance Suite (Dictionary-Based)
 echo ================================================================================
 echo.
-echo This script manages three governance processes:
+echo This script manages four governance processes:
 echo   1. Main Sync - Object model and KPI synchronization
 echo   2. Arithmetic Governance - Abstract arithmetic modifiers from KPI names
 echo   3. KPI Consolidation - Identify and consolidate duplicate KPIs
+echo   4. KPI Validation - Ensure complete KPI definitions with sample data
 echo.
 echo Using: analytics_metadata_service/definitions (Dictionary Format)
 echo ================================================================================
@@ -27,9 +28,11 @@ echo   2 - Main Sync only
 echo   3 - Arithmetic Governance only
 echo   4 - KPI Consolidation Analysis only
 echo   5 - KPI Consolidation Execution only
+echo   6 - KPI Validation and Enhancement only
+echo   7 - Regenerate Sample Data only
 echo   0 - Exit
 echo.
-set /p CHOICE="Enter your choice (0-5): "
+set /p CHOICE="Enter your choice (0-7): "
 
 if "%CHOICE%"=="0" goto END
 if "%CHOICE%"=="1" goto RUN_ALL
@@ -37,6 +40,8 @@ if "%CHOICE%"=="2" goto RUN_SYNC
 if "%CHOICE%"=="3" goto RUN_ARITHMETIC
 if "%CHOICE%"=="4" goto RUN_CONSOLIDATION_ANALYSIS
 if "%CHOICE%"=="5" goto RUN_CONSOLIDATION_EXECUTION
+if "%CHOICE%"=="6" goto RUN_KPI_VALIDATION
+if "%CHOICE%"=="7" goto RUN_REGENERATE_SAMPLE_DATA
 
 echo Invalid choice. Please try again.
 goto MENU
@@ -50,10 +55,11 @@ echo ===========================================================================
 echo Running FULL GOVERNANCE SUITE
 echo ================================================================================
 echo.
-echo This will run all three processes in sequence:
+echo This will run all four processes in sequence:
 echo   1. Main Sync
 echo   2. Arithmetic Governance
 echo   3. KPI Consolidation Analysis
+echo   4. KPI Validation and Enhancement
 echo.
 set /p CONFIRM_ALL="Continue? (Y/N): "
 if /i not "%CONFIRM_ALL%"=="Y" goto MENU
@@ -82,12 +88,22 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo --------------------------------------------------------------------------------
-echo STEP 3/3: KPI Consolidation Analysis
+echo STEP 3/4: KPI Consolidation Analysis
 echo --------------------------------------------------------------------------------
 call :RUN_CONSOLIDATION_ANALYSIS_INTERNAL
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ⚠️  Consolidation Analysis had issues, but continuing...
+)
+
+echo.
+echo --------------------------------------------------------------------------------
+echo STEP 4/4: KPI Validation and Enhancement
+echo --------------------------------------------------------------------------------
+call :RUN_KPI_VALIDATION_INTERNAL
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ⚠️  KPI Validation had issues, but continuing...
 )
 
 echo.
@@ -98,7 +114,8 @@ echo.
 echo Next steps:
 echo   1. Review: output\kpi_consolidation_recommendations.md
 echo   2. Approve consolidations by checking boxes
-echo   3. Run option 6 to execute approved consolidations
+echo   3. Run option 5 to execute approved consolidations
+echo   4. Review: output\kpi_validation_report_*.json for validation results
 echo.
 echo ================================================================================
 pause
@@ -243,6 +260,80 @@ if %EXEC_RESULT% EQU 0 (
 )
 
 exit /b %EXEC_RESULT%
+
+REM ============================================================================
+REM Run KPI Validation and Enhancement
+REM ============================================================================
+:RUN_KPI_VALIDATION
+call :RUN_KPI_VALIDATION_INTERNAL
+pause
+goto MENU
+
+:RUN_KPI_VALIDATION_INTERNAL
+echo.
+echo Running KPI Validation and Enhancement...
+echo.
+echo This will:
+echo   - Validate all 21 required KPI fields
+echo   - Add missing fields with sensible defaults
+echo   - Generate formula-aware sample data
+echo   - Create automatic backup
+echo.
+python validate_and_enhance_kpis.py
+set VALIDATION_RESULT=%ERRORLEVEL%
+
+if %VALIDATION_RESULT% EQU 0 (
+    echo.
+    echo ✅ KPI Validation complete!
+    echo.
+    echo Check output folder for validation report.
+) else (
+    echo.
+    echo ❌ KPI Validation failed.
+)
+
+exit /b %VALIDATION_RESULT%
+
+REM ============================================================================
+REM Regenerate Sample Data
+REM ============================================================================
+:RUN_REGENERATE_SAMPLE_DATA
+call :RUN_REGENERATE_SAMPLE_DATA_INTERNAL
+pause
+goto MENU
+
+:RUN_REGENERATE_SAMPLE_DATA_INTERNAL
+echo.
+echo Regenerating Sample Data for All KPIs...
+echo.
+echo This will:
+echo   - Regenerate sample_data for all KPIs
+echo   - Use formula-aware generation
+echo   - Create smart category names
+echo   - Create automatic backup
+echo.
+echo ⚠️  WARNING: This will overwrite existing sample_data!
+echo.
+set /p CONFIRM_REGEN="Continue? (Y/N): "
+if /i not "%CONFIRM_REGEN%"=="Y" (
+    echo.
+    echo Operation cancelled.
+    exit /b 1
+)
+
+echo.
+python regenerate_sample_data.py
+set REGEN_RESULT=%ERRORLEVEL%
+
+if %REGEN_RESULT% EQU 0 (
+    echo.
+    echo ✅ Sample data regeneration complete!
+) else (
+    echo.
+    echo ❌ Sample data regeneration failed.
+)
+
+exit /b %REGEN_RESULT%
 
 REM ============================================================================
 REM Exit

@@ -11,6 +11,7 @@ import RequiredObjectsViewer from './pages/RequiredObjectsViewer';
 import DataSourceConfig from './pages/DataSourceConfig';
 import ServiceProposal from './pages/ServiceProposal';
 import Layout from './components/Layout';
+import { CartProvider } from './contexts/CartContext';
 
 // Create theme
 const theme = createTheme({
@@ -41,20 +42,22 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BrowserRouter>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/demo" replace />} />
-              <Route path="/demo" element={<DemoPage />} />
-              <Route path="/config" element={<ConfigPage />} />
-              <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
-              <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
-              <Route path="/required-objects" element={<RequiredObjectsViewer />} />
-              <Route path="/data-sources" element={<DataSourceConfig />} />
-              <Route path="/proposal" element={<ServiceProposal />} />
-            </Routes>
-          </Layout>
-        </BrowserRouter>
+        <CartProvider>
+          <BrowserRouter>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/demo" replace />} />
+                <Route path="/demo" element={<DemoPage />} />
+                <Route path="/config" element={<ConfigPage />} />
+                <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
+                <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
+                <Route path="/required-objects" element={<RequiredObjectsViewer />} />
+                <Route path="/data-sources" element={<DataSourceConfig />} />
+                <Route path="/proposal" element={<ServiceProposal />} />
+              </Routes>
+            </Layout>
+          </BrowserRouter>
+        </CartProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

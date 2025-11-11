@@ -1,5 +1,5 @@
 """
-Customer Retention Cost KPI
+Customer Retention Cost
 
 The total cost associated with retaining an existing customer.
 """
@@ -12,43 +12,169 @@ CUSTOMER_RETENTION_COST = {
     "calculation_formula": "Total Retention Costs / Number of Customers Retained",
     "category": "Customer Retention",
     "is_active": True,
-    "kpi_definition": "The total cost associated with retaining an existing customer.",
-    "expected_business_insights": "Gives insight into the investment required to keep customers and can be compared against the cost of acquiring new customers.",
-    "measurement_approach": "Tracks the total costs associated with retaining an existing customer.",
+    "full_kpi_definition": "Complete definition for Customer Retention Cost to be added.",
     "trend_analysis": """
+
+
+
     * Increasing customer retention cost may indicate higher expenses in loyalty programs or customer support.
     * Decreasing cost could signal improved customer satisfaction and loyalty, leading to lower retention efforts.
+    
+    
+    
     """,
     "diagnostic_questions": """
+
+
+
     * Are there specific customer segments that require higher retention costs?
     * How does our customer retention cost compare with industry averages or benchmarks?
+    
+    
+    
     """,
     "actionable_tips": """
+
+
+
     * Invest in customer relationship management (CRM) systems to better understand and target high-cost segments.
     * Implement customer loyalty programs to increase retention without significantly increasing costs.
     * Regularly review and optimize customer support processes to reduce associated expenses.
+    
+    
+    
     """,
     "visualization_suggestions": """
+
+
+
     * Line charts showing the trend of customer retention cost over time.
     * Pie charts to compare the distribution of retention costs across different customer segments.
+    
+    
+    
     """,
     "risk_warnings": """
+
+
+
     * High customer retention costs may erode profitability if not aligned with the value derived from retained customers.
     * Significant fluctuations in retention costs may indicate inconsistent customer experiences or ineffective retention strategies.
+    
+    
+    
     """,
     "tracking_tools": """
+
+
+
     * CRM software like Salesforce or HubSpot for tracking and managing customer retention efforts.
     * Customer loyalty platforms such as Smile.io or Yotpo to implement and monitor loyalty programs.
+    
+    
+    
     """,
     "integration_points": """
+
+
+
     * Integrate customer retention cost analysis with financial systems to understand its impact on overall profitability.
     * Link retention cost data with customer feedback and satisfaction metrics to identify areas for improvement.
+    
+    
+    
     """,
     "change_impact_analysis": """
+
+
+
     * Reducing customer retention costs may lead to improved profitability, but it should not compromise the quality of customer experience.
     * Increasing retention costs without a corresponding increase in customer value may indicate inefficiencies in retention strategies.
+    
+    
+    
     """,
-    "metadata_": {"modules": ["CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Customer Advocacy Program", "Customer Cohort", "Customer Community", "Customer Education", "Customer Feedback", "Customer Goal", "Customer Health Record", "Customer Journey", "Customer Onboarding", "Customer Segment", "Customer Success Manager", "Sale"], "replaces": ["ACCOUNT_RETENTION_COSTS"]},
+    "metadata_": {"modules": ["CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "OUTSIDE_SALES"], "source": "kpidepot.com", "import_date": "2025-11-07", "required_objects": ["Customer", "Customer Advocacy Program", "Customer Cohort", "Customer Community", "Customer Education", "Customer Feedback", "Customer Goal", "Customer Health Record", "Customer Journey", "Customer Onboarding", "Customer Segment", "Customer Success Manager", "Sale"], "replaces": ["ACCOUNT_RETENTION_COSTS"], "last_validated": "2025-11-10T13:49:32.869485"},
+    "required_objects": [],
     "modules": ["CUSTOMER_RETENTION", "CUSTOMER_SUCCESS", "OUTSIDE_SALES"],
     "module_code": "CUSTOMER_RETENTION",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        447,
+                        432,
+                        437,
+                        407,
+                        426,
+                        416,
+                        434,
+                        421,
+                        430,
+                        449,
+                        434,
+                        408
+                ],
+                "unit": "count"
+        },
+        "current": {
+                "value": 408,
+                "unit": "count",
+                "change": -26,
+                "change_percent": -6.0,
+                "trend": "stable"
+        },
+        "statistics": {
+                "average": 428.42,
+                "min": 407,
+                "max": 449,
+                "unit": "count"
+        },
+        "breakdown": [
+                {
+                        "category": "New Customers",
+                        "value": 97.21,
+                        "percentage": 23.8
+                },
+                {
+                        "category": "Existing Customers",
+                        "value": 85.43,
+                        "percentage": 20.9
+                },
+                {
+                        "category": "VIP Customers",
+                        "value": 57.34,
+                        "percentage": 14.1
+                },
+                {
+                        "category": "At-Risk Customers",
+                        "value": 46.39,
+                        "percentage": 11.4
+                },
+                {
+                        "category": "Other",
+                        "value": 121.63,
+                        "percentage": 29.8
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:51:11.776491",
+                "data_points": 12,
+                "kpi_type": "count",
+                "kpi_name": "Customer Retention Cost"
+        }
+    },
 }

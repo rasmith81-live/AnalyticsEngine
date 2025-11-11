@@ -1,0 +1,121 @@
+"""
+
+
+"""
+
+RETURN_ON_SALES_INVESTMENT_ROSI = {
+    "code": "RETURN_ON_SALES_INVESTMENT_ROSI",
+    "name": "",
+    "description": "",
+    "formula": "(Gross Profit from Sales - Sales Investment) / Sales Investment",
+    "calculation_formula": "(Gross Profit from Sales - Sales Investment) / Sales Investment",
+    "category": "General",
+    "is_active": True,
+    "full_kpi_definition": "Complete definition for  to be added.",
+    "trend_analysis": "Trend analysis to be defined.",
+    "diagnostic_questions": """
+
+* What factors are influencing this metric?
+* Are there any anomalies in the data?
+    
+    """,
+    "actionable_tips": """
+
+* Monitor this KPI regularly
+* Set appropriate targets and thresholds
+    
+    """,
+    "visualization_suggestions": """
+
+* Line chart for time series analysis
+* Bar chart for comparisons
+    
+    """,
+    "risk_warnings": "* Monitor for significant deviations from expected values",
+    "tracking_tools": "* CRM or analytics platform",
+    "integration_points": "* Integrate with related business metrics",
+    "change_impact_analysis": "Changes in this KPI may impact related business processes.",
+    "metadata_": {"modules": [], "required_objects": [], "last_validated": "2025-11-10T13:43:24.091775"},
+    "required_objects": [],
+    "modules": [],
+    "module_code": "GENERAL",
+    "sample_data": {
+        "time_series": {
+                "dates": [
+                        "2024-12-15",
+                        "2025-01-14",
+                        "2025-02-13",
+                        "2025-03-15",
+                        "2025-04-14",
+                        "2025-05-14",
+                        "2025-06-13",
+                        "2025-07-13",
+                        "2025-08-12",
+                        "2025-09-11",
+                        "2025-10-11",
+                        "2025-11-10"
+                ],
+                "values": [
+                        706.95,
+                        708.53,
+                        836.64,
+                        757.79,
+                        803.73,
+                        728.76,
+                        712.64,
+                        711.21,
+                        765.85,
+                        808.95,
+                        824.51,
+                        765.35
+                ],
+                "unit": "units"
+        },
+        "current": {
+                "value": 765.35,
+                "unit": "units",
+                "change": -59.16,
+                "change_percent": -7.2,
+                "trend": "increasing"
+        },
+        "statistics": {
+                "average": 760.91,
+                "min": 706.95,
+                "max": 836.64,
+                "unit": "units"
+        },
+        "breakdown": [
+                {
+                        "category": "Category A",
+                        "value": 242.33,
+                        "percentage": 31.7
+                },
+                {
+                        "category": "Category B",
+                        "value": 92.22,
+                        "percentage": 12.0
+                },
+                {
+                        "category": "Category C",
+                        "value": 147.16,
+                        "percentage": 19.2
+                },
+                {
+                        "category": "Category D",
+                        "value": 79.07,
+                        "percentage": 10.3
+                },
+                {
+                        "category": "Other",
+                        "value": 204.57,
+                        "percentage": 26.7
+                }
+        ],
+        "metadata": {
+                "generated_date": "2025-11-10T13:43:24.091775",
+                "data_points": 12,
+                "kpi_type": "metric",
+                "kpi_name": ""
+        }
+    },
+}
