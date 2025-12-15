@@ -37,9 +37,9 @@
 ┌─────────────────────────────────────────────────────────────┐
 │ Messaging Service (Redis Pub/Sub)                          │
 │ ├─ Channel: "data.stream.{domain}"                         │
-│ ├─ Channel: "data.stream.scor"                             │
-│ ├─ Channel: "data.stream.crm"                              │
-│ └─ Channel: "data.stream.sales"                            │
+│ ├─ Channel: "data.stream.supply_chain"                     │
+│ ├─ Channel: "data.stream.finance"                          │
+│ └─ Channel: "data.stream.marketing"                        │
 └─────────────────────────────────────────────────────────────┘
                            ↓ Subscribe
 ┌─────────────────────────────────────────────────────────────┐
@@ -135,7 +135,7 @@ class DataStreamPublisher:
         Start publishing data stream for a domain.
         
         Args:
-            domain: Domain name (scor, crm, sales)
+            domain: Domain name (e.g., supply_chain, sales)
             config: Stream configuration (tables, frequency, filters)
         """
         channel = f"data.stream.{domain}"
@@ -235,7 +235,7 @@ class StreamProcessor:
         Start processing data stream for KPIs.
         
         Args:
-            domain: Domain to subscribe to (scor, crm, sales)
+            domain: Domain to subscribe to (e.g., supply_chain, finance)
             kpi_codes: List of KPI codes to calculate
         """
         channel = f"data.stream.{domain}"

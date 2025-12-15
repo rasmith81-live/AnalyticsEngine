@@ -15,9 +15,7 @@ import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SettingsIcon from '@mui/icons-material/Settings';
-import DescriptionIcon from '@mui/icons-material/Description';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
 import StorageIcon from '@mui/icons-material/Storage';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 
@@ -29,10 +27,8 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Demo', icon: <DashboardIcon />, path: '/demo' },
-  { text: 'Configuration', icon: <SettingsIcon />, path: '/config' },
-  { text: 'KPI Details', icon: <DescriptionIcon />, path: '/kpi/PERFECT_ORDER_FULFILLMENT' },
-  { text: 'Object Models', icon: <AccountTreeIcon />, path: '/object-model/ORDER' },
-  { text: 'Required Objects', icon: <AnalyticsIcon />, path: '/required-objects' },
+  { text: 'KPI Configuration', icon: <SettingsIcon />, path: '/config' },
+  { text: 'Object Models', icon: <AccountTreeIcon />, path: '/object-models' },
   { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
   { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },
 ];

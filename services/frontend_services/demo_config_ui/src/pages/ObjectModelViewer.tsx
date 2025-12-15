@@ -11,9 +11,6 @@ import {
   Grid,
   Card,
   CardContent,
-  List,
-  ListItem,
-  ListItemText,
   IconButton,
   Table,
   TableBody,
@@ -27,6 +24,9 @@ import {
   AccountTree as AccountTreeIcon,
   Storage as StorageIcon,
   Link as LinkIcon,
+  ArrowForward as ArrowForwardIcon,
+  ArrowBack as ArrowBackwardIcon,
+  SwapHoriz as SwapHorizIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useObjectModels } from '../hooks/useObjectModelDetails';
@@ -63,48 +63,70 @@ export default function ObjectModelViewer() {
     );
   }
 
-  // Parse schema definition to extract fields and relationships
+  // Parse UML class diagram schema definition
   const parseSchema = (schema: string) => {
     const fields: Array<{ name: string; type: string; nullable: boolean }> = [];
-    const relationships: Array<{ name: string; target: string; type: string }> = [];
+    const relationships: Array<{ 
+      from: string; 
+      to: string; 
+      type: string; 
+      cardinality: string;
+      label: string;
+      direction: 'forward' | 'backward' | 'bidirectional';
+    }> = [];
 
     if (!schema) return { fields, relationships };
 
     const lines = schema.split('\n');
-    let inRelationships = false;
+    
+    // UML relationship patterns
+    const associationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
+    const compositionPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(\*--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
+    const aggregationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(o--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
+    const generalizationPattern = /([A-Za-z0-9_]+)\s+(--\|>)\s+([A-Za-z0-9_]+)/;
 
     for (const line of lines) {
       const trimmed = line.trim();
+      
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith("'") || trimmed.startsWith('@')) continue;
 
-      // Check if we're in relationships section
-      if (trimmed.startsWith("' Relationships")) {
-        inRelationships = true;
-        continue;
+      // Try to match UML relationships
+      let match;
+      let relType = 'association';
+      let from = '';
+      let to = '';
+      let fromCard = '';
+      let toCard = '';
+      let label = '';
+      
+      if ((match = trimmed.match(compositionPattern))) {
+        [, from, fromCard, , toCard, to, label] = match;
+        relType = 'composition';
+      } else if ((match = trimmed.match(aggregationPattern))) {
+        [, from, fromCard, , toCard, to, label] = match;
+        relType = 'aggregation';
+      } else if ((match = trimmed.match(generalizationPattern))) {
+        [, from, , to] = match;
+        relType = 'generalization';
+        label = 'inherits from';
+      } else if ((match = trimmed.match(associationPattern))) {
+        [, from, fromCard, , toCard, to, label] = match;
+        relType = 'association';
       }
-
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith("'")) continue;
-
-      if (inRelationships) {
-        // Parse relationship: field_name --> TargetModel
-        const relMatch = trimmed.match(/(\w+)\s*-->\s*(\w+)/);
-        if (relMatch) {
-          relationships.push({
-            name: relMatch[1],
-            target: relMatch[2],
-            type: 'association',
-          });
-        }
-      } else {
-        // Parse field: field_name : type
-        const fieldMatch = trimmed.match(/(\w+)\s*:\s*(\w+)(\?)?/);
-        if (fieldMatch) {
-          fields.push({
-            name: fieldMatch[1],
-            type: fieldMatch[2],
-            nullable: !!fieldMatch[3],
-          });
-        }
+      
+      if (match && (from === model?.code || to === model?.code)) {
+        const direction: 'forward' | 'backward' | 'bidirectional' = 
+          relType === 'generalization' ? (from === model?.code ? 'forward' : 'backward') : 'bidirectional';
+        
+        relationships.push({
+          from,
+          to,
+          type: relType,
+          cardinality: fromCard && toCard ? `${fromCard} to ${toCard}` : '',
+          label: label.trim(),
+          direction
+        });
       }
     }
 
@@ -228,39 +250,71 @@ export default function ObjectModelViewer() {
 
         {/* Relationships */}
         {relationships.length > 0 && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
                   <LinkIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Relationships
+                  UML Relationships ({relationships.length})
                 </Typography>
-                <List>
-                  {relationships.map((rel, index) => (
-                    <ListItem key={index}>
-                      <ListItemText
-                        primary={
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="body2" component="span">
-                              <code>{rel.name}</code>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>From</strong></TableCell>
+                        <TableCell align="center"><strong>Direction</strong></TableCell>
+                        <TableCell><strong>To</strong></TableCell>
+                        <TableCell><strong>Type</strong></TableCell>
+                        <TableCell><strong>Cardinality</strong></TableCell>
+                        <TableCell><strong>Relationship</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {relationships.map((rel, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {rel.from}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              →
+                          </TableCell>
+                          <TableCell align="center">
+                            {rel.direction === 'forward' && <ArrowForwardIcon fontSize="small" color="action" />}
+                            {rel.direction === 'backward' && <ArrowBackwardIcon fontSize="small" color="action" />}
+                            {rel.direction === 'bidirectional' && <SwapHorizIcon fontSize="small" color="action" />}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {rel.to}
                             </Typography>
-                            <Chip
-                              label={rel.target}
-                              size="small"
-                              clickable
-                              component={RouterLink}
-                              to={`/object-model/${rel.target}`}
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={rel.type} 
+                              size="small" 
+                              color={
+                                rel.type === 'composition' ? 'error' :
+                                rel.type === 'aggregation' ? 'warning' :
+                                rel.type === 'generalization' ? 'info' :
+                                'default'
+                              }
+                              variant="outlined" 
                             />
-                          </Stack>
-                        }
-                        secondary={rel.type}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary" fontFamily="monospace">
+                              {rel.cardinality || '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {rel.label || '-'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               </CardContent>
             </Card>
           </Grid>

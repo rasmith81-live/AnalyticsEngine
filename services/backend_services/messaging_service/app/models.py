@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 
 class MessagePriority(str, Enum):
@@ -56,7 +56,8 @@ class PublishMessageRequest(BaseModel):
     service_name: str = Field(..., description="Publishing service name")
     persistent: bool = Field(default=True, description="Whether to persist the message")
     
-    @validator('channel')
+    @field_validator('channel')
+    @classmethod
     def validate_channel(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError("Channel cannot be empty")
@@ -200,7 +201,8 @@ class EventRequest(BaseModel):
     correlation_id: Optional[str] = Field(None, description="Correlation ID")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     
-    @validator('event_type')
+    @field_validator('event_type')
+    @classmethod
     def validate_event_type(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError("Event type cannot be empty")
@@ -226,7 +228,8 @@ class PublishCommandRequest(BaseModel):
     correlation_id: Optional[str] = Field(None, description="Correlation ID for distributed tracing")
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
 
-    @validator('command_type')
+    @field_validator('command_type')
+    @classmethod
     def validate_command_type(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError("Command type cannot be empty")

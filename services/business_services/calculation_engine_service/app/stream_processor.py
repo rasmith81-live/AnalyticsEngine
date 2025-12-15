@@ -11,6 +11,7 @@ import httpx
 
 from .base_handler import CalculationParams, CalculationResult
 from .orchestrator import CalculationOrchestrator
+from .engine.stream_aggregator import StreamAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class StreamProcessor:
     Responsibilities:
     - Subscribe to data streams from database service
     - Listen for stream updates via messaging service
+    - Ingest high-velocity data into StreamAggregator (Redis TimeSeries)
     - Calculate KPIs when new data arrives
     - Publish calculation results back to messaging service
     - Manage stream subscriptions lifecycle
@@ -32,6 +34,7 @@ class StreamProcessor:
         orchestrator: CalculationOrchestrator,
         database_service_url: str,
         messaging_service_url: str,
+        redis_url: str,
         subscriber_id: Optional[str] = None
     ):
         """
@@ -41,12 +44,16 @@ class StreamProcessor:
             orchestrator: Calculation orchestrator for KPI calculations
             database_service_url: URL of database service
             messaging_service_url: URL of messaging service
+            redis_url: Redis connection URL for StreamAggregator
             subscriber_id: Optional subscriber ID (generated if not provided)
         """
         self.orchestrator = orchestrator
         self.database_service_url = database_service_url
         self.messaging_service_url = messaging_service_url
         self.subscriber_id = subscriber_id or f"calc_engine_{id(self)}"
+        
+        # Initialize Stream Aggregator
+        self.aggregator = StreamAggregator(redis_url=redis_url)
         
         # Track active subscriptions: stream_key -> subscription_info
         self._active_subscriptions: Dict[str, Dict] = {}
@@ -320,6 +327,15 @@ class StreamProcessor:
             # Extract data from message
             timestamp = message.get("timestamp")
             avg_value = message.get("avg_value")
+            
+            # Ingest into In-Memory Stream Aggregator (Redis TimeSeries)
+            # This allows for high-velocity lookups and sub-second windowing before DB persistence
+            if avg_value is not None:
+                await self.aggregator.add_sample(
+                    metric_name=kpi_code,
+                    value=float(avg_value),
+                    dimensions={"entity_id": entity_id, "period": period}
+                )
             
             # Create calculation parameters
             params = CalculationParams(

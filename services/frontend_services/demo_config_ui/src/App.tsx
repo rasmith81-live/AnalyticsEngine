@@ -7,7 +7,8 @@ import DemoPage from './pages/DemoPage';
 import ConfigPage from './pages/ConfigPage';
 import KPIDetailPage from './pages/KPIDetailPage';
 import ObjectModelViewer from './pages/ObjectModelViewer';
-import RequiredObjectsViewer from './pages/RequiredObjectsViewer';
+import ObjectModelsBrowser from './pages/ObjectModelsBrowser';
+import RequiredObjectsView from './pages/RequiredObjectsView';
 import DataSourceConfig from './pages/DataSourceConfig';
 import ServiceProposal from './pages/ServiceProposal';
 import Layout from './components/Layout';
@@ -50,8 +51,9 @@ function App() {
                 <Route path="/demo" element={<DemoPage />} />
                 <Route path="/config" element={<ConfigPage />} />
                 <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
+                <Route path="/object-models" element={<ObjectModelsBrowser />} />
                 <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
-                <Route path="/required-objects" element={<RequiredObjectsViewer />} />
+                <Route path="/required-objects-view" element={<RequiredObjectsView />} />
                 <Route path="/data-sources" element={<DataSourceConfig />} />
                 <Route path="/proposal" element={<ServiceProposal />} />
               </Routes>

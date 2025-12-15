@@ -79,6 +79,35 @@ class KPIExcelProcessor:
             'defect': 'Defect',
             'quality': 'QualityMetric'
         }
+        
+        # Unsupported Excel functions that translate poorly to SQL
+        self.unsupported_functions = [
+            'VLOOKUP', 'HLOOKUP', 'LOOKUP', 'OFFSET', 'INDIRECT', 
+            'INDEX', 'MATCH', 'XLOOKUP', 'CHOOSE', 'ADDRESS', 
+            'CELL', 'HYPERLINK', 'RTD', 'CUBE'
+        ]
+    
+    def validate_formula(self, formula: str) -> tuple[bool, str]:
+        """
+        Validate that the formula does not contain unsupported procedural or recursive functions.
+        Returns: (is_valid, error_message)
+        """
+        if not formula:
+            return True, ""
+            
+        formula_upper = formula.upper()
+        
+        # Check for unsupported functions
+        for func in self.unsupported_functions:
+            # Check if function exists followed by opening parenthesis (to avoid partial matches like 'INDEX_VAL')
+            if f"{func}(" in formula_upper or f"{func} (" in formula_upper:
+                return False, f"Contains unsupported function: {func}. Procedural lookups are not supported in SQL translation."
+        
+        # Check for cross-sheet references (e.g., 'Sheet1'!A1) which imply disparate data sources without joins
+        if "!" in formula:
+            return False, "Contains cross-sheet reference ('!'). All data must be mapped to defined Entities."
+            
+        return True, ""
     
     def load_data(self) -> pd.DataFrame:
         """Load Excel or CSV file."""
@@ -224,6 +253,11 @@ class KPIExcelProcessor:
         
         if not kpi_name:
             return None
+            
+        # Validate formula against supported SQL translation features
+        is_valid, error_msg = self.validate_formula(formula)
+        if not is_valid:
+            raise ValueError(f"Invalid Formula for KPI '{kpi_name}': {error_msg}")
         
         # Generate names
         code_name = self.generate_code_name(kpi_name)

@@ -249,9 +249,9 @@ class SubscriptionManager:
                 callback_url=callback_url,
                 webhook_headers=headers,
                 max_delivery_attempts=max_retries,
-                ack_timeout=30,  # Default or from params
-                batch_size=1, # Default or from params
-                auto_ack=False # Default or from params
+                ack_timeout=kwargs.get('ack_timeout', 30),
+                batch_size=kwargs.get('batch_size', 1),
+                auto_ack=kwargs.get('auto_ack', False)
             )
             
             # Store subscription
@@ -1231,7 +1231,7 @@ class SubscriptionManager:
         try:
             # Add to pending messages
             subscription.pending_messages[message.message_id] = {
-                "timestamp": time.time(),
+                "timestamp": datetime.now(timezone.utc),
                 "attempts": message.delivery_attempt
             }
             
@@ -1279,20 +1279,31 @@ class SubscriptionManager:
             # Extract correlation ID from message metadata if available
             correlation_id = None
             if hasattr(message, "metadata") and message.metadata:
-                correlation_id = message.metadata.get("correlation_id")
+                if isinstance(message.metadata, dict):
+                    correlation_id = message.metadata.get("correlation_id")
+                else:
+                    correlation_id = getattr(message.metadata, "correlation_id", None)
+                    
                 if correlation_id:
                     headers["X-Correlation-ID"] = correlation_id
             
             # Inject trace context into outgoing request headers
-            inject_trace_context(headers)
+            headers = inject_trace_context(headers)
             
             # Prepare webhook payload
+            # Handle Pydantic model serialization compatibility (V1 vs V2)
+            metadata_dict = message.metadata
+            if hasattr(message.metadata, 'model_dump'):
+                metadata_dict = message.metadata.model_dump(mode='json')
+            elif hasattr(message.metadata, 'dict'):
+                metadata_dict = json.loads(message.metadata.json())
+                
             webhook_payload = {
                 "subscription_id": subscription.subscription_id,
                 "message_id": message.message_id,
                 "channel": message.channel,
                 "payload": message.payload,
-                "metadata": message.metadata.dict() if hasattr(message.metadata, 'dict') else message.metadata,
+                "metadata": metadata_dict,
                 "delivery_attempt": message.delivery_attempt,
                 "delivered_at": message.delivered_at.isoformat()
             }
@@ -1323,12 +1334,12 @@ class SubscriptionManager:
             pending_info = subscription.pending_messages[message.message_id]
             pending_info["attempts"] += 1
             
-            if pending_info["attempts"] >= subscription.max_delivery_attempts:
+            if pending_info["attempts"] > subscription.max_delivery_attempts:
                 # Max attempts reached, mark as failed
                 await self.acknowledge_message(subscription.subscription_id, message.message_id, False, "Max delivery attempts exceeded")
             else:
                 # Retry delivery
-                message.delivery_attempt = pending_info["attempts"] + 1
+                message.delivery_attempt = pending_info["attempts"]
                 await subscription.message_queue.put(message)
     
     @trace_method(name="subscription_heartbeat", kind="INTERNAL")

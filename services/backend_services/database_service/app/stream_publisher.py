@@ -146,7 +146,8 @@ class StreamPublisher:
             pass
         
         # Remove from active publishers
-        del self._active_publishers[stream_key]
+        if stream_key in self._active_publishers:
+            del self._active_publishers[stream_key]
         
         # Remove last published timestamp
         if stream_key in self._last_published:

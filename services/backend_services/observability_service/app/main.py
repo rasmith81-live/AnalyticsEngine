@@ -66,8 +66,11 @@ from .models import (
 )
 
 # Import API routers
-from .api import events, traces
+from .api import events, traces, logs, analysis
 from .otlp_grpc_server import serve_otlp_grpc, shutdown_otlp_grpc
+
+# Import Alerting Manager
+from .alerting_manager import AlertingManager, AlertRule
 
 # Setup logging
 from .logging import setup_logging, get_logger
@@ -88,6 +91,7 @@ health_status = {
 # Global clients
 messaging_client: Optional[MessagingClient] = None
 otlp_server: Optional[grpc.aio.Server] = None
+alerting_manager: Optional[AlertingManager] = None
 
 
 def update_health_status(component: str, status: bool) -> None:
@@ -346,7 +350,9 @@ def create_application() -> FastAPI:
     
     # Include routers
     app.include_router(events.router, prefix=f"{settings.api_prefix}/events", tags=["events"])
-    app.include_router(traces.router, prefix=f"{settings.api_prefix}/traces", tags=["traces"]) 
+    app.include_router(traces.router, prefix=f"{settings.api_prefix}/traces", tags=["traces"])
+    app.include_router(logs.router, prefix=f"{settings.api_prefix}/logs", tags=["logs"]) 
+    app.include_router(analysis.router, prefix=f"{settings.api_prefix}/analysis", tags=["analysis"])
     
     # Add health and metrics endpoints
     @app.get("/health", response_model=ServiceHealthResponse, tags=["Health"])
@@ -1028,6 +1034,48 @@ async def handle_dependency_event(event: Dict[str, Any], correlation_id: Optiona
     if not messaging_client:
         logger.error("Messaging client not initialized, skipping dependency event")
         return False
+    
+    try:
+        # Extract dependency data from event
+        event_data = event.get("event_data", {})
+        dependency_data = event_data.get("dependency", {})
+        
+        # Store dependency data
+        await store_dependency(dependency_data)
+        
+        # Track telemetry ingestion
+        from .metrics import track_telemetry_ingestion
+        track_telemetry_ingestion("dependency")
+        
+        # Track dependency check processing
+        from .metrics import track_dependency_check_processing
+        track_dependency_check_processing(
+            service=dependency_data.get("service", "unknown"),
+            dependency=dependency_data.get("dependency", "unknown"),
+            status=dependency_data.get("status", "unknown")
+        )
+        
+        logger.info(f"Handled dependency event: {event.get('event_type')}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to handle dependency event: {str(e)}")
+        return False
+
+
+# Create FastAPI application
+app = create_application()
+
+
+if __name__ == "__main__":
+    # Run application with uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )
+
     
     try:
         # Extract dependency data from event

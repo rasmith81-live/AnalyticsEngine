@@ -33,10 +33,13 @@ from .news_consumer import NewsConsumer
 from .market_data_consumer import MarketDataConsumer
 from .subscriber_manager import SubscriberManager
 from .stream_publisher import StreamPublisher
+from .query_builder import QueryBuilder
+from .secure_storage_manager import SecureStorageManager
 from .models import (
-    QueryRequest, QueryResponse, CommandRequest, CommandResponse,
+    QueryRequest, QueryResponse, AdHocQueryRequest, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
-    ModelRegistrationRequest, ModelDiscoveryResponse, HealthResponse
+    ModelRegistrationRequest, ModelDiscoveryResponse, HealthResponse,
+    SecureArtifactRequest, SecureArtifactResponse, SecureArtifactValueResponse
 )
 from .config import get_settings
 from .metrics import metrics, update_system_metrics, update_db_connection_metrics, export_metrics_to_observability, track_endpoint_execution, track_db_operation, track_query, update_timescale_metrics
@@ -60,6 +63,7 @@ news_consumer = None
 market_data_consumer = None
 subscriber_manager = None
 stream_publisher = None
+secure_storage_manager = None
 service_start_time = datetime.utcnow()
 
 # Background task cancellation handles
@@ -70,7 +74,7 @@ system_metrics_task = None
 @trace_method(name="main.lifespan")
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, subscriber_manager, stream_publisher, metrics_export_task, system_metrics_task
+    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, subscriber_manager, stream_publisher, secure_storage_manager, metrics_export_task, system_metrics_task
     
     # Startup
     start_time = datetime.utcnow()
@@ -112,6 +116,9 @@ async def lifespan(app: FastAPI):
         if settings.enable_distributed_tracing and database_manager.async_engine:
             instrument_sqlalchemy(database_manager.async_engine)
         
+        # Initialize secure storage manager
+        secure_storage_manager = SecureStorageManager(database_manager.session_factory)
+
         # Initialize messaging client for Redis pub/sub
         messaging_client = MessagingClient(
             redis_url=get_settings().redis_url,
@@ -428,6 +435,12 @@ def get_stream_publisher() -> StreamPublisher:
         raise HTTPException(status_code=503, detail="Stream publisher not initialized")
     return stream_publisher
 
+def get_secure_storage_manager() -> SecureStorageManager:
+    """Dependency to get secure storage manager instance."""
+    if secure_storage_manager is None:
+        raise HTTPException(status_code=503, detail="Secure storage manager not initialized")
+    return secure_storage_manager
+
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
 @trace_method(name="database_service.health_check", kind="SERVER")
@@ -539,9 +552,9 @@ async def execute_query(
         query_start_time = time.time()
         result = await db_manager.execute_query(
             service_name=request.service_name,
-            query_type=request.query_type,
             query=request.query,
-            parameters=request.parameters
+            parameters=request.parameters,
+            correlation_id=correlation_id
         )
         execution_time = time.time() - query_start_time
         
@@ -554,14 +567,16 @@ async def execute_query(
             "timestamp.end": end_time.isoformat(),
             "duration_ms": (end_time - start_time).total_seconds() * 1000,
             "execution_time_ms": execution_time * 1000,
-            "result_size": len(result) if isinstance(result, list) else 1,
+            "result_size": len(result.get('rows', [])) if isinstance(result, dict) else 0,
             "success": True
         })
         
         return QueryResponse(
             success=True,
-            result=result,
-            execution_time=execution_time
+            data=result,
+            execution_time=execution_time,
+            row_count=result.get('row_count', 0),
+            cache_hit=result.get('cache_hit', False)
         )
     except Exception as e:
         # Add span attributes for error
@@ -576,6 +591,68 @@ async def execute_query(
         
         logger.error(f"Query execution failed: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Query execution failed: {str(e)}")
+
+@app.post("/database/query/adhoc", response_model=QueryResponse)
+@track_endpoint_execution
+@track_query(query_type="read", entity_type="adhoc")
+@trace_method(name="database_service.execute_adhoc_query", kind="SERVER")
+async def execute_adhoc_query(
+    request: AdHocQueryRequest,
+    db_manager: DatabaseManager = Depends(get_database_manager)
+):
+    """Execute a structured ad-hoc query securely."""
+    correlation_id = str(uuid.uuid4())
+    start_time = datetime.utcnow()
+    
+    add_span_attributes({
+        "correlation_id": correlation_id,
+        "endpoint": "/database/query/adhoc",
+        "service_name": request.service_name,
+        "table_name": request.table_name,
+        "has_filters": bool(request.filters)
+    })
+    
+    try:
+        # Build secure SQL
+        qb = QueryBuilder()
+        sql, params = qb.build_select(
+            table_name=request.table_name,
+            columns=request.columns,
+            filters=request.filters,
+            time_range=request.time_range,
+            group_by=request.group_by,
+            order_by=request.order_by,
+            order_direction=request.order_direction,
+            limit=request.limit,
+            offset=request.offset
+        )
+        
+        # Execute
+        query_start_time = time.time()
+        result = await db_manager.execute_query(
+            service_name=request.service_name,
+            query=sql,
+            parameters=params,
+            correlation_id=correlation_id
+        )
+        execution_time = time.time() - query_start_time
+        
+        track_db_operation("adhoc_query", execution_time)
+        
+        return QueryResponse(
+            success=True,
+            data=result,
+            execution_time=execution_time,
+            row_count=result.get('row_count', 0),
+            cache_hit=result.get('cache_hit', False)
+        )
+        
+    except ValueError as e:
+        logger.warning(f"Invalid ad-hoc query request: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Ad-hoc query failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error executing query")
 
 @app.post("/database/command", response_model=CommandResponse)
 @track_endpoint_execution
@@ -1295,6 +1372,94 @@ async def stream_heartbeat(
     except Exception as e:
         logger.error(f"Failed to process heartbeat: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Heartbeat failed: {str(e)}")
+
+# ============================================================================
+# SECURE ARTIFACT STORAGE ENDPOINTS
+# ============================================================================
+
+@app.post("/secure/artifacts", response_model=SecureArtifactResponse)
+@trace_method(name="database_service.store_artifact", kind="SERVER")
+async def store_secure_artifact(
+    request: SecureArtifactRequest,
+    ssm: SecureStorageManager = Depends(get_secure_storage_manager)
+):
+    """Store or update a sensitive artifact securely."""
+    try:
+        artifact = await ssm.store_artifact(
+            key=request.key,
+            value=request.value,
+            description=request.description,
+            category=request.category
+        )
+        return artifact
+    except Exception as e:
+        logger.error(f"Failed to store artifact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/secure/artifacts/{key}", response_model=SecureArtifactValueResponse)
+@trace_method(name="database_service.get_artifact", kind="SERVER")
+async def get_secure_artifact(
+    key: str,
+    ssm: SecureStorageManager = Depends(get_secure_storage_manager)
+):
+    """Retrieve a secure artifact by key (includes decrypted value)."""
+    try:
+        artifact = await ssm.get_artifact(key)
+        if not artifact:
+            raise HTTPException(status_code=404, detail="Artifact not found")
+        return artifact
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Decryption failed: {e}")
+    except Exception as e:
+        logger.error(f"Failed to retrieve artifact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/secure/artifacts", response_model=List[SecureArtifactResponse])
+@trace_method(name="database_service.list_artifacts", kind="SERVER")
+async def list_secure_artifacts(
+    category: Optional[str] = None,
+    ssm: SecureStorageManager = Depends(get_secure_storage_manager)
+):
+    """List secure artifacts (metadata only)."""
+    try:
+        return await ssm.list_artifacts(category=category)
+    except Exception as e:
+        logger.error(f"Failed to list artifacts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/secure/artifacts/{key}")
+@trace_method(name="database_service.delete_artifact", kind="SERVER")
+async def delete_secure_artifact(
+    key: str,
+    ssm: SecureStorageManager = Depends(get_secure_storage_manager)
+):
+    """Delete a secure artifact."""
+    try:
+        deleted = await ssm.delete_artifact(key)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Artifact not found")
+        return {"success": True, "message": f"Artifact {key} deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete artifact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/secure/rotate-keys")
+@trace_method(name="database_service.rotate_keys", kind="SERVER")
+async def rotate_encryption_keys(
+    new_secret_key: str,
+    ssm: SecureStorageManager = Depends(get_secure_storage_manager)
+):
+    """Re-encrypt all artifacts with a new key."""
+    try:
+        count = await ssm.rotate_keys(new_secret_key)
+        return {"success": True, "rotated_count": count, "message": "Encryption keys rotated successfully"}
+    except Exception as e:
+        logger.error(f"Failed to rotate keys: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

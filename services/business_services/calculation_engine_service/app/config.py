@@ -38,6 +38,12 @@ class CalculationEngineSettings(BaseSettings):
         description="Messaging service URL"
     )
     
+    # Redis Configuration (for Stream Aggregator)
+    redis_url: str = Field(
+        default="redis://redis:6379",
+        description="Redis connection URL for TimeSeries"
+    )
+    
     # Metadata Service Configuration
     metadata_service_url: str = Field(
         default="http://analytics_metadata_service:8000",

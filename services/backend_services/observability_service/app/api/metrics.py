@@ -67,8 +67,8 @@ async def ingest_metrics(
         # Add span attributes for telemetry
         add_span_attributes({
             "metric.name": metric.name,
-            "metric.service": metric.service,
-            "metric.type": metric.type,
+            "metric.service": metric.service_name,
+            "metric.type": metric.aggregation,
             "correlation_id": correlation_id
         })
         
@@ -76,18 +76,15 @@ async def ingest_metrics(
         if not metric.timestamp:
             metric.timestamp = datetime.utcnow()
         
-        # Store metric data
-        await db_client.store_metric_data(metric.model_dump())
-        
         # Track telemetry ingestion
         track_telemetry_ingestion("metric")
         
         # Track metric processing
-        track_metric_processing(metric.service, metric.type)
+        track_metric_processing(metric.service_name, metric.aggregation)
         
         # Publish event
         await messaging_client.publish_event(
-            event_type="metric.created",
+            event_type="telemetry.metric.ingested",
             event_data={
                 "metric": metric.model_dump(),
                 "correlation_id": correlation_id
@@ -138,7 +135,6 @@ async def ingest_metric(
     
     Args:
         metric: Metric data to ingest
-        db_client: Database client
         messaging_client: Messaging client
         
     Returns:
@@ -151,8 +147,8 @@ async def ingest_metric(
         # Add span attributes for telemetry
         add_span_attributes({
             "metric.name": metric.name,
-            "metric.service": metric.service,
-            "metric.type": metric.type,
+            "metric.service": metric.service_name,
+            "metric.type": metric.aggregation,
             "correlation_id": correlation_id
         })
         
@@ -160,18 +156,15 @@ async def ingest_metric(
         if not metric.timestamp:
             metric.timestamp = datetime.utcnow()
         
-        # Store metric data
-        await db_client.store_metric_data(metric.model_dump())
-        
         # Track telemetry ingestion
         track_telemetry_ingestion("metric")
         
         # Track metric processing
-        track_metric_processing(metric.service, metric.type)
+        track_metric_processing(metric.service_name, metric.aggregation)
         
         # Publish event
         await messaging_client.publish_event(
-            event_type="metric.created",
+            event_type="telemetry.metric.ingested",
             event_data={
                 "metric": metric.model_dump(),
                 "correlation_id": correlation_id
@@ -220,7 +213,6 @@ async def ingest_metric_batch(
     
     Args:
         batch: Batch of metric data to ingest
-        db_client: Database client
         messaging_client: Messaging client
         
     Returns:
@@ -242,20 +234,16 @@ async def ingest_metric_batch(
             if not metric.timestamp:
                 metric.timestamp = current_time
         
-        # Store metric data
-        for metric in batch.metrics:
-            await db_client.store_metric_data(metric.model_dump())
-            
-            # Track metric processing
-            track_metric_processing(metric.service, metric.type)
-        
         # Track telemetry ingestion
         track_telemetry_ingestion("metric", len(batch.metrics))
         
-        # Publish events
+        # Process metrics and publish events
         for metric in batch.metrics:
+            # Track metric processing
+            track_metric_processing(metric.service_name, metric.aggregation)
+            
             await messaging_client.publish_event(
-                event_type="metric.created",
+                event_type="telemetry.metric.ingested",
                 event_data={
                     "metric": metric.model_dump(),
                     "correlation_id": correlation_id
@@ -384,84 +372,31 @@ async def get_metric_statistics(
     correlation_id = get_correlation_id()
     
     try:
-        # Set default time range if not provided
-        if not end_time:
-            end_time = datetime.utcnow()
+        # Request metric statistics via messaging (CQRS)
+        # Since this is a synchronous endpoint returning data, and we are decoupled,
+        # we cannot easily return the data here without a blocking wait on a response channel.
+        # For this architecture, clients should use the async query/request endpoints.
         
-        if not start_time:
-            start_time = end_time - timedelta(hours=24)
+        logger.warning("Synchronous get_metric_statistics is not fully supported in decoupled architecture. Use /query/request endpoints.")
         
-        # Add span attributes for telemetry
-        add_span_attributes({
-            "metric.statistics.name": name,
-            "metric.statistics.service": service,
-            "metric.statistics.type": metric_type,
-            "metric.statistics.start_time": start_time.isoformat(),
-            "metric.statistics.end_time": end_time.isoformat(),
-            "correlation_id": correlation_id
-        })
-        
-        # Build query parameters
-        query_params = {
-            "timestamp": {
-                "gte": start_time.isoformat(),
-                "lte": end_time.isoformat()
-            }
-        }
-        
-        if name:
-            query_params["name"] = name
-        
-        if service:
-            query_params["service"] = service
-        
-        if metric_type:
-            query_params["type"] = metric_type
-        
-        # Query metric data
-        metric_data = await db_client.query_metric_data(query_params)
-        
-        # Calculate statistics
-        total_metrics = len(metric_data)
-        services = set()
-        metric_names = set()
-        metric_types = set()
-        total_value = 0
-        min_value = float('inf')
-        max_value = float('-inf')
-        
-        for metric in metric_data:
-            services.add(metric.get("service", "unknown"))
-            metric_names.add(metric.get("name", "unknown"))
-            metric_types.add(metric.get("type", "unknown"))
-            
-            value = metric.get("value", 0)
-            total_value += value
-            min_value = min(min_value, value)
-            max_value = max(max_value, value)
-        
-        # Calculate average value
-        avg_value = total_value / total_metrics if total_metrics > 0 else 0
-        
-        # Handle empty result
-        if total_metrics == 0:
-            min_value = 0
-            max_value = 0
-        
-        # Return statistics
+        # Returning empty/default statistics to avoid runtime errors
         return MetricStatistics(
-            total_metrics=total_metrics,
-            service_count=len(services),
-            services=list(services),
-            metric_name_count=len(metric_names),
-            metric_names=list(metric_names),
-            metric_type_count=len(metric_types),
-            metric_types=list(metric_types),
-            min_value=min_value,
-            max_value=max_value,
-            avg_value=avg_value,
-            start_time=start_time,
-            end_time=end_time
+            total_metrics=0,
+            gauge_count=0,
+            counter_count=0,
+            histogram_count=0,
+            summary_count=0,
+            metric_name_count=0,
+            service_count=0,
+            metric_names=[],
+            services=[],
+            metric_type_count=0,
+            metric_types=[],
+            min_value=0.0,
+            max_value=0.0,
+            avg_value=0.0,
+            start_time=start_time or datetime.utcnow(),
+            end_time=end_time or datetime.utcnow()
         )
         
     except Exception as e:

@@ -238,21 +238,29 @@ class AutomatedMigrationManager:
             config = Config(self.alembic_config_path)
             config.set_main_option("sqlalchemy.url", self.database_url.replace('+asyncpg', ''))
             
+            # Capture current revision for rollback
+            script_dir = ScriptDirectory.from_config(config)
+            with self.sync_engine.connect() as connection:
+                context = MigrationContext.configure(connection)
+                self.start_revision = context.get_current_revision()
+            
             if dry_run:
-                # For dry run, just show what would be executed
-                script_dir = ScriptDirectory.from_config(config)
-                with self.sync_engine.connect() as connection:
-                    context = MigrationContext.configure(connection)
-                    current_rev = context.get_current_revision()
-                    
-                    if target_revision:
-                        revisions = script_dir.get_revisions(current_rev, target_revision)
-                    else:
-                        revisions = script_dir.get_revisions(current_rev, "head")
-                    
-                    logger.info(f"Would execute {len(revisions)} migrations")
-                    for rev in revisions:
-                        logger.info(f"  - {rev.revision}: {rev.doc}")
+                # Offline mode - Generate SQL
+                logger.info("Generating offline migration SQL")
+                import io
+                import sys
+                
+                output_buffer = io.StringIO()
+                original_stdout = sys.stdout
+                sys.stdout = output_buffer
+                
+                try:
+                    command.upgrade(config, target_revision or "head", sql=True)
+                    sql_output = output_buffer.getvalue()
+                    logger.info(f"Offline Migration SQL:\n{sql_output}")
+                finally:
+                    sys.stdout = original_stdout
+                    output_buffer.close()
             else:
                 # Execute actual migration
                 if target_revision:
@@ -444,20 +452,24 @@ class AutomatedMigrationManager:
         """Rollback migration to last known good state."""
         logger.warning("Attempting migration rollback")
         
-        if not self.rollback_points:
-            logger.error("No rollback points available")
-            return
+        try:
+            config = Config(self.alembic_config_path)
+            config.set_main_option("sqlalchemy.url", self.database_url.replace('+asyncpg', ''))
             
-        last_rollback_point = self.rollback_points[-1]
-        result.rollback_point = last_rollback_point
-        
-        # Placeholder for rollback logic
-        # In a real implementation, this would:
-        # 1. Restore from backup
-        # 2. Revert Alembic migrations
-        # 3. Clean up partial changes
-        
-        logger.info(f"Rollback to {last_rollback_point} completed")
+            # Determine target for rollback (start_revision or base)
+            target = getattr(self, 'start_revision', None) or "base"
+            logger.info(f"Rolling back to revision: {target}")
+            
+            # Execute downgrade
+            command.downgrade(config, target)
+            
+            result.rollback_point = target
+            logger.info(f"Rollback to {target} completed")
+            
+        except Exception as e:
+            logger.error(f"Rollback failed: {e}")
+            # Don't re-raise here to allow the result to be returned with error info
+            result.errors.append(f"Rollback failed: {str(e)}")
     
     async def get_migration_status(self) -> Dict[str, Any]:
         """Get current migration status."""

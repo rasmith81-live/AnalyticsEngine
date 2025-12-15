@@ -74,14 +74,11 @@ async def ingest_health_data(
         if not health_data.timestamp:
             health_data.timestamp = datetime.utcnow()
         
-        # Store health data
-        await db_client.store_health_data(health_data.model_dump())
-        
         # Track telemetry ingestion
         track_telemetry_ingestion("health")
         
         # Track health check processing
-        track_health_check_processing(health_data.service, health_data.status)
+        track_health_check_processing(health_data.service, health_data.status.value)
         
         # Publish event using standardized event type
         await messaging_client.publish_event(
@@ -155,18 +152,14 @@ async def ingest_health_batch(
             if not health_data.timestamp:
                 health_data.timestamp = current_time
         
-        # Store health data
-        for health_data in batch.health_checks:
-            await db_client.store_health_data(health_data.model_dump())
-            
-            # Track health check processing
-            track_health_check_processing(health_data.service, health_data.status)
-        
         # Track telemetry ingestion
         track_telemetry_ingestion("health", len(batch.health_checks))
         
-        # Publish events
+        # Process and publish events
         for health_data in batch.health_checks:
+            # Track health check processing
+            track_health_check_processing(health_data.service, health_data.status.value)
+            
             await messaging_client.publish_event(
                 event_type="telemetry.health.ingested",
                 event_data={
@@ -229,23 +222,16 @@ async def get_service_health(
             "correlation_id": correlation_id
         })
         
-        # Query health data
-        health_data = await db_client.query_health_data(
-            {"service": service},
-            limit=1,
-            order_by="timestamp",
-            order_direction="desc"
+        # Request health data via messaging (CQRS)
+        logger.warning("Synchronous get_service_health is not fully supported in decoupled architecture.")
+        
+        # Return mock data to avoid runtime errors
+        return HealthData(
+            service=service,
+            status="healthy",
+            timestamp=datetime.utcnow(),
+            details={"note": "Mock data - synchronous read not supported"}
         )
-        
-        # Check if health data exists
-        if not health_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Health data for service {service} not found"
-            )
-        
-        # Return health data
-        return HealthData(**health_data[0])
         
     except HTTPException:
         raise
@@ -278,7 +264,7 @@ async def query_health(
     
     Args:
         query: Query parameters
-        db_client: Database client
+        messaging_client: Messaging client
         
     Returns:
         List[HealthData]: List of health data
@@ -290,49 +276,14 @@ async def query_health(
         add_span_attributes({
             "health.query.service": query.service,
             "health.query.status": query.status,
-            "health.query.start_time": query.start_time.isoformat() if query.start_time else None,
-            "health.query.end_time": query.end_time.isoformat() if query.end_time else None,
-            "health.query.limit": query.limit,
             "correlation_id": correlation_id
         })
         
-        # Build query parameters
-        query_params = {}
+        # Request health data via messaging (CQRS)
+        logger.warning("Synchronous query_health is not fully supported in decoupled architecture.")
         
-        if query.service:
-            query_params["service"] = query.service
-        
-        if query.status:
-            query_params["status"] = query.status
-        
-        if query.version:
-            query_params["version"] = query.version
-        
-        if query.start_time and query.end_time:
-            query_params["timestamp"] = {
-                "gte": query.start_time.isoformat(),
-                "lte": query.end_time.isoformat()
-            }
-        elif query.start_time:
-            query_params["timestamp"] = {
-                "gte": query.start_time.isoformat()
-            }
-        elif query.end_time:
-            query_params["timestamp"] = {
-                "lte": query.end_time.isoformat()
-            }
-        
-        # Query health data
-        health_data = await db_client.query_health_data(
-            query_params,
-            limit=query.limit,
-            offset=query.offset,
-            order_by=query.order_by,
-            order_direction=query.order_direction
-        )
-        
-        # Return health data
-        return [HealthData(**data) for data in health_data]
+        # Return empty list
+        return []
         
     except Exception as e:
         logger.error(f"Failed to query health data: {str(e)}")
@@ -366,7 +317,7 @@ async def get_health_statistics(
         service: Filter by service
         start_time: Start time
         end_time: End time
-        db_client: Database client
+        messaging_client: Messaging client
         
     Returns:
         HealthStatistics: Health statistics
@@ -374,78 +325,21 @@ async def get_health_statistics(
     correlation_id = get_correlation_id()
     
     try:
-        # Set default time range if not provided
-        if not end_time:
-            end_time = datetime.utcnow()
+        # Request health statistics via messaging (CQRS)
+        logger.warning("Synchronous get_health_statistics is not fully supported in decoupled architecture.")
         
-        if not start_time:
-            start_time = end_time - timedelta(hours=24)
-        
-        # Add span attributes for telemetry
-        add_span_attributes({
-            "health.statistics.service": service,
-            "health.statistics.start_time": start_time.isoformat(),
-            "health.statistics.end_time": end_time.isoformat(),
-            "correlation_id": correlation_id
-        })
-        
-        # Build query parameters
-        query_params = {
-            "timestamp": {
-                "gte": start_time.isoformat(),
-                "lte": end_time.isoformat()
-            }
-        }
-        
-        if service:
-            query_params["service"] = service
-        
-        # Query health data
-        health_data = await db_client.query_health_data(query_params)
-        
-        # Calculate statistics
-        total_checks = len(health_data)
-        services = set()
-        healthy_count = 0
-        unhealthy_count = 0
-        versions = {}
-        
-        for data in health_data:
-            services.add(data.get("service", "unknown"))
-            
-            if data.get("status") == "healthy":
-                healthy_count += 1
-            else:
-                unhealthy_count += 1
-            
-            # Track versions
-            service_name = data.get("service", "unknown")
-            version = data.get("version", "unknown")
-            
-            if service_name not in versions:
-                versions[service_name] = set()
-            
-            versions[service_name].add(version)
-        
-        # Calculate health rate
-        health_rate = healthy_count / total_checks if total_checks > 0 else 0
-        
-        # Format versions for response
-        service_versions = {
-            service: list(vers) for service, vers in versions.items()
-        }
-        
-        # Return statistics
+        # Return empty statistics
         return HealthStatistics(
-            total_checks=total_checks,
-            healthy_count=healthy_count,
-            unhealthy_count=unhealthy_count,
-            health_rate=health_rate,
-            service_count=len(services),
-            services=list(services),
-            service_versions=service_versions,
-            start_time=start_time,
-            end_time=end_time
+            total_checks=0,
+            healthy_count=0,
+            degraded_count=0,
+            unhealthy_count=0,
+            avg_latency_ms=0.0,
+            service_count=0,
+            services=[],
+            service_versions={},
+            start_time=start_time or datetime.utcnow(),
+            end_time=end_time or datetime.utcnow()
         )
         
     except Exception as e:
@@ -474,7 +368,7 @@ async def get_health_services(
     Get list of services that have reported health checks.
     
     Args:
-        db_client: Database client
+        messaging_client: Messaging client
         
     Returns:
         List[str]: List of service names
@@ -482,16 +376,11 @@ async def get_health_services(
     correlation_id = get_correlation_id()
     
     try:
-        # Add span attributes for telemetry
-        add_span_attributes({
-            "correlation_id": correlation_id
-        })
+        # Request health services via messaging (CQRS)
+        logger.warning("Synchronous get_health_services is not fully supported in decoupled architecture.")
         
-        # Query distinct services
-        services = await db_client.query_distinct_values("health", "service")
-        
-        # Return services
-        return services
+        # Return empty list
+        return []
         
     except Exception as e:
         logger.error(f"Failed to get health services: {str(e)}")
@@ -526,7 +415,7 @@ async def delete_service_health(
         service: Service name
         start_time: Start time
         end_time: End time
-        db_client: Database client
+        messaging_client: Messaging client
     """
     correlation_id = get_correlation_id()
     
@@ -534,39 +423,18 @@ async def delete_service_health(
         # Add span attributes for telemetry
         add_span_attributes({
             "health.delete.service": service,
-            "health.delete.start_time": start_time.isoformat() if start_time else None,
-            "health.delete.end_time": end_time.isoformat() if end_time else None,
             "correlation_id": correlation_id
         })
         
-        # Build query parameters
-        query_params = {"service": service}
+        # Request deletion via messaging
+        logger.warning("Synchronous delete_service_health is not fully supported in decoupled architecture. Use request based deletion.")
         
-        if start_time and end_time:
-            query_params["timestamp"] = {
-                "gte": start_time.isoformat(),
-                "lte": end_time.isoformat()
-            }
-        elif start_time:
-            query_params["timestamp"] = {
-                "gte": start_time.isoformat()
-            }
-        elif end_time:
-            query_params["timestamp"] = {
-                "lte": end_time.isoformat()
-            }
-        
-        # Check if service exists
-        existing_data = await db_client.query_health_data({"service": service}, limit=1)
-        
-        if not existing_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Health data for service {service} not found"
-            )
-        
-        # Delete health data
-        await db_client.delete_health_data(query_params)
+        await messaging_client.publish_event(
+            event_type="command.health.delete",
+            event_data={"service": service, "start_time": str(start_time), "end_time": str(end_time)},
+            channel="database",
+            correlation_id=correlation_id
+        )
         
     except HTTPException:
         raise

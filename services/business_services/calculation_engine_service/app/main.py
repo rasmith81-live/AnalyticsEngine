@@ -2,7 +2,7 @@
 Calculation Engine Service
 
 Generic calculation orchestration service that routes KPI calculations
-to domain-specific handlers (SCOR, CRM, Sales, etc.).
+to dynamic handlers based on metadata definitions.
 """
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -13,9 +13,7 @@ import logging
 
 from .orchestrator import CalculationOrchestrator
 from .base_handler import CalculationParams, CalculationResult
-from .handlers.scor_handler import SCORCalculationHandler
-# from .handlers.crm_handler import CRMCalculationHandler
-# from .handlers.sales_handler import SalesCalculationHandler
+from .handlers.dynamic_handler import DynamicCalculationHandler
 from .stream_processor import StreamProcessor
 from .config import get_settings
 
@@ -36,23 +34,23 @@ async def lifespan(app: FastAPI):
     # Initialize orchestrator
     orchestrator = CalculationOrchestrator()
     
-    # Register SCOR handler
-    scor_handler = SCORCalculationHandler(
+    # Register Generic Dynamic Handler
+    # In a fully generic system, we might iterate over active value chains from metadata
+    # For now, we register a dynamic handler that can handle any generic request
+    dynamic_handler = DynamicCalculationHandler(
+        value_chain_code="GENERIC", # or iterate and register for specific domains
         database_service_url=settings.database_service_url,
         messaging_service_url=settings.messaging_service_url,
         metadata_service_url=settings.metadata_service_url,
         cache_enabled=settings.cache_enabled,
         cache_ttl=settings.cache_ttl
     )
-    orchestrator.register_handler("SUPPLY_CHAIN", scor_handler)
     
-    # Register CRM handler
-    # crm_handler = CRMCalculationHandler(...)
-    # orchestrator.register_handler("CRM", crm_handler)
-    
-    # Register Sales handler
-    # sales_handler = SalesCalculationHandler(...)
-    # orchestrator.register_handler("SALES", sales_handler)
+    # Register for specific domains if needed, or use a catch-all strategy in orchestrator
+    # Here we register it for common domains to ensure routing works
+    orchestrator.register_handler("SUPPLY_CHAIN", dynamic_handler)
+    orchestrator.register_handler("SALES", dynamic_handler)
+    orchestrator.register_handler("CRM", dynamic_handler)
     
     # Load KPI mappings
     await orchestrator.load_kpi_mappings(settings.metadata_service_url)
@@ -61,7 +59,8 @@ async def lifespan(app: FastAPI):
     stream_processor = StreamProcessor(
         orchestrator=orchestrator,
         database_service_url=settings.database_service_url,
-        messaging_service_url=settings.messaging_service_url
+        messaging_service_url=settings.messaging_service_url,
+        redis_url=settings.redis_url
     )
     await stream_processor.start()
     

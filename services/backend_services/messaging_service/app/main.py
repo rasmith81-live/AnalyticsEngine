@@ -635,10 +635,11 @@ async def publish_command(
             "correlation_id": correlation_id,
             "messaging.channel": command_channel
         }) as publish_span:
-            command_id = await publisher.publish(
+            command_id = await publisher.publish_message(
                 channel=command_channel,
-                message=request.payload,
-                headers=headers
+                payload=request.payload,
+                headers=headers,
+                correlation_id=correlation_id
             )
             publish_span.set_attribute("messaging.message_id", command_id)
 
@@ -702,20 +703,42 @@ async def publish_message(
         current_span.set_attribute("timestamp.start", start_time.isoformat())
         
         # Add message metadata
-        if hasattr(request, "id") and request.id:
-            current_span.set_attribute("messaging.message_id", str(request.id))
-        current_span.set_attribute("messaging.message_size_bytes", len(request.message.encode()))
-        if request.ttl:
-            current_span.set_attribute("messaging.message_ttl", request.ttl)
+        if request.metadata and request.metadata.message_id:
+            current_span.set_attribute("messaging.message_id", request.metadata.message_id)
+        
+        # Calculate size based on payload type
+        payload_size = 0
+        if isinstance(request.payload, str):
+            payload_size = len(request.payload.encode())
+        elif isinstance(request.payload, bytes):
+            payload_size = len(request.payload)
+        else:
+            import json
+            payload_size = len(json.dumps(request.payload).encode())
+            
+        current_span.set_attribute("messaging.message_size_bytes", payload_size)
+        
+        if request.metadata and request.metadata.ttl:
+            current_span.set_attribute("messaging.message_ttl", request.metadata.ttl)
     
     try:
+        # Calculate payload size for validation
+        payload_size = 0
+        if isinstance(request.payload, str):
+            payload_size = len(request.payload.encode())
+        elif isinstance(request.payload, bytes):
+            payload_size = len(request.payload)
+        else:
+            import json
+            payload_size = len(json.dumps(request.payload).encode())
+
         # Validate message size with tracing
         with traced_span("validate_message_size", attributes={
             "correlation_id": correlation_id,
             "messaging.max_size_bytes": publisher.max_message_size,
-            "messaging.actual_size_bytes": len(request.message.encode())
+            "messaging.actual_size_bytes": payload_size
         }) as validation_span:
-            if len(request.message.encode()) > publisher.max_message_size:
+            if payload_size > publisher.max_message_size:
                 validation_span.set_status(Status(StatusCode.ERROR, "Message size exceeds limit"))
                 raise HTTPException(
                     status_code=400,
@@ -723,7 +746,10 @@ async def publish_message(
                 )
         
         # Add correlation ID to headers if not present
-        headers = request.headers or {}
+        headers = {}
+        if request.metadata and request.metadata.headers:
+            headers.update(request.metadata.headers)
+            
         if settings.propagate_correlation_id:
             headers["X-Correlation-ID"] = correlation_id
         
@@ -734,10 +760,12 @@ async def publish_message(
             "messaging.system": "redis_pubsub"
         }) as publish_span:
             publish_start = time.time()
-            message_id = await publisher.publish(
+            message_id = await publisher.publish_message(
                 channel=request.channel,
-                message=request.message,
-                ttl=request.ttl,
+                payload=request.payload,
+                metadata=request.metadata,
+                persistent=request.persistent,
+                correlation_id=correlation_id,
                 headers=headers
             )
             publish_duration_ms = (time.time() - publish_start) * 1000
@@ -798,7 +826,10 @@ async def publish_bulk_messages(
         messages = []
         for msg_req in request.messages:
             # Add correlation ID to headers if not present
-            headers = msg_req.headers or {}
+            headers = {}
+            if msg_req.metadata and msg_req.metadata.headers:
+                headers.update(msg_req.metadata.headers)
+            
             if settings.propagate_correlation_id and correlation_id:
                 headers["X-Correlation-ID"] = correlation_id
             
@@ -807,15 +838,23 @@ async def publish_bulk_messages(
                 "messaging.system": "redis_pubsub",
                 "messaging.destination": msg_req.channel,
                 "messaging.destination_kind": "channel",
-                "messaging.message_id": str(msg_req.id) if hasattr(msg_req, "id") else None,
+                "messaging.message_id": msg_req.metadata.message_id if msg_req.metadata and msg_req.metadata.message_id else None,
                 "correlation_id": correlation_id
             })
             
+            # Prepare metadata with headers
+            metadata = msg_req.metadata
+            if headers and metadata:
+                if not metadata.headers:
+                    metadata.headers = {}
+                metadata.headers.update(headers)
+            
             messages.append({
                 "channel": msg_req.channel,
-                "message": msg_req.message,
-                "ttl": msg_req.ttl,
-                "headers": headers
+                "payload": msg_req.payload,
+                "metadata": metadata,
+                "persistent": msg_req.persistent,
+                "correlation_id": correlation_id
             })
         
         # Publish bulk messages
@@ -824,11 +863,15 @@ async def publish_bulk_messages(
         # Convert results to response format
         response_results = []
         for i, res in enumerate(result["results"]):
+            # Extract correlation_id from result or fallback to request correlation_id
+            res_correlation_id = res.get("correlation_id", correlation_id) or str(uuid.uuid4())
+            
             response_results.append(PublishMessageResponse(
                 success=res["success"],
                 message_id=res.get("message_id", ""),
                 channel=res.get("channel", ""),
                 timestamp=datetime.utcnow(),
+                correlation_id=res_correlation_id,
                 error=res.get("error")
             ))
         

@@ -23,8 +23,10 @@ import {
   DeleteSweep as ClearIcon,
   Save as SaveIcon,
   Visibility as ViewIcon,
+  AccountTree as ObjectsIcon,
 } from '@mui/icons-material';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useKPIDetails } from '../hooks/useKPIDetails';
 
 interface KPICartBadgeProps {
@@ -44,6 +46,7 @@ export default function KPICartBadge({
   onViewKPI,
   currentViewKPI,
 }: KPICartBadgeProps) {
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const { data: kpiDetails } = useKPIDetails(selectedKPIs);
 
@@ -223,7 +226,20 @@ export default function KPICartBadge({
             <Divider />
 
             {/* Actions */}
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                fullWidth
+                startIcon={<ObjectsIcon />}
+                onClick={() => {
+                  navigate('/required-objects-view', { state: { kpiCodes: selectedKPIs } });
+                  handleClose();
+                }}
+                disabled={selectedKPIs.length === 0}
+              >
+                View Required Objects
+              </Button>
               <Button
                 variant="contained"
                 color="primary"

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Calculation Engine is a **generic, reusable abstraction layer** that sits between the API Gateway and domain-specific calculation services (SCOR, CRM, Sales, etc.).
+The Calculation Engine is a **generic, reusable abstraction layer** that sits between the API Gateway and the data layer. It dynamically executes KPI calculations based on metadata definitions using a `DynamicCalculationHandler`.
 
 ## Architecture Layers
 
@@ -15,27 +15,27 @@ The Calculation Engine is a **generic, reusable abstraction layer** that sits be
 ┌─────────────────────────────────────────────────────────────┐
 │ Calculation Engine Service (8020)                           │
 │ ├─ Generic calculation orchestration                        │
-│ ├─ KPI routing and aggregation                             │
+│ ├─ KPI routing and aggregation                              │
 │ ├─ Caching layer                                            │
 │ ├─ Result aggregation                                       │
 │ └─ Abstract base classes                                    │
 └─────────────────────────────────────────────────────────────┘
                            ↓
         ┌──────────────────┼──────────────────┐
-        ↓                  ↓                   ↓
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ SCOR Handler │  │ CRM Handler  │  │ Sales Handler│
-│ (inherits)   │  │ (inherits)   │  │ (inherits)   │
-│              │  │              │  │              │
-│ Implements:  │  │ Implements:  │  │ Implements:  │
-│ - calculate()│  │ - calculate()│  │ - calculate()│
-│ - validate() │  │ - validate() │  │ - validate() │
-│ - cache_key()│  │ - cache_key()│  │ - cache_key()│
-└──────────────┘  └──────────────┘  └──────────────┘
-        ↓                  ↓                   ↓
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ scor_data    │  │ crm_data     │  │ sales_data   │
-└──────────────┘  └──────────────┘  └──────────────┘
+        ↓                  ↓                  ↓
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ Dynamic Handler │  │ Dynamic Handler │  │ Dynamic Handler │
+│ (Supply Chain)  │  │ (Finance)       │  │ (Sales)         │
+│                 │  │                 │  │                 │
+│ Implements:     │  │ Implements:     │  │ Implements:     │
+│ - calculate()   │  │ - calculate()   │  │ - calculate()   │
+│ - validate()    │  │ - validate()    │  │ - validate()    │
+│ - cache_key()   │  │ - cache_key()   │  │ - cache_key()   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+        ↓                  ↓                  ↓
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ Generic Schema  │  │ Generic Schema  │  │ Generic Schema  │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
 ## Core Components
@@ -43,7 +43,7 @@ The Calculation Engine is a **generic, reusable abstraction layer** that sits be
 ### 1. Base Calculation Handler (Abstract)
 ```python
 class BaseCalculationHandler(ABC):
-    """Abstract base for all value chain calculation handlers."""
+    """Abstract base class for calculation handlers."""
     
     @abstractmethod
     async def calculate(self, kpi_code: str, params: dict) -> CalculationResult:
@@ -67,19 +67,19 @@ class BaseCalculationHandler(ABC):
 - Aggregates multi-KPI requests
 - Handles parallel execution
 
-### 3. Value Chain Handlers
-- SCOR Handler (heavy calculations)
-- CRM Handler (light calculations)
-- Sales Handler (medium calculations)
-- Each inherits from BaseCalculationHandler
+### 3. Dynamic Calculation Handler
+- Fetches KPI definitions from Metadata Service
+- Parses formulas into AST
+- Generates optimized SQL using `TimescaleManager` and `SQLGenerator`
+- Executes queries against generic schemas
 
 ## Benefits
 
-✅ **Single Responsibility** - Each handler focuses on domain logic
-✅ **Reusability** - Common patterns in base class
+✅ **Single Responsibility** - Engine focuses on execution, not business logic
+✅ **Reusability** - One handler class supports infinite KPIs
 ✅ **Scalability** - Handlers can be scaled independently
-✅ **Maintainability** - Changes to one handler don't affect others
-✅ **Testability** - Mock handlers for testing
+✅ **Maintainability** - Changes to formulas happen in metadata, not code
+✅ **Testability** - Mock metadata for testing
 
 ## Implementation
 

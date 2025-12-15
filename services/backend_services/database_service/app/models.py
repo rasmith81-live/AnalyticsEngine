@@ -22,6 +22,21 @@ class QueryRequest(BaseModel):
     service_name: str = Field(..., description="Name of the requesting service")
     timeout: Optional[int] = Field(default=30, description="Query timeout in seconds")
     use_cache: bool = Field(default=True, description="Use query result caching")
+    query_type: str = Field(default="read", description="Type of query (read/write)")
+
+class AdHocQueryRequest(BaseModel):
+    """Request model for ad-hoc structured queries."""
+    table_name: str = Field(..., description="Table to query")
+    columns: Optional[List[str]] = Field(default=None, description="Columns to select")
+    filters: Optional[List[Dict[str, Any]]] = Field(default=None, description="List of filters")
+    time_range: Optional[Dict[str, Any]] = Field(default=None, description="Time range filter")
+    group_by: Optional[List[str]] = Field(default=None, description="Group by columns")
+    order_by: Optional[str] = Field(default=None, description="Order by column")
+    order_direction: str = Field(default="DESC", description="Order direction (ASC/DESC)")
+    limit: int = Field(default=100, description="Row limit")
+    offset: int = Field(default=0, description="Row offset")
+    service_name: str = Field(..., description="Name of the requesting service")
+    use_cache: bool = Field(default=True, description="Use query result caching")
 
 class CommandRequest(BaseModel):
     """Request model for database commands."""
@@ -254,3 +269,27 @@ class ConnectionPoolStatus(BaseModel):
     overflow: int
     invalid: int
     total_created: int
+
+# Secure Storage Models
+class SecureArtifactRequest(BaseModel):
+    """Request model for storing a secure artifact."""
+    key: str = Field(..., description="Unique key for the artifact")
+    value: str = Field(..., description="Sensitive value to store")
+    description: Optional[str] = Field(None, description="Description of the artifact")
+    category: str = Field(default="general", description="Category (e.g., 'api_key', 'credential')")
+
+class SecureArtifactResponse(BaseModel):
+    """Response model for secure artifact metadata."""
+    key: str
+    description: Optional[str]
+    category: str
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = {"from_attributes": True}
+
+class SecureArtifactValueResponse(SecureArtifactResponse):
+    """Response model for secure artifact with decrypted value."""
+    value: str
+    
+    model_config = {"from_attributes": True}

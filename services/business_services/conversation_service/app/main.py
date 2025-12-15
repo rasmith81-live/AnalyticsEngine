@@ -1,0 +1,236 @@
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Dict
+import json
+import logging
+import asyncio
+
+# Import standardized clients (assuming they are available in the python path or vendored)
+# In a real monorepo with PYTHONPATH=. this would be installed as a package.
+try:
+    from services.backend_services.database_service.app.messaging_client import MessagingClient
+except ImportError:
+    # Fallback/Mock for standalone dev without full path setup
+    logging.warning("Could not import MessagingClient from backend_services. Using mock.")
+    class MessagingClient:
+        def __init__(self, *args, **kwargs): pass
+        async def connect(self): pass
+        async def publish_event(self, *args, **kwargs): return True
+
+from .config import settings
+from .models import (
+    ChatRequest, ChatResponse, Utterance, BusinessIntent, 
+    InterviewSession, CompanyValueChainModel, ValueChainNode, ValueChainLink
+)
+from .llm_client import llm_client
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("conversation_service")
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+)
+
+# Initialize Messaging Client
+messaging_client = MessagingClient(
+    redis_url=settings.REDIS_URL,
+    service_name="conversation_service"
+)
+
+@app.on_event("startup")
+async def startup_event():
+    await messaging_client.connect()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Cleanup logic if needed
+    pass
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# In-memory session stores
+active_sessions: Dict[str, List[Dict[str, str]]] = {} # Stores chat history for LLM context
+sessions_store: Dict[str, InterviewSession] = {} # Stores structured session metadata
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "conversation-service"}
+
+@app.post(f"{settings.API_V1_STR}/sessions", response_model=InterviewSession)
+async def create_session(user_id: str):
+    """Create a new interview session."""
+    session = InterviewSession(user_id=user_id)
+    sessions_store[session.id] = session
+    active_sessions[session.id] = [] # Initialize chat context
+    
+    logger.info(f"Created new session {session.id} for user {user_id}")
+    return session
+
+@app.get(f"{settings.API_V1_STR}/sessions/{{session_id}}", response_model=InterviewSession)
+async def get_session(session_id: str):
+    """Get interview session details."""
+    if session_id not in sessions_store:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return sessions_store[session_id]
+
+@app.post(f"{settings.API_V1_STR}/sessions/{{session_id}}/model", response_model=CompanyValueChainModel)
+async def generate_value_chain_model(session_id: str):
+    """Generate and persist a Company Value Chain Model from the session context."""
+    if session_id not in sessions_store:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions_store[session_id]
+    context = active_sessions.get(session_id, [])
+    
+    if not context:
+        raise HTTPException(status_code=400, detail="Session has no context to generate model from")
+
+    try:
+        # Use LLM to generate model structure from conversation history
+        model = await llm_client.generate_value_chain(context)
+        model.name = f"Value Chain - {session_id}"
+        
+        # In a real scenario, we would persist this to the Business Metadata Service
+        # For now, we'll log it and return it
+        logger.info(f"Generated value chain model for session {session_id}: {model}")
+        
+        # Publish event
+        await messaging_client.publish_event(
+            topic="business_metadata.events",
+            event_type="value_chain_model_generated",
+            payload={
+                "session_id": session_id,
+                "model": model.dict(),
+                "user_id": session.user_id
+            }
+        )
+        
+        return model
+    except Exception as e:
+        logger.error(f"Failed to generate value chain model: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate model: {str(e)}")
+
+@app.post(f"{settings.API_V1_STR}/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """
+    Process a chat message from the user.
+    1. Update session context
+    2. Extract Business Intents using LLM
+    3. Generate Response
+    4. Publish 'conversation.message_received' event
+    """
+    session_id = request.session_id
+    
+    # Auto-create session if not provided or doesn't exist (backward compatibility/ease of use)
+    if not session_id or session_id not in sessions_store:
+        # If user_id is provided, try to find active session or create new
+        if not session_id:
+             session_id = f"session_{request.user_id}" # Simple deterministic ID for demo
+        
+        if session_id not in sessions_store:
+             session = InterviewSession(id=session_id, user_id=request.user_id)
+             sessions_store[session_id] = session
+             active_sessions[session_id] = []
+    
+    # Update context
+    session_context = active_sessions[session_id]
+    session = sessions_store[session_id]
+    
+    # Extract Intents
+    try:
+        intents = await llm_client.extract_intents(request.message, session_context)
+        logger.info(f"Extracted intents for session {session_id}: {intents}")
+        
+        # Update session metadata with new intents
+        session.intents_identified.extend(intents)
+        session.last_activity = datetime.utcnow()
+        
+    except Exception as e:
+        logger.error(f"Error extracting intents: {e}")
+        intents = []
+
+    # Generate Response
+    try:
+        response_text = await llm_client.generate_response(request.message, session_context, intents)
+    except Exception as e:
+        logger.error(f"Error generating response: {e}")
+        response_text = "I encountered an error processing your request."
+
+    # Update context with this turn
+    session_context.append({"role": "user", "content": request.message})
+    session_context.append({"role": "assistant", "content": response_text})
+    
+    # Publish Event
+    await messaging_client.publish_event(
+        topic="conversation.events",
+        event_type="message_received",
+        payload={
+            "session_id": session_id,
+            "user_id": request.user_id,
+            "message": request.message,
+            "intents": [intent.dict() for intent in intents],
+            "response": response_text
+        }
+    )
+    
+    # Keep context manageable
+    if len(session_context) > 20:
+        active_sessions[session_id] = session_context[-20:]
+
+    return ChatResponse(
+        session_id=session_id,
+        message=response_text,
+        intents=intents
+    )
+
+# WebSocket Endpoint for Real-time Chat
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    await websocket.accept()
+    session_id = f"session_{user_id}"
+    
+    if session_id not in active_sessions:
+        active_sessions[session_id] = []
+        
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Process strictly as text for now, can expand to JSON
+            
+            # Context
+            session_context = active_sessions[session_id]
+            
+            # Async processing
+            intents = await llm_client.extract_intents(data, session_context)
+            response_text = await llm_client.generate_response(data, session_context, intents)
+            
+            # Update Context
+            session_context.append({"role": "user", "content": data})
+            session_context.append({"role": "assistant", "content": response_text})
+            
+            # Send back
+            response_data = {
+                "message": response_text,
+                "intents": [intent.dict() for intent in intents]
+            }
+            await websocket.send_text(json.dumps(response_data))
+            
+    except WebSocketDisconnect:
+        logger.info(f"User {user_id} disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await websocket.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8004)
