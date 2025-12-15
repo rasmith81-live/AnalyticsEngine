@@ -16,6 +16,7 @@ from azure.storage.blob.aio import BlobServiceClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .lakehouse_client import LakehouseClient
 from .config import settings
 from .database import get_db_session
 from .models import ArchivalConfirmation, ArchivalEvent, ArchivalStatus
@@ -37,41 +38,37 @@ class ArchivalProcessor:
             redis_client: Redis client for publishing confirmation events.
         """
         self.redis_client = redis_client
-        self.blob_service_client = None
-        self.container_client = None
+        self.lakehouse_client = None
         self.monitor = get_monitor()
     
     @trace_method(name="ArchivalProcessor.initialize", kind="INTERNAL")
     async def initialize(self):
         """Initialize the archival processor."""
-        # Initialize Azure Blob Storage client
+        # Initialize Lakehouse client
         try:
-            self.blob_service_client = BlobServiceClient.from_connection_string(
-                settings.azure_storage_connection_string
-            )
-            self.container_client = self.blob_service_client.get_container_client(
-                settings.azure_storage_container
+            self.lakehouse_client = LakehouseClient(
+                storage_account=settings.azure_storage_account_name,
+                container_name=settings.azure_storage_container,
+                connection_string=settings.azure_storage_connection_string
             )
             
             # Add span attributes for storage context
             add_span_attributes({
-                "storage.system": "azure_blob",
+                "storage.system": "azure_datalake",
                 "storage.container": settings.azure_storage_container,
                 "storage.operation": "initialize"
             })
             
-            # Create container if it doesn't exist
-            if not await self.container_client.exists():
-                await self.container_client.create_container()
-                logger.info(f"Created container: {settings.azure_storage_container}")
-            
-            logger.info("Azure Blob Storage client initialized successfully")
+            # Test connection (optional, or ensure container exists)
+            # LakehouseClient handles container creation implicitly in write_data logic or we can add it here
+            logger.info("Lakehouse client initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize Azure Blob Storage client: {str(e)}")
+            logger.error(f"Failed to initialize Lakehouse client: {str(e)}")
             raise
     
     @trace_method(name="ArchivalProcessor.process_archival_event", kind="CONSUMER")
     async def process_archival_event(self, event: ArchivalEvent):
+
         """Process an archival event.
         
         Args:
@@ -202,7 +199,7 @@ class ArchivalProcessor:
         """
         # Add span attributes for storage operation
         add_span_attributes({
-            "storage.system": "azure_blob",
+            "storage.system": "azure_datalake",
             "storage.container": settings.azure_storage_container,
             "storage.operation": "write_to_lakehouse",
             "chunk_id": event.chunk_id,
@@ -215,25 +212,32 @@ class ArchivalProcessor:
             logger.warning(f"No data to write for chunk {event.chunk_id}")
             return
         
-        # Generate blob path
+        # Generate blob path with {year}/{month}/{day} structure
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        date_obj = event.chunk_start_time
+        if isinstance(date_obj, str):
+            date_obj = datetime.fromisoformat(date_obj)
+            
         blob_path = (
             f"{event.schema_name}/{event.table_name}/"
-            f"{event.chunk_start_time.split('T')[0]}/"
+            f"{date_obj.year}/{date_obj.month:02d}/{date_obj.day:02d}/"
             f"{event.chunk_id}_{timestamp}.parquet"
         )
         
-        # Convert DataFrame to Parquet
-        parquet_data = df.to_parquet()
-        
-        # Upload to Azure Blob Storage
-        blob_client = self.container_client.get_blob_client(blob_path)
-        await blob_client.upload_blob(parquet_data, overwrite=True)
-        
-        logger.info(
-            f"Uploaded chunk {event.chunk_id} to {blob_path} "
-            f"({len(parquet_data)} bytes)"
+        # Write data using Lakehouse Client
+        success = await self.lakehouse_client.write_data(
+            path=blob_path,
+            data=df,
+            format="parquet",
+            correlation_id=event.event_id
         )
+        
+        if success:
+            logger.info(
+                f"Uploaded chunk {event.chunk_id} to {blob_path}"
+            )
+        else:
+            raise Exception(f"Failed to write chunk {event.chunk_id} to lakehouse at {blob_path}")
     
     @trace_method(name="ArchivalProcessor._send_confirmation", kind="PRODUCER")
     async def _send_confirmation(

@@ -124,7 +124,7 @@ class EventPublisher:
                 metadata = MessageMetadata(message_id=message_id)
             
             # Add correlation ID to metadata if provided
-            if correlation_id and not hasattr(metadata, "correlation_id"):
+            if correlation_id and not metadata.correlation_id:
                 metadata.correlation_id = correlation_id
                 
             # Add headers to metadata if provided
@@ -335,11 +335,20 @@ class EventPublisher:
         if self.enable_compression and len(message_bytes) > 1024:  # Only compress larger messages
             try:
                 import gzip
-                compressed = gzip.compress(message_bytes)
+                
+                # Prepare envelope with gzip encoding metadata to see if it compresses well
+                envelope_gzip = envelope.copy()
+                envelope_gzip["metadata"] = envelope["metadata"].copy()
+                envelope_gzip["metadata"]["content_encoding"] = "gzip"
+                
+                message_str_gzip = json.dumps(envelope_gzip, default=str, ensure_ascii=False)
+                message_bytes_gzip = message_str_gzip.encode('utf-8')
+                
+                compressed = gzip.compress(message_bytes_gzip)
+                
                 if len(compressed) < len(message_bytes):
-                    # Add compression header
-                    envelope["metadata"]["content_encoding"] = "gzip"
-                    message_bytes = compressed
+                    # Use compressed version
+                    return compressed
             except ImportError:
                 logger.warning("gzip not available for compression")
         

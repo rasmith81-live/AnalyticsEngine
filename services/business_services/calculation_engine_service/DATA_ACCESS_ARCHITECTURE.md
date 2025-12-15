@@ -44,10 +44,10 @@ class BaseCalculationHandler(ABC):
         pass
 ```
 
-**Current SCOR Handler Implementation:**
-- Uses `_execute_query()` method (also a stub)
-- Writes SQL queries directly
-- Assumes direct database access
+**Current Dynamic Handler Implementation:**
+- Uses `query_data()` method (to be implemented)
+- Generates SQL queries dynamically based on metadata
+- Assumes direct database access via Service
 
 ---
 
@@ -221,16 +221,16 @@ async def query_data(
     db_client = DatabaseServiceClient(self.database_service_url)
     
     return await db_client.query(
-        schema=self.schema_name,  # e.g., "scor_data"
+        schema=self.schema_name,  # e.g., "supply_chain_data"
         table=table_name,
         filters=filters,
         columns=columns
     )
 ```
 
-**3. Update SCOR Handler to Use query_data()**
+**3. Update Handler to Use query_data()**
 ```python
-async def _calculate_perfect_order(self, params: CalculationParams):
+async def _calculate_metric(self, params: CalculationParams):
     # Replace direct SQL with query_data() call
     orders = await self.query_data(
         table_name="orders",

@@ -1,2 +1,0 @@
-# Azure Ad Sso Service
-

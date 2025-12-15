@@ -9,6 +9,8 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 import asyncio
 import logging
+import hashlib
+import json
 
 from .base_handler import (
     BaseCalculationHandler,
@@ -29,12 +31,14 @@ class CalculationOrchestrator:
     - Execute calculations in parallel
     - Aggregate multi-KPI results
     - Handle errors and retries
+    - Request Coalescing (Single-flight)
     """
     
     def __init__(self):
         """Initialize orchestrator."""
         self.handlers: Dict[str, BaseCalculationHandler] = {}
         self.kpi_to_handler_map: Dict[str, str] = {}
+        self._pending_calculations: Dict[str, asyncio.Task] = {}
     
     def register_handler(
         self,
@@ -68,7 +72,11 @@ class CalculationOrchestrator:
         params: CalculationParams
     ) -> CalculationResult:
         """
-        Calculate a single KPI.
+        Calculate a single KPI with Request Coalescing.
+        
+        If a calculation with the same parameters is already in progress,
+        this method will wait for that calculation to complete and return
+        the same result, rather than starting a new one.
         
         Args:
             params: Calculation parameters
@@ -79,6 +87,30 @@ class CalculationOrchestrator:
         Raises:
             ValueError: If KPI not found or handler not registered
             CalculationError: If calculation fails
+        """
+        key = self._get_request_key(params)
+        
+        # Check if already running
+        if key in self._pending_calculations:
+            logger.debug(f"Coalescing request for {params.kpi_code} (key: {key})")
+            return await self._pending_calculations[key]
+            
+        # Create new task
+        task = asyncio.create_task(self._execute_calculate_single(params))
+        self._pending_calculations[key] = task
+        
+        try:
+            return await task
+        finally:
+            # Cleanup finished task
+            self._pending_calculations.pop(key, None)
+
+    async def _execute_calculate_single(
+        self,
+        params: CalculationParams
+    ) -> CalculationResult:
+        """
+        Internal execution logic for single KPI calculation.
         """
         # Get handler for this KPI
         handler = self._get_handler_for_kpi(params.kpi_code)
@@ -113,6 +145,15 @@ class CalculationOrchestrator:
                 f"Failed to calculate {params.kpi_code}: {str(e)}"
             )
     
+    def _get_request_key(self, params: CalculationParams) -> str:
+        """Generate a unique key for the calculation request."""
+        # Dump model to dict, exclude metadata if it contains transient info
+        # For now we include everything as params should be deterministic
+        params_dict = params.model_dump(mode='json')
+        # Sort keys to ensure consistent hash
+        params_json = json.dumps(params_dict, sort_keys=True)
+        return hashlib.sha256(params_json.encode()).hexdigest()
+
     async def calculate_batch(
         self,
         params_list: List[CalculationParams]

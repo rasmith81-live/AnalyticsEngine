@@ -75,7 +75,7 @@ async def ingest_event(
     try:
         add_span_attributes({
             "event.type": event.event_type,
-            "event.service": event.service,
+            "event.service": event.source_service,
             "correlation_id": correlation_id
         })
         
@@ -83,7 +83,7 @@ async def ingest_event(
             event.timestamp = datetime.utcnow()
         
         track_telemetry_ingestion("event")
-        track_event_processing(event.service, event.event_type, event.severity)
+        track_event_processing(event.source_service, event.event_type, event.severity)
         
         await messaging_client.publish_event(
             event_type="telemetry.event.ingested",
@@ -95,7 +95,7 @@ async def ingest_event(
         track_telemetry_processing("event", time.time() - start_time)
         
         return EventResponse(
-            event_id=None, # ID will be assigned by the database service
+            event_type=event.event_type,
             status="success",
             message="Event ingestion request published successfully"
         )
@@ -151,7 +151,7 @@ async def ingest_event_batch(
         track_telemetry_processing("event", time.time() - start_time)
         
         return EventResponse(
-            event_id=None,
+            event_type="batch",
             status="success",
             message=f"Batch of {len(batch.events)} events published for ingestion successfully"
         )

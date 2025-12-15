@@ -148,3 +148,15 @@ class NewsArticle(BaseModel):
 
     __table_args__ = (Index('ix_news_articles_published_at', 'published_at'),)
 
+
+class SecureArtifact(BaseModel):
+    """Secure artifact storage model."""
+    __tablename__ = 'secure_artifacts'
+
+    key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String(50), nullable=False, default="general")
+
+    __table_args__ = (Index('ix_secure_artifacts_key', 'key'),)
+

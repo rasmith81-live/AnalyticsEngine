@@ -1,7 +1,7 @@
 """
-Base Calculation Handler - Abstract base class for all value chain calculation handlers.
+Base Calculation Handler - Abstract base class for calculation handlers.
 
-All domain-specific handlers (SCOR, CRM, Sales, etc.) inherit from this base class.
+Defines the interface for the DynamicCalculationHandler and any future specialized handlers.
 """
 
 from abc import ABC, abstractmethod
@@ -40,9 +40,8 @@ class BaseCalculationHandler(ABC):
     """
     Abstract base class for all value chain calculation handlers.
     
-    Each value chain (SCOR, CRM, Sales, etc.) implements this interface
-    to provide domain-specific calculation logic while maintaining
-    a consistent API.
+    Handlers implement this interface to provide calculation logic 
+    while maintaining a consistent API.
     """
     
     def __init__(
@@ -58,7 +57,7 @@ class BaseCalculationHandler(ABC):
         Initialize calculation handler.
         
         Args:
-            value_chain_code: Value chain identifier (e.g., "SUPPLY_CHAIN", "SALES")
+            value_chain_code: Value chain identifier (e.g., "SUPPLY_CHAIN", "FINANCE")
             database_service_url: URL for database service
             messaging_service_url: URL for messaging service
             metadata_service_url: URL for metadata service

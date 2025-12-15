@@ -256,6 +256,52 @@ class DependencyStatistics(BaseModel):
     end_time: datetime = Field(..., description="End time of statistics")
 
 
+class LogSeverity(str, Enum):
+    """Log severity enum."""
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+class LogData(BaseModel):
+    """Model for log data ingestion."""
+    service: str = Field(..., description="Name of the service generating the log")
+    timestamp: Optional[datetime] = Field(None, description="Timestamp of the log entry")
+    severity: LogSeverity = Field(..., description="Log severity level")
+    message: str = Field(..., description="Log message")
+    attributes: Dict[str, Any] = Field(default_factory=dict, description="Log attributes/metadata")
+    trace_id: Optional[str] = Field(None, description="Trace ID for correlation")
+    span_id: Optional[str] = Field(None, description="Span ID for correlation")
+    correlation_id: Optional[str] = Field(None, description="Correlation ID")
+
+
+class LogDataBatch(BaseModel):
+    """Model for batch log data ingestion."""
+    logs: List[LogData] = Field(..., description="List of log data")
+
+
+class LogQuery(BaseModel):
+    """Model for log data queries."""
+    service: Optional[str] = Field(None, description="Filter by service name")
+    severity: Optional[LogSeverity] = Field(None, description="Filter by severity")
+    search_text: Optional[str] = Field(None, description="Text search in message")
+    trace_id: Optional[str] = Field(None, description="Filter by trace ID")
+    span_id: Optional[str] = Field(None, description="Filter by span ID")
+    start_time: Optional[datetime] = Field(None, description="Start time for query")
+    end_time: Optional[datetime] = Field(None, description="End time for query")
+    limit: int = Field(100, description="Maximum number of results")
+    offset: int = Field(0, description="Offset for pagination")
+
+
+class LogResponse(BaseModel):
+    """Response model for log operations."""
+    status: str = Field(..., description="Operation status")
+    message: str = Field(..., description="Response message")
+    count: Optional[int] = Field(None, description="Number of logs processed")
+
+
 # Event Models
 class EventSeverity(str, Enum):
     """Event severity enum."""
@@ -547,4 +593,21 @@ class IncomingEvent(BaseModel):
     timestamp: datetime = Field(..., description="The timestamp of when the event was published.")
     correlation_id: Optional[str] = Field(None, description="Correlation ID for tracing the event across services.")
     message_id: Optional[str] = Field(None, description="Unique ID of the message from the messaging system.")
+
+
+# Code Traceability Models
+class CodeUsageData(BaseModel):
+    """Model for code usage data."""
+    file_path: str = Field(..., description="Absolute path to the file")
+    class_name: Optional[str] = Field(None, description="Name of the class used")
+    method_name: str = Field(..., description="Name of the method/function used")
+    timestamp: datetime = Field(..., description="Timestamp of usage")
+
+class UnusedFilesResponse(BaseModel):
+    """Response model for unused files analysis."""
+    total_files: int = Field(..., description="Total number of python files scanned")
+    unused_files_count: int = Field(..., description="Number of unused files")
+    unused_files: List[str] = Field(..., description="List of unused file paths")
+    period_seconds: int = Field(..., description="Period in seconds used for analysis")
+    timestamp: datetime = Field(..., description="Timestamp of the analysis")
 

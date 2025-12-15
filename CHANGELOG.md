@@ -7,6 +7,321 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2025-12-06] - Complete Analytics Strategy Ontology
+
+### Added
+- **26 New Ontology Classes** (`definitions/ontology_models.py`)
+  
+  **Business Ontology (8 classes):**
+  - `ValueChainPatternDefinition` - Value chain patterns (base class for business processes)
+  - `ActorDefinition` - Base class for actors (people, roles, organizations, systems)
+  - `BeneficiaryDefinition` - Actors that receive value from value chains (inherits from Actor)
+  - `CompanyDefinition` - Top-level value chain representing entire company (inherits from ValueChainPattern)
+  - `BusinessProcessDefinition` - Low-level value chain patterns (inherits from ValueChainPattern)
+  - `StrategicObjectiveDefinition` - Strategic objectives that achieve business purpose
+  - `BenchmarkDefinition` - Industry benchmark data points with full citation and context
+  - `ExternalEventDefinition` - External events/news impacting business (news, economic, regulatory, competitor, market)
+  
+  **Authorization / Access Control (8 classes):**
+  - `ClientDefinition` - Multi-tenant client/organization with access control
+  - `RoleDefinition` - Role within client organization (inherits from Actor)
+  - `PermissionDefinition` - Base class for all permission types
+  - `ModulePermissionDefinition` - Module-level access control (whitelist approach)
+  - `EntityPermissionDefinition` - Entity/ObjectModel-level access control
+  - `MetricPermissionDefinition` - Metric/KPI-level access control
+  - `AttributePermissionDefinition` - Attribute-level access control with data masking
+  - `RowLevelSecurityDefinition` - Row-level security filters for data access control
+  
+  **Geographic & Industry Classification (4 classes):**
+  - `CountryDefinition` - Countries with ISO 3166-1 codes (alpha-2, alpha-3, numeric)
+  - `RegionDefinition` - States, provinces, territories within countries
+  - `MetropolitanAreaDefinition` - MSAs, CMAs, and metropolitan areas
+  - `NAICSIndustryDefinition` - NAICS industry codes with hierarchical structure
+  
+  **Analytics Strategy & Data Management (7 classes):**
+  - `AnalyticsStrategyDefinition` - Company analytics strategy and maturity
+  - `DataSourceDefinition` - Internal/external data sources with quality tracking
+  - `DataProductDefinition` - Curated data assets with SLAs
+  - `AnalyticsUseCaseDefinition` - Business problems solved with analytics
+  - `DimensionDefinition` - Analytical dimensions for metric slicing
+  - `MetricCategoryDefinition` - Hierarchical metric categorization
+  - `DataQualityRuleDefinition` - Data quality validation rules
+
+### Changed
+- **Enhanced `ValueChainPatternDefinition`**
+  - Added `business_purpose` field - Purpose statement for the value chain
+  - Added `intended_value` field - Value to be produced
+  - Updated `domain` field to include "company" granularity level
+  - Established inheritance hierarchy: Company and BusinessProcess extend ValueChain
+
+- **Enhanced `MetricDefinition`**
+  - Added `default_time_period` and `default_aggregation` fields for query-time modifiers
+  - Added `metric_classification` field - "operational", "result", or "business_value"
+  - Added `analytics_type` field - "operational", "correlative", or "predictive"
+  - Added correlative metric fields: `correlated_with`, `correlation_strength`
+  - Added predictive metric fields: `prediction_model`, `prediction_confidence`, `scenario_parameters`
+  - **REMOVED** `benchmarks` field - benchmarks now stored as separate `BenchmarkDefinition` entities linked via relationships
+  - Clarified that metrics should NOT include time/arithmetic modifiers in name (e.g., "Recurring Revenue" not "Monthly Recurring Revenue")
+  - Added analytics strategy linkage: `metric_category`, `data_sources`, `quality_rules`
+
+- **Enhanced `StrategicObjectiveDefinition`**
+  - Added `aligned_use_cases` field - Links to AnalyticsUseCaseDefinition
+  - Added `supporting_metrics` field - Links to MetricDefinition (KPIs)
+  - Added `responsible_actors` field - Links to ActorDefinition
+
+- **Enhanced `ClientDefinition`**
+  - Added geographic classification fields: `country_code`, `region_code`, `metropolitan_area_code`
+  - Added industry classification fields: `naics_code`, `naics_title`, `naics_sector`, `naics_subsector`
+  - Enables client segmentation by location and industry
+
+- **Enhanced `CompanyDefinition`**
+  - Added geographic classification fields: `country_code`, `region_code`, `metropolitan_area_code`
+  - Updated `naics_code` to link to `NAICSIndustryDefinition`
+  - Enables company location and industry tracking
+
+- **Updated `business_metadata` Service**
+  - Added support for all 26 new ontology classes in `MetadataInstantiationService`
+  - Added convenience API endpoints:
+    - Business: `/actors/{code}`, `/beneficiaries/{code}`, `/companies/{code}`, `/business-processes/{code}`, `/strategic-objectives/{code}`, `/benchmarks/{code}`
+    - Authorization: `/clients/{code}`, `/roles/{code}`, `/permissions/{code}`, `/row-level-security/{code}`
+    - Geographic: `/countries/{code}`, `/regions/{code}`, `/metropolitan-areas/{code}`, `/naics-industries/{code}`
+    - Analytics Strategy: `/analytics-strategies/{code}`, `/data-sources/{code}`, `/data-products/{code}`, `/analytics-use-cases/{code}`, `/dimensions/{code}`, `/metric-categories/{code}`, `/data-quality-rules/{code}`, `/external-events/{code}`
+  - Added hierarchical query endpoints:
+    - `/metrics/{metric_code}/benchmarks` - Get all benchmarks for a metric
+    - `/clients/{client_code}/roles` - Get all roles for a client
+    - `/countries/{country_code}/regions` - Get all regions for a country
+    - `/regions/{region_code}/metropolitan-areas` - Get all MSAs for a region
+
+### Technical Details
+- **Inheritance Hierarchy**: Company and BusinessProcess now properly inherit from ValueChainPatternDefinition, creating a unified value chain model at different granularity levels (company → industry → module → process)
+- **Actor Pattern**: Beneficiary properly inherits from Actor, establishing reusable actor characteristics
+- **Metric Design**: Time and arithmetic modifiers (daily/monthly/yearly, sum/avg/min/max) are now metadata fields applied at query time, not part of metric names
+- **Formula Syntax**: Metrics use Entity.attribute syntax in formulas for calculation engine parsing
+- **Benchmark Architecture**: Benchmarks are now first-class entities with full citation support (publisher, author, title, year, URL, DOI), structured context (company size, industry, geography, time period), statistical rigor (statistic type, sample size, confidence level), and quality tracking (verification, credibility, data quality score)
+- **Benchmark Relationships**: Benchmarks link to metrics via relationships, supporting multiple benchmarks per metric (different industries, time periods, percentiles)
+
+### Benchmark Features
+- **Citation Fields**: source_publisher, source_author, source_title, source_year, source_date, source_url, source_download_url, source_doi, source_type, source_credibility
+- **Context Fields**: company_size, industry, geography, time_period, population, sample_size
+- **Metric Fields**: metric_value, metric_unit, statistic_type (mean/median/percentile/range), percentile, value_min, value_max
+- **Quality Fields**: confidence_level, data_quality_score, last_verified_at, verified_by
+- **Categorization**: benchmark_category (industry_standard/best_in_class/average/poor_performance), display_order, is_featured, tags
+
+### Authorization Features
+- **Multi-Tenancy**: ClientDefinition for tenant isolation, separate from business CompanyDefinition
+- **RBAC**: RoleDefinition inherits from ActorDefinition, links to ClientDefinition
+- **Permission Hierarchy**: Base PermissionDefinition with specialized subclasses for module, entity, metric, and attribute access
+- **CRUD Permissions**: can_view, can_create, can_update, can_delete on all permission types
+- **Row-Level Security**: RowLevelSecurityDefinition with attribute_filters supporting operators (eq, ne, in, not_in, gt, gte, lt, lte, contains, startswith, between)
+- **Data Masking**: AttributePermissionDefinition supports mask types (partial, full, hash, encrypt) with custom patterns
+- **Whitelist Approach**: ModulePermissionDefinition uses whitelist - only explicitly listed modules are accessible
+- **Relationship-Based**: All permissions link subjects (clients, roles) to resources (modules, entities, metrics) via knowledge graph relationships
+
+### Geographic & Industry Classification Features
+- **Standardized Codes**: ISO 3166-1 for countries (alpha-2, alpha-3, numeric), official NAICS codes for industries
+- **Hierarchical Structure**: Country → Region → Metropolitan Area hierarchy with relationship links
+- **NAICS Hierarchy**: 2-6 digit NAICS codes with sector, subsector, industry group levels
+- **Client Segmentation**: Geographic and industry classification on both ClientDefinition and CompanyDefinition
+- **Benchmarking Support**: Enables geographic and industry-specific benchmark comparisons
+- **MSA/CMA Support**: US Metropolitan Statistical Areas and Canadian Census Metropolitan Areas
+- **Currency & Phone Codes**: ISO 4217 currency codes and international dialing codes on countries
+- **Knowledge Graph Integration**: All geographic relationships (contains, located_in, classified_as) are first-class entities
+
+### Analytics Strategy & Data Management Features
+- **Strategy Maturity**: Track analytics maturity levels (descriptive → diagnostic → predictive → prescriptive → cognitive)
+- **Data Lineage**: Complete traceability from data sources through entities to metrics and data products
+- **Use Case Management**: Link business problems to required data, metrics, and stakeholders
+- **Dimension Formalization**: Explicit dimension definitions with hierarchies and cardinality
+- **Metric Organization**: Hierarchical metric categories for navigation and discovery
+- **Data Quality**: Validation rules with severity levels, monitoring frequency, and alerting
+- **External Context**: Capture news, economic events, regulatory changes, and competitor actions
+- **Impact Analysis**: Link external events to affected metrics, entities, companies, industries, and geographies
+- **Sentiment Tracking**: Positive/negative/neutral sentiment on external events
+- **Data Products**: Modern data mesh approach with SLAs, ownership, and consumer tracking
+- **Complete Traceability**: AnalyticsStrategy → StrategicObjectives → UseCases → DataProducts → Metrics → Entities → DataSources
+
+### Files Modified
+- `services/business_services/analytics_metadata_service/definitions/ontology_models.py`
+- `services/business_services/business_metadata/services/metadata_instantiation_service.py`
+- `services/business_services/business_metadata/api/metadata_api.py`
+
+---
+
+## [2025-12-04] - Knowledge Graph Ontology Foundation (In Progress)
+
+### Added
+- **Ontology Models Layer** (`definitions/ontology_models.py`)
+  - Pydantic v2 models for knowledge-graph-based metadata foundation
+  - Core types: `ThingDefinition`, `EntityDefinition`, `RelationshipDefinition`
+  - Table schema: `TableSchemaDefinition`, `ColumnDefinition`
+  - Terminology: `ValueSetDefinition`, `CodeSystemDefinition`
+  - Metrics: `MetricDefinition`
+  - Modules & value chains: `ModuleDefinition`, `ValueChainPatternDefinition`, `CompanyValueChainModelDefinition`
+  - Governance: `ConstraintDefinition`, `DesignPolicyDefinition`
+  - Conversation layer: `InterviewSessionDefinition`, `UtteranceDefinition`, `BusinessIntentDefinition`, `PatternMatchDefinition`, `DesignSuggestionDefinition`
+
+- **Migration Helpers** (`definitions/migrate_legacy_to_ontology.py`)
+  - `convert_legacy_object_model()` - converts dict-based object models to `EntityDefinition` + `ValueSetDefinition`s
+  - `convert_legacy_kpi()` - converts KPI dicts to `MetricDefinition`
+  - `convert_legacy_value_chain()` - converts value chain dicts to `ValueChainPatternDefinition`
+
+- **Architecture Documentation** (`SERVICE_INTERPLAY_ARCHITECTURE.md`)
+  - Knowledge-Graph Ontology Foundation section documenting core principles
+  - Ontology layers (upper, measurement/KPI, module/value chain, terminology/governance, conversation/design)
+  - Migration roadmap with 6 phases from legacy dicts to ontology-driven foundation
+
+### Changed
+- **Object Models Converted to Ontology** (legacy dicts removed):
+  - **103 object models** converted from dict-based to `EntityDefinition` + `ValueSetDefinition`s
+  - Includes: order, appointment, partner_agreement, shipment, customer, account, inventory, and 96 more
+  - All files now use `from ..ontology_models import EntityDefinition, TableSchemaDefinition, ColumnDefinition`
+
+- **KPIs Converted to Ontology** (legacy dicts removed):
+  - **719 KPIs** converted from dict/BaseKPI to `MetricDefinition`
+  - Includes all SCOR metrics (perfect_order_fulfillment, order_fulfillment_cycle_time, etc.)
+  - All sales, supply chain, procurement, logistics, and customer success KPIs
+  - All files now use `from ...ontology_models import MetricDefinition`
+
+- **Value Chains Converted to Ontology** (legacy dicts removed):
+  - **2 value chains** converted: `supply_chain`, `sales_mgmt`
+  - Now use `ValueChainPatternDefinition` with explicit domain and applicability
+
+- **Modules Converted to Ontology** (legacy dicts removed):
+  - **20 modules** converted from dict-based to `ModuleDefinition`
+  - Includes: ASCM_SCOR, business_development, channel_sales, customer_success, sales_enablement, ISO standards, and 14 more
+  - All files now use `from ..ontology_models import ModuleDefinition`
+
+- **Industries Converted to Ontology** (legacy dicts removed):
+  - **2 industries** converted: retail, manufacturing
+  - Now use `ThingDefinition` with industry-specific metadata
+
+- **Relationships Extracted to Knowledge Graph**:
+  - **1,791 entity relationships** extracted from UML schema_definition fields in object models
+  - **188 module-to-object-model** relationships converted from mappings
+  - **4 industry-to-valuechain** relationships converted
+  - **3 valuechain-to-module** relationships converted
+  - All relationships now explicit `RelationshipDefinition` instances with cardinality
+  - Generated `extracted_relationships.py` with all entity relationships (reference file)
+  - Converted all mapping files to use `RelationshipDefinition` format
+  - **Added `relationships` field to `EntityDefinition`** - each entity now stores its outbound relationships directly
+  - **Populated relationships in all 113 object models** - parsed from UML and stored as explicit `RelationshipDefinition` instances
+
+### Technical Details
+- New ontology foundation enables:
+  - Data-driven metadata (all class structures generated from ontology definitions)
+  - Knowledge-graph relationships (explicit entity/relationship modeling)
+  - Conversation-driven value chain design (chatbot can build company models from business interviews)
+  - Industry standards integration (SCOR, HL7 FHIR, etc. as reusable patterns)
+  - CQRS + TimescaleDB + Redis alignment (ontology drives write/read models and hypertables)
+
+### Changed
+- **Relationships field moved to base class**:
+  - Added `relationships` field to `ThingDefinition` base class
+  - All ontology objects (entities, modules, value chains, industries, metrics) can now store relationships
+  - Removed redundant `relationships` override from `EntityDefinition`
+
+- **Mapping relationships incorporated into objects**:
+  - Module-to-object-model relationships added to 12 `ModuleDefinition` instances
+  - Value-chain-to-module relationships added to 2 `ValueChainPatternDefinition` instances
+  - Industry-to-value-chain relationships added to 2 industry definitions
+  - Total: 195 mapping relationships now embedded in ontology objects
+
+- **Modules converted to Value Chain Patterns** (architectural simplification):
+  - Recognized that modules are simply lower-order value chain patterns
+  - Converted all 20 `ModuleDefinition` instances to `ValueChainPatternDefinition`
+  - Added `domain` field to indicate granularity level:
+    - `"industry"` or `"cross_industry"`: High-level (SUPPLY_CHAIN, SALES_MGMT)
+    - `"module"`: Mid-level (CHANNEL_SALES, CUSTOMER_SUCCESS, ASCM_SCOR)
+    - `"process"`: Low-level operational patterns
+  - Removed `ModuleDefinition` class from ontology models
+  - Merged `modules/` directory into `value_chains/` (now 23 value chain patterns total)
+  - Updated all relationship IDs from `Module:*` to `ValueChain:*`
+  - Single unified concept: **Value Chain Patterns at different scales**
+
+- **Value chain metadata converted to explicit relationships**:
+  - Extracted relationships from metadata fields in 19 value chain patterns
+  - `metadata_['value_chains']` → `part_of` relationships to parent patterns
+  - `metadata_['associated_object_models']` → `uses` relationships to entities
+  - `metadata_['associated_kpis']` → `measures` relationships to metrics
+  - Removed these fields from metadata after conversion
+  - Example: BUSINESS_DEVELOPMENT now has 67 explicit relationships (1 parent + 10 entities + 56 metrics)
+  - Total: ~1,000+ additional relationships extracted from value chain metadata
+
+- **Knowledge graph conformance validation and fixes**:
+  - Created validation script to check all definition files against KG pattern
+  - Fixed 704 KPI files: moved `modules` field from metadata_ to top-level
+  - Fixed 2 value chain files: removed legacy relationship fields from metadata
+  - Fixed 3 value chain files: replaced `Module:` prefix with `ValueChain:`
+  - **Validation result**: ✅ All 846 definition files now conform to knowledge graph pattern
+  - 0 errors, 22 acceptable warnings (missing optional fields)
+
+- **Entity relationships extracted and schema_definition removed**:
+  - Converted all 116 entity files in `entities/` directory (renamed from `object_models/`)
+  - Extracted UML relationships from `schema_definition` to explicit `RelationshipDefinition` instances
+  - Removed `schema_definition` field after extraction (UML no longer needed - relationships are explicit)
+  - Extracted `modules` → `used_by` relationships to ValueChain patterns (116 entities)
+  - Extracted `related_kpis` → `measured_by` relationships to Metrics (116 entities)
+  - Removed `related_objects`, `modules`, `related_kpis` from metadata (now explicit relationships)
+  - Validated and removed `key_attributes` from metadata (91 entities - all attributes exist in column definitions)
+  - Removed empty `metadata_={}` fields from 9 entities
+  - Fixed trailing spaces in relationship types and IDs (83 entities)
+  - Added SCOR metric relationships: 15 entities with `scor_metrics` now have `used_in_calculation` relationships to SCOR_METRIC entity
+  - Removed `scor_metrics` from metadata (16 entities - now explicit relationships, metric details in SCOR_METRIC entity)
+  - Remaining metadata (6 entities): only technical configuration fields (`is_hypertable`, `time_series`, `is_reference_only`, etc.)
+  - Total: ~3,015+ entity relationships extracted (entity-to-entity, entity-to-valuechain, entity-to-metric, entity-to-scor)
+  - All entities now have complete, explicit relationship definitions and clean metadata
+
+### Removed
+- **All .bak files** (28 files removed from kpis directory)
+
+- **Mappings directory** (relationships now embedded in objects):
+  - `mappings/module_objectmodel.py` - relationships added to value chain patterns
+  - `mappings/valuechain_module.py` - relationships added to value chains
+  - `mappings/industry_valuechain.py` - relationships added to industries
+  - `mappings/objectmodel_kpi.py` - implicit in MetricDefinition.required_objects
+  - `mappings/kpi_benchmark.py` - embedded in MetricDefinition.benchmarks
+
+- **Modules directory** (merged into value_chains/):
+  - All 20 module files converted to `ValueChainPatternDefinition` with `domain="module"`
+  - `modules/` directory removed - now part of unified `value_chains/` directory
+
+- **Legacy conversion scripts** (migration complete):
+  - `add_required_objects_to_kpis.py`, `add_uml_relationships.py`, `analyze_duplicate_kpis.py`
+  - `batch_convert_to_ontology.py`, `comprehensive_object_analysis.py`, `consolidate_rate_kpis.py`
+  - `convert_industries_and_relationships.py`, `convert_remaining_kpis.py`, `convert_remaining_modules.py`, `convert_remaining_objects.py`
+  - `fix_kpi_metadata_formatting.py`, `fix_metadata_comma.py`, `update_*_object_models*.py`
+  - `validate_and_update_kpi_required_objects.py`, `verify_metadata_formatting.py`
+  - `convert_basekpi_to_dict.py`, `convert_definitions_to_dict.py`
+
+- **Legacy documentation** (superseded by ONTOLOGY_MIGRATION_COMPLETE.md):
+  - All SCOR implementation progress docs (10 files)
+  - All module/object analysis summaries (10 files)
+  - Example files (5 files)
+
+- **Legacy registry system**:
+  - `base_registry.py` - Base class for old dict-based registries
+  - `migrate_legacy_to_ontology.py` - Migration helpers (no longer needed)
+  - `definitions/*/registry.py` - Legacy registries in industries, kpis, modules, object_models, value_chains
+  - `definitions/kpis/base_kpi.py` - Legacy BaseKPI class
+
+- **Total files removed**: 48 files + 1 JSON (573 MB)
+
+### Next Steps
+- **Ontology-based registries** to replace legacy `BaseRegistry` pattern
+  - Build new registries that load Pydantic v2 ontology models instead of legacy dicts
+  - Update `definitions/__init__.py` to use new registries
+- **Generator tooling** for downstream artifacts from ontology:
+  - SQLAlchemy ORM models from `EntityDefinition` + `TableSchemaDefinition`
+  - TimescaleDB DDL with `create_hypertable()` for time-series entities
+  - JSON schemas for API validation
+  - GraphQL schema for knowledge graph queries
+- **Service integration**:
+  - Wire ontology-based registries into Analytics Metadata Service
+  - Update Calculation Engine to consume `MetricDefinition` instead of legacy KPI dicts
+  - Refactor Demo/Config Service to use ontology models
+
+---
+
 ## [2025-11-11] - Persistent Cart State with Context API
 
 ### Added

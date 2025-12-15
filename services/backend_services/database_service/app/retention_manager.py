@@ -142,7 +142,7 @@ class RetentionManager:
                     tables_processed += 1
                     
                     # Identify chunks for archival
-                    chunks = await self._identify_chunks_for_archival(table_name)
+                    chunks = await self._identify_chunks_for_archival(table_name, policy.retention_period_days)
                     
                     if chunks:
                         # Publish archival event

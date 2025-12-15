@@ -132,6 +132,40 @@ class MessagingClient:
             logger.error(f"Failed to publish event to {topic}: {e}", exc_info=True)
             return False
 
+    async def publish_message(
+        self,
+        channel: str,
+        message: Dict[str, Any],
+        message_type: str = "message"
+    ) -> bool:
+        """
+        Publish a generic message to a channel.
+        
+        Args:
+            channel: Redis channel to publish to
+            message: Message content (will be JSON encoded)
+            message_type: Type of message
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Reuse publish_event logic or simple publish
+        # StreamPublisher expects specific format possibly? 
+        # Looking at StreamPublisher code, it just sends the message dict directly 
+        # inside publish_message call, but wrapping it might be safer for consistency.
+        # However, StreamPublisher code:
+        # await self.messaging_client.publish_message(
+        #     channel=channel,
+        #     message=message,
+        #     message_type="kpi_stream_update"
+        # )
+        
+        return await self.publish_event(
+            topic=channel,
+            event_type=message_type,
+            payload=message
+        )
+
     async def subscribe(
         self,
         topic: str,

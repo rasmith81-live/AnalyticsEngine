@@ -152,7 +152,7 @@ async def ingest_trace_batch(
         track_telemetry_processing("trace", time.time() - start_time)
         
         return TraceResponse(
-            trace_id=None,
+            trace_id="batch",
             status="accepted",
             message=f"Batch of {len(batch.traces)} traces published for ingestion successfully"
         )

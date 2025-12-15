@@ -19,6 +19,9 @@ import redis.asyncio as redis
 from .config import DatabaseServiceSettings
 from .base_models import Base, NewsArticle
 from .telemetry import trace_method, add_span_attributes, inject_trace_context
+from .timescale_manager import TimescaleManager
+from .consistency_checker import ConsistencyChecker
+from .models import ModelInfo, ValidationIssue
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,7 @@ class DatabaseManager:
         self.sync_engine = None
         self.session_factory = None
         self.redis_client = None
+        self.timescale_manager = None
         self.query_metrics = {}
         self.command_metrics = {}
         self.cache_stats = {"hits": 0, "misses": 0}
@@ -82,6 +86,12 @@ class DatabaseManager:
             # Create session factory
             self.session_factory = async_sessionmaker(self.async_engine, class_=AsyncSession)
             
+            # Initialize TimescaleManager
+            self.timescale_manager = TimescaleManager(self.session_factory)
+            
+            # Initialize ConsistencyChecker
+            self.consistency_checker = ConsistencyChecker(self.async_engine)
+
             # Initialize Redis
             if self.settings.enable_query_cache:
                 self.redis_client = redis.from_url(self.settings.redis_url, decode_responses=True)
@@ -184,43 +194,19 @@ class DatabaseManager:
             # Add span attributes for hypertable creation
             add_span_attributes({
                 "db.system": "timescaledb",
-                "db.operation": "create_hypertable",
-                "db.table": "timescaledb",
-                "db.time_column": "time",
-                "db.chunk_interval": "7 days",
+                "db.operation": "validate_extension",
                 "correlation_id": "not_provided"
             })
             
-            async with self.async_engine.begin() as conn:
-                # Check if TimescaleDB extension exists
-                result = await conn.execute(text("SELECT extname FROM pg_extension WHERE extname = 'timescaledb'"))
-                extension_exists = result.fetchone() is not None
-                
-                if not extension_exists:
-                    logger.info("TimescaleDB extension not found, attempting to create it")
-                    try:
-                        # Create the TimescaleDB extension
-                        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
-                        logger.info("TimescaleDB extension created successfully")
-                        
-                        # Set up permissions (extract database name from connection URL)
-                        db_name = self.settings.database_url.split('/')[-1].split('?')[0]
-                        user = self.settings.database_url.split(':')[1].lstrip('/').split(':')[0]
-                        if db_name and user:
-                            logger.info(f"Setting up permissions for database {db_name} and user {user}")
-                            try:
-                                await conn.execute(text(f"GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {user};"))
-                                logger.info(f"Permissions granted for {user} on {db_name}")
-                            except Exception as perm_error:
-                                logger.warning(f"Could not set permissions: {perm_error}. This may be expected if user doesn't have GRANT privileges.")
-                    except Exception as ext_error:
-                        if self.settings.enforce_timescaledb:
-                            logger.error(f"Failed to create TimescaleDB extension: {ext_error}")
-                            raise
-                        logger.warning(f"Could not create TimescaleDB extension: {ext_error}")
-                else:
-                    logger.info("TimescaleDB extension already exists")
-                    
+            if self.timescale_manager:
+                success = await self.timescale_manager.init_extension()
+                if not success:
+                    if self.settings.enforce_timescaledb:
+                        raise Exception("Failed to enable TimescaleDB extension")
+                    logger.warning("TimescaleDB extension could not be enabled.")
+            else:
+                logger.error("TimescaleManager not initialized")
+
         except Exception as e:
             if self.settings.enforce_timescaledb:
                 logger.error(f"TimescaleDB validation failed: {str(e)}")
@@ -444,63 +430,52 @@ class DatabaseManager:
             "timestamp.start": start_time.isoformat(),
             "db.system": "timescaledb",
             "db.operation": "create_hypertable",
-            "db.table_name": table_name,
-            "db.time_column": time_column,
-            "db.chunk_interval": chunk_interval,
-            "db.compression_enabled": str(compression_enabled),
-            "db.retention_period": retention_period or "none"
+            "db.table_name": table_name
         })
         
+        if not self.timescale_manager:
+            raise RuntimeError("TimescaleManager not initialized")
+
         try:
-            async with self.session_factory() as session:
-                # Inject trace context into session
-                if hasattr(session, "info"):
-                    session.info["correlation_id"] = correlation_id
-                    inject_trace_context(session.info)
-                
-                async with session.begin():
-                    # Create hypertable
-                    await session.execute(
-                        text(f"SELECT create_hypertable('{table_name}', '{time_column}', chunk_time_interval => INTERVAL '{chunk_interval}')")
-                    )
-                    
-                    result = {
-                        "created": True, 
-                        "chunk_interval": chunk_interval,
-                        "correlation_id": correlation_id,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                    
-                    # Add compression
-                    if compression_enabled:
-                        await session.execute(text(f"ALTER TABLE {table_name} SET (timescaledb.compress)"))
-                        await session.execute(text(f"SELECT add_compression_policy('{table_name}', INTERVAL '7 days')"))
-                        result["compression_policy"] = {"enabled": True, "compress_after": "7 days"}
-                        
-                        # Add compression span attributes
-                        add_span_attributes({
-                            "db.compression_policy": "7 days"
-                        })
-                    
-                    # Add retention
-                    if retention_period:
-                        await session.execute(text(f"SELECT add_retention_policy('{table_name}', INTERVAL '{retention_period}')"))
-                        result["retention_policy"] = {"enabled": True, "drop_after": retention_period}
-                        
-                        # Add retention span attributes
-                        add_span_attributes({
-                            "db.retention_policy": retention_period
-                        })
-                    
-                    # Add success span attributes
-                    end_time = datetime.utcnow()
-                    add_span_attributes({
-                        "timestamp.end": end_time.isoformat(),
-                        "duration_ms": (end_time - start_time).total_seconds() * 1000,
-                        "success": True
-                    })
-                    
-                    return result
+            # 1. Convert to Hypertable
+            await self.timescale_manager.convert_to_hypertable(
+                table_name=table_name,
+                time_column=time_column,
+                chunk_time_interval=chunk_interval
+            )
+            
+            result = {
+                "created": True, 
+                "chunk_interval": chunk_interval,
+                "correlation_id": correlation_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            # 2. Add Compression
+            if compression_enabled:
+                await self.timescale_manager.set_compression_policy(
+                    table_name=table_name,
+                    compress_after="7 days" # Defaulting for now, could be parameterized better if needed
+                )
+                result["compression_policy"] = {"enabled": True, "compress_after": "7 days"}
+            
+            # 3. Add Retention
+            if retention_period:
+                await self.timescale_manager.set_retention_policy(
+                    table_name=table_name,
+                    drop_after=retention_period
+                )
+                result["retention_policy"] = {"enabled": True, "drop_after": retention_period}
+            
+            # Add success span attributes
+            end_time = datetime.utcnow()
+            add_span_attributes({
+                "timestamp.end": end_time.isoformat(),
+                "duration_ms": (end_time - start_time).total_seconds() * 1000,
+                "success": True
+            })
+            
+            return result
                     
         except Exception as e:
             # Add error span attributes
@@ -639,9 +614,92 @@ class DatabaseManager:
             }
     
     async def register_models(self, service_name: str, models: List[Dict[str, Any]], auto_create_tables: bool = True) -> List[str]:
-        """Register models."""
-        return [model.get("name", "") for model in models]
-    
+        """
+        Register models for a service and reconcile with database schema.
+        
+        Args:
+            service_name: Name of the service registering models
+            models: List of model definitions
+            auto_create_tables: Whether to automatically create/update tables
+            
+        Returns:
+            List of registered model names
+        """
+        logger.info(f"Registering {len(models)} models for service {service_name}")
+        
+        try:
+            # Convert dictionary models to ModelInfo objects
+            entity_definitions = []
+            for m in models:
+                # Ensure fields are present
+                if "name" not in m or "table_name" not in m or "fields" not in m:
+                    logger.warning(f"Skipping invalid model definition: {m}")
+                    continue
+                
+                # Create ModelInfo object
+                model_info = ModelInfo(
+                    name=m["name"],
+                    table_name=m["table_name"],
+                    fields=m["fields"],
+                    relationships=m.get("relationships", []),
+                    is_hypertable=m.get("is_hypertable", False),
+                    time_column=m.get("time_column"),
+                    source_file=m.get("source_file", "")
+                )
+                entity_definitions.append(model_info)
+            
+            if not entity_definitions:
+                logger.warning("No valid models to register")
+                return []
+            
+            # Use ConsistencyChecker to reconcile
+            if self.consistency_checker:
+                await self.consistency_checker.reconcile(
+                    entity_definitions=entity_definitions,
+                    auto_repair=auto_create_tables
+                )
+                
+            return [m.name for m in entity_definitions]
+            
+        except Exception as e:
+            logger.error(f"Failed to register models: {e}")
+            raise
+
+    async def check_consistency(self, service_name: str, models: List[Dict[str, Any]]) -> List[ValidationIssue]:
+        """
+        Check consistency between model definitions and database schema.
+        
+        Args:
+            service_name: Name of the service
+            models: List of model definitions
+            
+        Returns:
+            List of validation issues
+        """
+        try:
+            entity_definitions = []
+            for m in models:
+                if "name" in m and "table_name" in m and "fields" in m:
+                    # Construct ModelInfo robustly handling defaults
+                    model_info = ModelInfo(
+                        name=m["name"],
+                        table_name=m["table_name"],
+                        fields=m["fields"],
+                        relationships=m.get("relationships", []),
+                        is_hypertable=m.get("is_hypertable", False),
+                        time_column=m.get("time_column"),
+                        source_file=m.get("source_file", "")
+                    )
+                    entity_definitions.append(model_info)
+            
+            if self.consistency_checker:
+                return await self.consistency_checker.run_check(entity_definitions)
+            return []
+            
+        except Exception as e:
+            logger.error(f"Failed to check consistency: {e}")
+            raise
+
     async def discover_models(self, service_name: str) -> List[Dict[str, Any]]:
         """Discover models."""
         return []
@@ -785,6 +843,44 @@ class DatabaseManager:
         total = self.cache_stats["hits"] + self.cache_stats["misses"]
         return self.cache_stats["hits"] / total if total > 0 else 0.0
         
+    def get_session(self) -> AsyncSession:
+        """Get a database session."""
+        if not self.session_factory:
+            raise RuntimeError("Database not initialized")
+        return self.session_factory()
+
+    async def store_dependency_data(self, data: Dict[str, Any]):
+        """Store dependency telemetry data."""
+        # Placeholder for actual implementation - would insert into telemetry_dependencies hypertable
+        logger.debug(f"Storing dependency data: {data}")
+        
+    async def store_event_data(self, data: Dict[str, Any]):
+        """Store event telemetry data."""
+        # Placeholder for actual implementation
+        logger.debug(f"Storing event data: {data}")
+
+    async def store_metric_data(self, data: Dict[str, Any]):
+        """Store metric telemetry data."""
+        # Placeholder for actual implementation
+        logger.debug(f"Storing metric data: {data}")
+
+    async def store_health_data(self, data: Dict[str, Any]):
+        """Store health telemetry data."""
+        # Placeholder for actual implementation
+        logger.debug(f"Storing health data: {data}")
+
+    async def store_trace_data(self, data: Dict[str, Any]):
+        """Store trace telemetry data."""
+        # Placeholder for actual implementation
+        logger.debug(f"Storing trace data: {data}")
+        
+    async def query_dependency_data(self, query: Dict[str, Any], limit: int = 100, 
+                                  offset: int = 0, order_by: str = "timestamp", 
+                                  order_direction: str = "desc") -> Dict[str, Any]:
+        """Query dependency data."""
+        # Placeholder for actual implementation
+        return {"data": [], "total": 0, "limit": limit, "offset": offset}
+
     async def _setup_hypertables_for_service(self, service_name: str) -> List[str]:
         """Set up TimescaleDB hypertables for a specific service.
         

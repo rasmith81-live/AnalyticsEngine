@@ -132,33 +132,45 @@ class SubscriberManager:
             Set of stream keys that now have zero subscribers (should stop publishing)
         """
         async with self._lock:
-            streams_to_stop = set()
-            
-            if kpi_code and entity_id and period:
-                # Remove from specific stream
-                stream_key = f"{kpi_code}:{entity_id}:{period}"
-                streams_to_stop = await self._remove_from_stream(subscriber_id, stream_key)
-            else:
-                # Remove from all streams
-                if subscriber_id in self._subscriber_streams:
-                    stream_keys = self._subscriber_streams[subscriber_id].copy()
-                    for stream_key in stream_keys:
-                        stopped = await self._remove_from_stream(subscriber_id, stream_key)
-                        streams_to_stop.update(stopped)
-            
-            # Clean up subscriber tracking
-            if subscriber_id in self._last_activity:
-                del self._last_activity[subscriber_id]
-            
-            if subscriber_id in self._subscriber_streams and not self._subscriber_streams[subscriber_id]:
-                del self._subscriber_streams[subscriber_id]
-            
-            logger.info(
-                f"Removed subscriber {subscriber_id}. "
-                f"Streams to stop: {len(streams_to_stop)}"
-            )
-            
-            return streams_to_stop
+            return await self._remove_subscriber_internal(subscriber_id, kpi_code, entity_id, period)
+
+    async def _remove_subscriber_internal(
+        self,
+        subscriber_id: str,
+        kpi_code: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        period: Optional[str] = None
+    ) -> Set[str]:
+        """
+        Internal method to remove subscriber (expects lock to be held)
+        """
+        streams_to_stop = set()
+        
+        if kpi_code and entity_id and period:
+            # Remove from specific stream
+            stream_key = f"{kpi_code}:{entity_id}:{period}"
+            streams_to_stop = await self._remove_from_stream(subscriber_id, stream_key)
+        else:
+            # Remove from all streams
+            if subscriber_id in self._subscriber_streams:
+                stream_keys = self._subscriber_streams[subscriber_id].copy()
+                for stream_key in stream_keys:
+                    stopped = await self._remove_from_stream(subscriber_id, stream_key)
+                    streams_to_stop.update(stopped)
+        
+        # Clean up subscriber tracking
+        if subscriber_id in self._last_activity:
+            del self._last_activity[subscriber_id]
+        
+        if subscriber_id in self._subscriber_streams and not self._subscriber_streams[subscriber_id]:
+            del self._subscriber_streams[subscriber_id]
+        
+        logger.info(
+            f"Removed subscriber {subscriber_id}. "
+            f"Streams to stop: {len(streams_to_stop)}"
+        )
+        
+        return streams_to_stop
     
     async def _remove_from_stream(self, subscriber_id: str, stream_key: str) -> Set[str]:
         """
@@ -254,7 +266,7 @@ class SubscriberManager:
             streams_to_stop = set()
             for subscriber_id in inactive_subscribers:
                 logger.warning(f"Removing inactive subscriber: {subscriber_id}")
-                stopped = await self.remove_subscriber(subscriber_id)
+                stopped = await self._remove_subscriber_internal(subscriber_id)
                 streams_to_stop.update(stopped)
             
             if inactive_subscribers:

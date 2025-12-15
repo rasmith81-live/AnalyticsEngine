@@ -23,7 +23,6 @@ WORKDIR /app
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip wheel && \
-    pip install "setuptools<81" && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy entrypoint script and make it executable
@@ -51,4 +50,15 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Run the application
-CMD ["sh", "-c", "cd ${SERVICE_DIR} && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Dynamic entrypoint detection:
+# 1. Install service-specific requirements if present
+# 2. Check for main.py in root (Business Metadata style) vs app/main.py (Standard style)
+CMD ["sh", "-c", "cd ${SERVICE_DIR} && \
+    if [ -f requirements.txt ]; then echo 'Installing service dependencies...'; pip install --no-cache-dir -r requirements.txt; fi && \
+    if [ -f main.py ]; then \
+        echo 'Starting service from root main.py...'; \
+        uvicorn main:app --host 0.0.0.0 --port 8000; \
+    else \
+        echo 'Starting service from app.main...'; \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000; \
+    fi"]
