@@ -6,18 +6,9 @@ No overview provided.
 
 ## Data Models
 
-### `EntityType`
+### `SourceRecord`
 
-Definition of an entity type (e.g., 'Customer', 'Product').
 
-**Fields:**
-
-- `name`: `str`
-- `attributes`: `List[str]`
-
-### `EntityRecord`
-
-A single record representing an entity from a specific source.
 
 **Fields:**
 
@@ -25,38 +16,28 @@ A single record representing an entity from a specific source.
 - `source_system`: `str`
 - `entity_type`: `str`
 - `attributes`: `Dict[str, Any]`
-- `timestamp`: `datetime`
+- `timestamp`: `Optional[str]`
 
 ### `MatchCandidate`
 
-A potential match found by the engine.
+
 
 **Fields:**
 
-- `record`: `EntityRecord`
+- `record_a_id`: `str`
+- `record_b_id`: `str`
 - `score`: `float`
-- `match_confidence`: `str`
-
-### `ResolutionResult`
-
-Result of an entity resolution request.
-
-**Fields:**
-
-- `source_record`: `EntityRecord`
-- `matches`: `List[MatchCandidate]`
-- `resolution_id`: `str`
-- `processing_time_ms`: `float`
+- `match_reasons`: `List[str]`
 
 ### `GoldenRecord`
 
-The consolidated 'Golden Record' for an entity.
+
 
 **Fields:**
 
-- `entity_id`: `str`
+- `golden_id`: `str`
 - `entity_type`: `str`
 - `attributes`: `Dict[str, Any]`
-- `lineage`: `List[str]`
-- `last_updated`: `datetime`
+- `source_record_ids`: `List[str]`
+- `lineage`: `List[Dict[str, Any]]`
 
