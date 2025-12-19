@@ -24,7 +24,7 @@ from definitions.ontology_models import (
     BenchmarkDefinition,
 )
 
-from ..services import MetadataService, MetadataInstantiationService
+from ..services import MetadataService, MetadataInstantiationService, ConsistencyService
 from ..repositories import MetadataWriteRepository, MetadataQueryRepository
 from ..dependencies import get_db_session, get_redis_client, get_event_publisher
 
@@ -43,6 +43,15 @@ async def get_metadata_service(
     instantiation_service = MetadataInstantiationService()
     
     return MetadataService(write_repo, query_repo, instantiation_service)
+
+
+async def get_consistency_service(
+    session: AsyncSession = Depends(get_db_session),
+    redis_client = Depends(get_redis_client)
+) -> ConsistencyService:
+    """Create ConsistencyService with injected dependencies."""
+    query_repo = MetadataQueryRepository(session, redis_client)
+    return ConsistencyService(query_repo)
 
 
 # -------------------------------------------------------------------------
@@ -698,6 +707,54 @@ async def get_external_event(
         raise HTTPException(status_code=404, detail=f"External event {code} not found")
     
     return service.instantiation.serialize(event)
+
+
+# -------------------------------------------------------------------------
+# Governance & Consistency Endpoints
+# -------------------------------------------------------------------------
+
+@router.get("/graph/uml", response_model=str)
+async def get_ontology_uml(
+    service: ConsistencyService = Depends(get_consistency_service)
+):
+    """Generate PlantUML diagram of the current ontology."""
+    return await service.generate_plantuml()
+
+
+@router.get("/consistency/check", response_model=Dict[str, List[str]])
+async def check_consistency(
+    service: ConsistencyService = Depends(get_consistency_service)
+):
+    """Run consistency checks on the metadata graph.
+    
+    Returns a list of errors found in relationships, metrics, and formulas.
+    """
+    return await service.check_integrity()
+
+
+@router.post("/definitions/merge", status_code=204)
+async def merge_definitions(
+    target_code: str = Body(..., description="The definition to keep"),
+    source_code: str = Body(..., description="The definition to merge and delete"),
+    kind: str = Body(..., description="Type of definition"),
+    merged_by: str = Query(..., description="User performing the merge"),
+    service: MetadataService = Depends(get_metadata_service)
+):
+    """Merge two definitions (e.g. duplicates).
+    
+    Moves all relationships from source to target, then deletes source.
+    """
+    try:
+        await service.merge_definitions(
+            target_code=target_code,
+            source_code=source_code,
+            kind=kind,
+            merged_by=merged_by
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Merge failed: {str(e)}")
 
 
 # -------------------------------------------------------------------------

@@ -1,21 +1,19 @@
 """
-Service A - Business logic service demonstrating CQRS and event-driven architecture.
+Machine Learning Service - Manages ML Models, Training Jobs, and Inference.
 
 This service:
-- Uses Database Service for all CQRS operations
-- Uses Messaging Service for event publishing and subscription
-- Implements business logic for item management
-- Demonstrates real-time processing and analytics
+- Uses Database Service for metadata persistence (via messaging/CQRS pattern)
+- Uses Messaging Service for event publishing (Training Jobs)
+- Exposes API for Model Registry and Inference
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request, Response
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
 import uuid
 import asyncio
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional
 from contextlib import asynccontextmanager
 from prometheus_client import make_wsgi_app
 from fastapi.middleware.wsgi import WSGIMiddleware
@@ -25,17 +23,17 @@ from opentelemetry.trace import SpanKind
 from .telemetry import initialize_telemetry, instrument_fastapi, extract_correlation_id_from_headers, add_span_attributes, trace_method
 
 from .messaging_client import MessagingClient
+from .database_client import DatabaseClient
+from .dependencies import set_messaging_client, set_database_client, get_messaging_client, set_service_start_time
 from .models import (
-    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemAnalytics,
-    ItemMetrics, ItemEvent, EventCallback, ServiceHealth, DependencyStatus,
-    ErrorResponse, ValidationErrorResponse
+    EventCallback, ServiceHealth, DependencyStatus,
+    ErrorResponse
 )
 from .config import get_settings
 from .metrics import (
-    metrics, track_endpoint_execution, track_message_processing, 
-    track_db_operation, track_domain_event, update_system_metrics,
-    update_db_connection_metrics, export_metrics_to_observability
+    metrics, update_system_metrics, export_metrics_to_observability
 )
+from .api.endpoints import router as api_router
 
 # Configure logging
 logging.basicConfig(
@@ -45,7 +43,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global service instances
-messaging_client: Optional[MessagingClient] = None
 service_start_time = time.time()
 metrics_export_task: Optional[asyncio.Task] = None
 
@@ -53,14 +50,20 @@ metrics_export_task: Optional[asyncio.Task] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global messaging_client, metrics_export_task
+    global metrics_export_task
     
+    messaging_client = None
+    database_client = None
+
     # Startup
     try:
         settings = get_settings()
         
         # Initialize metrics with service info
         metrics.initialize(service_name=settings.service_name)
+        
+        # Set service start time
+        set_service_start_time(time.time())
         
         # Initialize OpenTelemetry if enabled
         if settings.enable_distributed_tracing:
@@ -75,8 +78,6 @@ async def lifespan(app: FastAPI):
             )
             logger.info(f"OpenTelemetry initialized with endpoint: {settings.otlp_endpoint}")
         
-
-        
         # Initialize messaging client
         messaging_client = MessagingClient(
             base_url=settings.messaging_service_url,
@@ -85,10 +86,21 @@ async def lifespan(app: FastAPI):
             retries=settings.messaging_service_retries
         )
         await messaging_client.initialize()
+        set_messaging_client(messaging_client)
+        
+        # Initialize database client
+        database_client = DatabaseClient(
+            base_url=settings.database_service_url,
+            service_name=settings.service_name,
+            timeout=settings.database_service_timeout,
+            retries=settings.database_service_retries
+        )
+        await database_client.initialize()
+        set_database_client(database_client)
         
         # Set up event subscriptions if enabled
         if settings.subscribe_to_events:
-            await setup_event_subscriptions()
+            await setup_event_subscriptions(messaging_client)
             
         # Set service as ready in metrics
         metrics.service_ready.set(1)
@@ -107,11 +119,11 @@ async def lifespan(app: FastAPI):
         # Start system metrics update task
         asyncio.create_task(update_system_metrics_loop())
         
-        logger.info("Service A started successfully")
+        logger.info("Machine Learning Service started successfully")
         yield
         
     except Exception as e:
-        logger.error(f"Failed to start Service A: {str(e)}")
+        logger.error(f"Failed to start Machine Learning Service: {str(e)}")
         raise
     finally:
         # Shutdown
@@ -126,9 +138,18 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
+        # We need to access the local variables or get them from dependencies if we want to close them
+        # Since we set them in dependencies, we might need a way to get them or just rely on local vars if available
+        # But local vars inside try block might not be available here if exception happened before assignment.
+        # However, for simplicity using the local variables initialized to None at start of lifespan.
+        
         if messaging_client:
             await messaging_client.close()
-        logger.info("Service A shutdown complete")
+            
+        if database_client:
+            await database_client.close()
+            
+        logger.info("Machine Learning Service shutdown complete")
 
 
 async def start_metrics_export_loop(interval: int, observability_url: str, push_gateway: str, job_name: str):
@@ -167,7 +188,7 @@ async def update_system_metrics_loop():
 
 
 @trace_method(name="setup_event_subscriptions", kind=SpanKind.CLIENT)
-async def setup_event_subscriptions():
+async def setup_event_subscriptions(messaging_client: MessagingClient):
     """Set up event subscriptions."""
     if not messaging_client:
         return
@@ -183,15 +204,25 @@ async def setup_event_subscriptions():
             "correlation_id": correlation_id
         })
         
-        # Subscribe to item events from other services
-        await messaging_client.subscribe_to_item_events(
+        # Subscribe to relevant events
+        
+        # 1. Broker Service events (Ping, etc.)
+        await messaging_client.subscribe_to_service_events(
+            target_service="broker_service",
             callback_url=settings.event_callback_url,
             correlation_id=correlation_id
         )
         
-        # Subscribe to broker service events for cross-service communication
-        await messaging_client.subscribe_to_service_events(
-            target_service="broker_service",
+        # 2. Data Ingestion events (to trigger training)
+        await messaging_client.create_subscription(
+            channel_pattern="events.data.ingestion.*",
+            callback_url=settings.event_callback_url,
+            correlation_id=correlation_id
+        )
+        
+        # 3. Model Metadata events (for cache invalidation/updates)
+        await messaging_client.create_subscription(
+            channel_pattern="events.metadata.model.*",
             callback_url=settings.event_callback_url,
             correlation_id=correlation_id
         )
@@ -209,8 +240,8 @@ async def setup_event_subscriptions():
 
 # Initialize FastAPI app with lifespan management
 app = FastAPI(
-    title="Service A",
-    description="Business logic service demonstrating CQRS and event-driven architecture",
+    title="Machine Learning Service",
+    description="Manages ML Models, Training Jobs, and Inference",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -296,10 +327,6 @@ async def metrics_middleware(request: Request, call_next):
         raise
 
 
-
-
-
-
 def get_messaging_client() -> MessagingClient:
     """Dependency to get messaging client instance."""
     if messaging_client is None:
@@ -307,239 +334,8 @@ def get_messaging_client() -> MessagingClient:
     return messaging_client
 
 
-# Health check endpoint
-@app.get("/health", response_model=ServiceHealth, responses={503: {"model": ErrorResponse}})
-@track_endpoint_execution
-@trace_method(name="health_check_endpoint", kind=SpanKind.SERVER)
-async def health_check(
-    msg_client: MessagingClient = Depends(get_messaging_client),
-    request: Request = None
-):
-    """Check service health and dependencies."""
-    try:
-        correlation_id = getattr(request.state, "correlation_id", None) if request else None
-        add_span_attributes({"endpoint": "health", "correlation_id": correlation_id})
-
-        dependencies = []
-        
-        # Check messaging service
-        try:
-            start_time_ms = time.time()
-            msg_health = await msg_client.check_health()
-            response_time_ms = (time.time() - start_time_ms) * 1000
-            msg_connected = msg_health.get("status") == "healthy"
-            dependencies.append(DependencyStatus(
-                service_name="messaging_service",
-                url=msg_client.base_url,
-                status="healthy" if msg_connected else "unhealthy",
-                response_time_ms=response_time_ms,
-                last_check=datetime.utcnow(),
-                error=msg_health.get("error")
-            ))
-        except Exception as e:
-            dependencies.append(DependencyStatus(
-                service_name="messaging_service",
-                url=msg_client.base_url,
-                status="unhealthy",
-                response_time_ms=0,
-                last_check=datetime.utcnow(),
-                error=str(e)
-            ))
-
-        # Get active subscriptions count
-        active_subscriptions = 0
-        try:
-            subscriptions = await msg_client.list_subscriptions()
-            active_subscriptions = len([s for s in subscriptions if s.get("status") == "active"])
-        except Exception as e:
-            logger.error(f"Could not retrieve subscriptions for health check: {e}")
-
-        # Determine overall status
-        all_deps_healthy = all(dep.status == "healthy" for dep in dependencies)
-        overall_status = "healthy" if all_deps_healthy else "unhealthy"
-        
-        # Update service health metric
-        metrics.service_health.set(1 if overall_status == "healthy" else 0)
-        
-        uptime = time.time() - service_start_time
-        
-        return ServiceHealth(
-            status=overall_status,
-            timestamp=datetime.utcnow(),
-            dependencies=dependencies,
-            active_subscriptions=active_subscriptions,
-            uptime_seconds=uptime,
-            version="1.0.0",
-            error=None if overall_status == "healthy" else "One or more dependencies are unhealthy"
-        )
-        
-    except Exception as e:
-        logger.error(f"Health check failed catastrophically: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
-
-
-# Item management endpoints
-@app.post("/items", status_code=202)
-@trace_method(name="create_item_endpoint", kind=SpanKind.SERVER)
-async def create_item(
-    item: ItemCreate,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client),
-    request: Request = None
-):
-    """Create a new item."""
-    try:
-        # Get correlation ID from request state or generate a new one
-        correlation_id = getattr(request.state, "correlation_id", None) if request else None
-        if not correlation_id:
-            correlation_id = str(uuid.uuid4())
-        
-        # Add span attributes for item creation
-        add_span_attributes({
-            "endpoint": "create_item",
-            "correlation_id": correlation_id,
-            "item_type": item.item_type if hasattr(item, "item_type") else "unknown"
-        })
-        
-        # Publish a command to create the item
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="CreateItemCommand",
-            payload=item.dict(),
-            correlation_id=correlation_id
-        )
-        
-        logger.info(f"Published CreateItemCommand with correlation ID {correlation_id}")
-        return {"message": "Create item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create item: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/items/{item_id}", response_model=ItemResponse, status_code=501)
-@trace_method(name="get_item_endpoint", kind=SpanKind.SERVER)
-async def get_item(item_id: int):
-    """Get an item by ID."""
-    try:
-        # Get correlation ID from request state or generate a new one
-        correlation_id = getattr(request.state, "correlation_id", None) if request else None
-        
-        # Add span attributes for item retrieval
-        add_span_attributes({
-            "endpoint": "get_item",
-            "item.id": item_id,
-            "correlation_id": correlation_id
-        })
-        
-        # This endpoint is not implemented in a pure event-driven model.
-        # Service A should maintain its own read model populated by events.
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.put("/items/{item_id}", status_code=202)
-async def update_item(
-    item_id: int,
-    item_update: ItemUpdate,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client)
-):
-    """Update an existing item."""
-    try:
-        correlation_id = str(uuid.uuid4())
-        
-        # Publish a command to update the item
-        payload = {"item_id": item_id, "update_data": item_update.dict(exclude_unset=True)}
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="UpdateItemCommand",
-            payload=payload,
-            correlation_id=correlation_id
-        )
-
-        logger.info(f"Published UpdateItemCommand for item {item_id} with correlation ID {correlation_id}")
-        return {"message": "Update item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to update item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.delete("/items/{item_id}", status_code=202)
-async def delete_item(
-    item_id: int,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client)
-):
-    """Delete an item."""
-    try:
-        correlation_id = str(uuid.uuid4())
-        
-        # Publish a command to delete the item
-        payload = {"item_id": item_id}
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="DeleteItemCommand",
-            payload=payload,
-            correlation_id=correlation_id
-        )
-        
-        logger.info(f"Published DeleteItemCommand for item {item_id} with correlation ID {correlation_id}")
-        return {"message": "Delete item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/items", response_model=ItemListResponse, status_code=501)
-async def list_items():
-    """List items with filters and pagination."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to list items: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-# Analytics endpoints
-@app.get("/analytics", response_model=ItemAnalytics, status_code=501)
-async def get_analytics():
-    """Get item analytics."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get analytics: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/metrics", response_model=ItemMetrics, status_code=501)
-async def get_metrics():
-    """Get service metrics."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Metrics are not available through this endpoint in an event-driven model.")
-        
-    except Exception as e:
-        logger.error(f"Failed to get metrics: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+# Include API router
+app.include_router(api_router)
 
 
 # Event handling endpoints
@@ -629,15 +425,6 @@ async def handle_event_callback(
         raise HTTPException(status_code=500, detail=f"Event processing failed: {str(e)}")
 
 
-
-
-# Background task functions
-
-
-
-
-
-
 @trace_method(name="acknowledge_event_message", kind=SpanKind.CLIENT)
 async def acknowledge_event_message(
     msg_client: MessagingClient,
@@ -722,90 +509,31 @@ async def process_event(event: EventCallback) -> bool:
             
             logger.info(f"Processing event type: {event_type}")
             
-            # Handle different event types
-            if event_type and event_type.startswith("item."):
-                return await process_item_event(event_type, event_data)
-            elif event_type and event_type.startswith("broker_service."):
-                return await process_broker_event(event_type, event_data)
-            else:
-                logger.warning(f"Unknown event type: {event_type}")
-                return True  # Acknowledge unknown events to avoid reprocessing
+            # Handle specific event types for ML service
+            if event_type == "broker_service.ping":
+                # Heartbeat or keepalive
+                return True
+            
+            elif event_type == "data.ingestion.completed":
+                # Trigger training job if configured
+                logger.info(f"Data ingestion completed event received: {event_data}")
+                # Logic to determine if auto-training should start would go here
+                # e.g., check if dataset is linked to any active models with auto-train enabled
+                return True
+
+            elif event_type == "metadata.model.updated":
+                # Update local cache or invalidate
+                logger.info(f"Model metadata updated event received: {event_data}")
+                # If we had an in-memory cache for models, we would invalidate it here
+                return True
+            
+            logger.warning(f"Unknown or unhandled event type: {event_type}")
+            return True  # Acknowledge unknown events to avoid reprocessing
         
         return True
         
     except Exception as e:
         logger.error(f"Failed to process event: {e}")
-        return False
-
-
-@trace_method(name="process_item_event", kind=SpanKind.CONSUMER)
-async def process_item_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process item-related events."""
-    try:
-        item_id = event_data.get("item_id")
-        item_uuid = event_data.get("item_uuid")
-        correlation_id = event_data.get("correlation_id")
-        
-        # Add span attributes for item event processing
-        add_span_attributes({
-            "messaging.event_type": event_type,
-            "messaging.item.id": item_id,
-            "messaging.item.uuid": item_uuid,
-            "correlation_id": correlation_id
-        })
-        
-        logger.info(f"Processing item event {event_type} for item {item_id}")
-        
-        # Add business logic here based on event type
-        if event_type == "item.created":
-            # Handle item creation from other services
-            pass
-        elif event_type == "item.updated":
-            # Handle item updates from other services
-            pass
-        elif event_type == "item.deleted":
-            # Handle item deletion from other services
-            pass
-        
-        return True
-        
-    except Exception as e:
-        # Record error in span
-        add_span_attributes({
-            "error": True,
-            "error.message": str(e)
-        })
-        logger.error(f"Failed to process item event: {e}")
-        return False
-
-
-@trace_method(name="process_broker_event", kind=SpanKind.CONSUMER)
-async def process_broker_event(event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Process events from Broker Service."""
-    try:
-        correlation_id = event_data.get("correlation_id")
-        
-        # Add span attributes for broker event processing
-        add_span_attributes({
-            "messaging.event_type": event_type,
-            "messaging.source_service": "broker_service",
-            "correlation_id": correlation_id
-        })
-        
-        logger.info(f"Processing Broker event: {event_type}")
-        
-        # Add cross-service communication logic here
-        # This demonstrates how services can react to events from other services
-        
-        return True
-        
-    except Exception as e:
-        # Record error in span
-        add_span_attributes({
-            "error": True,
-            "error.message": str(e)
-        })
-        logger.error(f"Failed to process Service B event: {e}")
         return False
 
 

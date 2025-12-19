@@ -8,10 +8,12 @@ import json
 from typing import Dict, Optional, Set, Callable, Any
 from datetime import datetime
 import httpx
+import redis.asyncio as redis
 
 from .base_handler import CalculationParams, CalculationResult
 from .orchestrator import CalculationOrchestrator
 from .engine.stream_aggregator import StreamAggregator
+from .engine.storage_sync import StorageSyncManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class StreamProcessor:
     - Calculate KPIs when new data arrives
     - Publish calculation results back to messaging service
     - Manage stream subscriptions lifecycle
+    - Sync in-memory data to TimescaleDB (Write-Behind)
     """
     
     def __init__(
@@ -50,10 +53,17 @@ class StreamProcessor:
         self.orchestrator = orchestrator
         self.database_service_url = database_service_url
         self.messaging_service_url = messaging_service_url
+        self.redis_url = redis_url
         self.subscriber_id = subscriber_id or f"calc_engine_{id(self)}"
         
         # Initialize Stream Aggregator
         self.aggregator = StreamAggregator(redis_url=redis_url)
+        
+        # Initialize Storage Sync Manager (Write-Behind)
+        self.sync_manager = StorageSyncManager(
+            stream_aggregator=self.aggregator,
+            database_service_url=database_service_url
+        )
         
         # Track active subscriptions: stream_key -> subscription_info
         self._active_subscriptions: Dict[str, Dict] = {}
@@ -82,11 +92,17 @@ class StreamProcessor:
         # Start heartbeat task
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
         
+        # Start Sync Manager
+        await self.sync_manager.start()
+        
         logger.info("StreamProcessor started")
     
     async def stop(self):
         """Stop the stream processor and cleanup all subscriptions"""
         self._running = False
+        
+        # Stop Sync Manager
+        await self.sync_manager.stop()
         
         # Unsubscribe from all streams
         for stream_key in list(self._active_subscriptions.keys()):
@@ -163,6 +179,9 @@ class StreamProcessor:
             # Start message consumer for this stream
             channel = subscription_info["channel"]
             await self._start_message_consumer(channel, kpi_code, entity_id, period, calculation_params)
+            
+            # Register for write-behind sync
+            await self.sync_manager.register_stream(kpi_code, entity_id)
             
             logger.info(f"Subscribed to stream: {stream_key} on channel: {channel}")
             
@@ -265,31 +284,40 @@ class StreamProcessor:
     ):
         """
         Consume messages from a Redis channel and calculate KPIs
-        
-        This is a simplified implementation. In production, you would use
-        the messaging service's subscribe functionality with Redis pub/sub.
         """
         logger.info(f"Message consumer started for channel: {channel}")
         
+        redis_client = None
+        pubsub = None
+        
         try:
-            # Subscribe to channel via messaging service
-            # Note: This is a placeholder - actual implementation would use
-            # Redis pub/sub or WebSocket connection to messaging service
+            # Connect to Redis
+            redis_client = redis.from_url(self.redis_url, decode_responses=True)
+            pubsub = redis_client.pubsub()
+            await pubsub.subscribe(channel)
+            
+            logger.info(f"Subscribed to Redis channel: {channel}")
             
             while self._running:
                 try:
-                    # In production, this would receive messages from Redis pub/sub
-                    # For now, we'll poll the messaging service
-                    # TODO: Implement actual Redis pub/sub subscription
+                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                     
-                    await asyncio.sleep(1)  # Placeholder polling interval
+                    if message:
+                        try:
+                            data = json.loads(message["data"])
+                            await self._process_stream_update(
+                                data, kpi_code, entity_id, period, calculation_params
+                            )
+                        except json.JSONDecodeError:
+                            logger.warning(f"Received invalid JSON on channel {channel}: {message['data']}")
+                        except Exception as e:
+                            logger.error(f"Error processing message on channel {channel}: {e}")
                     
-                    # When a message is received, process it
-                    # message = await receive_from_channel(channel)
-                    # await self._process_stream_update(message, kpi_code, entity_id, period, calculation_params)
+                    # Small sleep to yield control if no message (though get_message with timeout handles waiting)
+                    if not message:
+                        await asyncio.sleep(0.01)
                 
                 except asyncio.CancelledError:
-                    logger.info(f"Consumer cancelled for channel: {channel}")
                     raise
                 
                 except Exception as e:
@@ -302,6 +330,13 @@ class StreamProcessor:
         
         except Exception as e:
             logger.error(f"Message consumer failed for channel {channel}: {e}")
+            
+        finally:
+            if pubsub:
+                await pubsub.unsubscribe(channel)
+                await pubsub.close()
+            if redis_client:
+                await redis_client.close()
     
     async def _process_stream_update(
         self,

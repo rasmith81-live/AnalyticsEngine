@@ -1,10 +1,11 @@
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 import json
 import logging
 import asyncio
+from datetime import datetime
 
 # Import standardized clients (assuming they are available in the python path or vendored)
 # In a real monorepo with PYTHONPATH=. this would be installed as a package.
@@ -21,9 +22,12 @@ except ImportError:
 from .config import settings
 from .models import (
     ChatRequest, ChatResponse, Utterance, BusinessIntent, 
-    InterviewSession, CompanyValueChainModel, ValueChainNode, ValueChainLink
+    InterviewSession, CompanyValueChainModel, ValueChainNode, ValueChainLink,
+    SenderType, RecommendStrategyRequest
 )
 from .llm_client import llm_client
+from .engine.pattern_matcher import PatternMatcher, DesignSuggester
+from .engine.strategic_recommender import StrategicRecommender, StrategyScore
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +37,11 @@ app = FastAPI(
     title=settings.APP_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+# Initialize Engines
+pattern_matcher = PatternMatcher()
+design_suggester = DesignSuggester()
+strategic_recommender = StrategicRecommender()
 
 # Initialize Messaging Client
 messaging_client = MessagingClient(
@@ -106,11 +115,11 @@ async def generate_value_chain_model(session_id: str):
         
         # Publish event
         await messaging_client.publish_event(
-            topic="business_metadata.events",
+            topic="business_metadata.events.value_chain_generated",
             event_type="value_chain_model_generated",
             payload={
                 "session_id": session_id,
-                "model": model.dict(),
+                "model": model.model_dump(),
                 "user_id": session.user_id
             }
         )
@@ -178,7 +187,7 @@ async def chat_endpoint(request: ChatRequest):
             "session_id": session_id,
             "user_id": request.user_id,
             "message": request.message,
-            "intents": [intent.dict() for intent in intents],
+            "intents": [intent.model_dump() for intent in intents],
             "response": response_text
         }
     )
@@ -192,6 +201,24 @@ async def chat_endpoint(request: ChatRequest):
         message=response_text,
         intents=intents
     )
+
+@app.post(f"{settings.API_V1_STR}/match-intent")
+async def match_intent(intent: BusinessIntent) -> List[Dict[str, Any]]:
+    """Match a business intent to ontology patterns."""
+    return pattern_matcher.match_intent(intent)
+
+@app.post(f"{settings.API_V1_STR}/suggestions/{{pattern_id}}/apply")
+async def apply_suggestion(pattern_id: str):
+    """Apply a design suggestion based on a pattern."""
+    suggestion = design_suggester.suggest_design(pattern_id)
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Pattern not found or no suggestion available")
+    return suggestion
+
+@app.post(f"{settings.API_V1_STR}/recommend-strategy", response_model=List[StrategyScore])
+async def recommend_strategy(request: RecommendStrategyRequest):
+    """Recommend value chains based on business description."""
+    return await strategic_recommender.recommend_value_chains(request.business_description, request.use_cases)
 
 # WebSocket Endpoint for Real-time Chat
 @app.websocket("/ws/chat/{user_id}")
@@ -221,7 +248,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             # Send back
             response_data = {
                 "message": response_text,
-                "intents": [intent.dict() for intent in intents]
+                "intents": [intent.model_dump() for intent in intents]
             }
             await websocket.send_text(json.dumps(response_data))
             

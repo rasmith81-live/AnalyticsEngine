@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from .models import (
+from models import (
     AzureADConfig,
     AzureADUser,
     AzureADGroup,

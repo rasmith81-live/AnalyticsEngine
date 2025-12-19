@@ -116,6 +116,16 @@ Service proposal creation request.
 - `integration_method`: `IntegrationMethod`
 - `custom_notes`: `Optional[str]`
 
+### `ServiceProposalUpdate`
+
+Service proposal update request.
+
+**Fields:**
+
+- `status`: `Optional[ProposalStatus]`
+- `custom_notes`: `Optional[str]`
+- `integration_method`: `Optional[IntegrationMethod]`
+
 ### `ServiceProposalResponse`
 
 Service proposal response.

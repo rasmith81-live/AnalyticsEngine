@@ -2,8 +2,8 @@
 
 from datetime import datetime
 from uuid import uuid4
-from sqlalchemy import Column, String, Integer, Text, Index
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB, TIMESTAMPTZ
+from sqlalchemy import Column, String, Integer, Text, Index, TIMESTAMP
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 import sys
 from pathlib import Path
@@ -29,7 +29,7 @@ class MetadataVersion(Base):
     data = Column(JSONB, nullable=False)
     change_type = Column(String(50), nullable=False)  # "created", "updated", "deleted"
     changed_by = Column(String(255))
-    changed_at = Column(TIMESTAMPTZ, nullable=False, default=datetime.utcnow)
+    changed_at = Column(TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow)
     change_description = Column(Text)
     
     __table_args__ = (

@@ -12,8 +12,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .dependencies import initialize_backend_services, shutdown_backend_services, db_manager
+from . import dependencies
 from .api import router as metadata_router
+from .consumers import ConversationEventConsumer
 
 # Configure logging
 logging.basicConfig(
@@ -22,22 +23,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Global consumer instance
+conversation_consumer: ConversationEventConsumer = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for FastAPI application."""
+    global conversation_consumer
+    
     # Startup
     logger.info(f"Starting {settings.service_name} service...")
     
     try:
         # Initialize backend services
-        await initialize_backend_services()
+        await dependencies.initialize_backend_services()
         logger.info("Backend services initialized successfully")
         
         # Run migrations
         logger.info("Running database migrations...")
-        await db_manager.run_migrations(service_name=settings.service_name)
+        await dependencies.db_manager.run_migrations(service_name=settings.service_name)
         logger.info("Migrations completed successfully")
+        
+        # Initialize and start Conversation Event Consumer
+        conversation_consumer = ConversationEventConsumer(
+            db_manager=dependencies.db_manager,
+            messaging_client=dependencies.messaging_client,
+            event_publisher=dependencies.event_publisher
+        )
+        await conversation_consumer.start()
+        logger.info("Conversation Event Consumer started")
         
         logger.info(f"{settings.service_name} service started on port {settings.service_port}")
         
@@ -46,7 +61,11 @@ async def lifespan(app: FastAPI):
     finally:
         # Shutdown
         logger.info(f"Shutting down {settings.service_name} service...")
-        await shutdown_backend_services()
+        
+        if conversation_consumer:
+            await conversation_consumer.stop()
+            
+        await dependencies.shutdown_backend_services()
         logger.info("Backend services shut down successfully")
 
 

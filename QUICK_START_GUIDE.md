@@ -17,10 +17,10 @@
 ```powershell
 cd C:\Users\Arthu\CascadeProjects\AnalyticsEngine
 
-# Build and start all services
-docker-compose build analytics_metadata_service calculation_engine_service demo_config_service
+# Build and start core services
+docker-compose build business_metadata calculation_engine_service demo_config_service api_gateway
 
-docker-compose up -d analytics_metadata_service calculation_engine_service demo_config_service
+docker-compose up -d business_metadata calculation_engine_service demo_config_service api_gateway
 ```
 
 **Wait 30-60 seconds for services to start**
@@ -34,6 +34,7 @@ docker-compose up -d analytics_metadata_service calculation_engine_service demo_
 curl http://localhost:8020/health  # Metadata Service
 curl http://localhost:8021/health  # Calculation Engine
 curl http://localhost:8022/health  # Demo/Config Service
+curl http://localhost:8090/health  # API Gateway
 ```
 
 **Expected**: All should return `{"status": "healthy"}`
@@ -43,6 +44,7 @@ curl http://localhost:8022/health  # Demo/Config Service
 ## Step 3: View API Documentation
 
 Open in browser:
+- **API Gateway (Unified)**: http://localhost:8090/docs
 - **Metadata Service**: http://localhost:8020/docs
 - **Calculation Engine**: http://localhost:8021/docs
 - **Demo/Config Service**: http://localhost:8022/docs
@@ -59,8 +61,7 @@ npm install
 
 # Create .env file
 @"
-VITE_API_URL=http://localhost:8020
-VITE_CONFIG_API_URL=http://localhost:8022
+VITE_API_BASE_URL=http://localhost:8090
 VITE_ENABLE_DEMO=true
 VITE_ENABLE_CUSTOM_KPIS=true
 "@ | Out-File -FilePath .env -Encoding utf8
@@ -81,29 +82,14 @@ npm run dev
 
 ## Quick Test
 
-### Test Metadata Service
+### Test via API Gateway
 
 ```powershell
 # Get KPI statistics
-curl http://localhost:8020/stats
+curl http://localhost:8090/api/v1/metadata/stats
 
 # Get all KPIs
-curl http://localhost:8020/kpis
-
-# Get specific KPI
-curl http://localhost:8020/kpis/PERFECT_ORDER_FULFILLMENT
-```
-
-### Test Demo/Config Service
-
-```powershell
-# Create client config
-curl -X POST http://localhost:8022/api/configs `
-  -H "Content-Type: application/json" `
-  -d '{\"client_name\": \"Test Client\", \"selected_kpis\": []}'
-
-# Check health
-curl http://localhost:8022/health
+curl http://localhost:8090/api/v1/metadata/kpis
 ```
 
 ---
@@ -112,7 +98,7 @@ curl http://localhost:8022/health
 
 | Service | Port | URL |
 |---------|------|-----|
-| Metadata Service | 8020 | http://localhost:8020 |
+| Business Metadata | 8020 | http://localhost:8020 |
 | Calculation Engine | 8021 | http://localhost:8021 |
 | Demo/Config Service | 8022 | http://localhost:8022 |
 | Frontend UI | 3000 | http://localhost:3000 |
@@ -126,12 +112,13 @@ curl http://localhost:8022/health
 
 ```powershell
 # Check Docker logs
-docker-compose logs analytics_metadata_service
+docker-compose logs business_metadata
 docker-compose logs calculation_engine_service
 docker-compose logs demo_config_service
+docker-compose logs api_gateway
 
 # Restart services
-docker-compose restart analytics_metadata_service
+docker-compose restart business_metadata
 ```
 
 ### Frontend won't start

@@ -18,6 +18,11 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import StorageIcon from '@mui/icons-material/Storage';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import PolicyIcon from '@mui/icons-material/Policy';
+import ModelTrainingIcon from '@mui/icons-material/ModelTraining';
+
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,9 +33,15 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Demo', icon: <DashboardIcon />, path: '/demo' },
   { text: 'KPI Configuration', icon: <SettingsIcon />, path: '/config' },
+  { text: 'Excel Import', icon: <UploadFileIcon />, path: '/excel-import' },
+  { text: 'Ontology Studio', icon: <AccountTreeIcon />, path: '/ontology-studio' },
+  { text: 'Simulation Controller', icon: <SettingsIcon />, path: '/simulation' },
+  { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
   { text: 'Object Models', icon: <AccountTreeIcon />, path: '/object-models' },
   { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
   { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },
+  { text: 'Governance', icon: <PolicyIcon />, path: '/governance' },
+  { text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
 ];
 
 export default function Layout({ children }: LayoutProps) {

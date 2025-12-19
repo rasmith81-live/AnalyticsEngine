@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default_factory=lambda: os.getenv("JWT_ALGORITHM", "HS256"))
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(60 * 24 * 8, description="Token expiry in minutes (8 days)")
     
+    # OIDC / Azure AD Settings
+    AUTH_METHOD: str = Field(default_factory=lambda: os.getenv("AUTH_METHOD", "oidc"), description="Auth method: 'secret' (HS256) or 'oidc' (RS256)")
+    OIDC_ISSUER: Optional[str] = Field(default_factory=lambda: os.getenv("OIDC_ISSUER"))
+    OIDC_JWKS_URI: Optional[str] = Field(default_factory=lambda: os.getenv("OIDC_JWKS_URI"))
+    OIDC_CLIENT_ID: Optional[str] = Field(default_factory=lambda: os.getenv("OIDC_CLIENT_ID"))
+    OIDC_AUDIENCE: Optional[str] = Field(default_factory=lambda: os.getenv("OIDC_AUDIENCE"))
+    
     # Redis - use the same connection settings as other services
     REDIS_URL: str = Field(
         default_factory=lambda: os.getenv(
@@ -53,23 +60,64 @@ class Settings(BaseSettings):
     SERVICE_REGISTRY: Dict[str, Dict[str, Any]] = Field(default_factory=lambda: {
         # Backend Services
         "messaging_service": {
-            "url": os.getenv("MESSAGING_SERVICE_URL"),
+            "url": os.getenv("MESSAGING_SERVICE_URL", "http://messaging_service:8001"),
             "timeout": 30.0,
             "health_endpoint": "/health",
         },
         "database_service": {
-            "url": os.getenv("DATABASE_SERVICE_URL"),
+            "url": os.getenv("DATABASE_SERVICE_URL", "http://database_service:8002"),
             "timeout": 30.0,
             "health_endpoint": "/health",
         },
         "archival_service": {
-            "url": os.getenv("ARCHIVAL_SERVICE_URL"),
+            "url": os.getenv("ARCHIVAL_SERVICE_URL", "http://archival_service:8003"),
             "timeout": 60.0,
             "health_endpoint": "/health",
         },
         "observability_service": {
-            "url": os.getenv("OBSERVABILITY_SERVICE_URL"),
+            "url": os.getenv("OBSERVABILITY_SERVICE_URL", "http://observability_service:8000"),
             "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        # Business Services
+        "business_metadata_service": {
+            "url": os.getenv("BUSINESS_METADATA_SERVICE_URL", "http://analytics_metadata_service:8023"),
+            "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        "calculation_engine_service": {
+            "url": os.getenv("CALCULATION_ENGINE_SERVICE_URL", "http://calculation_engine_service:8000"),
+            "timeout": 60.0,
+            "health_endpoint": "/health",
+        },
+        "conversation_service": {
+            "url": os.getenv("CONVERSATION_SERVICE_URL", "http://conversation_service:8004"),
+            "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        "demo_config_service": {
+            "url": os.getenv("DEMO_CONFIG_SERVICE_URL", "http://demo_config_service:8000"),
+            "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        "connector_service": {
+            "url": os.getenv("CONNECTOR_SERVICE_URL", "http://connector_service:8000"),
+            "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        "ingestion_service": {
+            "url": os.getenv("INGESTION_SERVICE_URL", "http://ingestion_service:8000"),
+            "timeout": 30.0,
+            "health_endpoint": "/health",
+        },
+        "entity_resolution_service": {
+            "url": os.getenv("ENTITY_RESOLUTION_SERVICE_URL", "http://entity_resolution_service:8000"),
+            "timeout": 60.0,
+            "health_endpoint": "/health",
+        },
+        "metadata_ingestion_service": {
+            "url": os.getenv("METADATA_INGESTION_SERVICE_URL", "http://metadata_ingestion_service:8000"),
+            "timeout": 60.0,
             "health_endpoint": "/health",
         },
     })

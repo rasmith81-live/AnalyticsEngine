@@ -131,6 +131,9 @@ class MetricDefinition(ThingDefinition):
     aggregation_methods: List[str] = []  # ["sum", "avg", "min", "max", "count", "median"]
     default_aggregation: str = "sum"
     
+    # Calculation Method
+    calculation_method: str = "exact"  # "exact", "approximate"
+    
     # Arithmetic modifiers - applied at query time
     time_periods: List[str] = []  # ["daily", "weekly", "monthly", "quarterly", "yearly"]
     default_time_period: str = "monthly"

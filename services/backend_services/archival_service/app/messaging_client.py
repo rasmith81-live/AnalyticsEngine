@@ -133,6 +133,46 @@ class MessagingClient:
         """
         return self._redis is not None and self._running
     
+    @trace_method(name="MessagingClient.get", kind="CLIENT")
+    async def get(self, key: str) -> Optional[str]:
+        """Get a value from Redis.
+        
+        Args:
+            key: Redis key
+            
+        Returns:
+            Value if found, None otherwise
+        """
+        if not self.is_connected():
+            await self.connect()
+            
+        try:
+            return await self._redis.get(key)
+        except Exception as e:
+            logger.error(f"Redis get failed: {e}", exc_info=True)
+            return None
+
+    @trace_method(name="MessagingClient.set", kind="CLIENT")
+    async def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
+        """Set a value in Redis.
+        
+        Args:
+            key: Redis key
+            value: Value to set
+            ex: Expiration in seconds
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.is_connected():
+            await self.connect()
+            
+        try:
+            return await self._redis.set(key, value, ex=ex)
+        except Exception as e:
+            logger.error(f"Redis set failed: {e}", exc_info=True)
+            return False
+
     @trace_method(name="MessagingClient.publish_event", kind="PRODUCER")
     async def publish_event(
         self,

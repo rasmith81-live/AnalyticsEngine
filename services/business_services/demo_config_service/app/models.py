@@ -115,6 +115,13 @@ class ServiceProposalCreate(BaseModel):
     custom_notes: Optional[str] = Field(None, description="Custom notes for proposal")
 
 
+class ServiceProposalUpdate(BaseModel):
+    """Service proposal update request."""
+    status: Optional[ProposalStatus] = Field(None, description="Proposal status")
+    custom_notes: Optional[str] = Field(None, description="Custom notes")
+    integration_method: Optional[IntegrationMethod] = Field(None, description="Integration method")
+
+
 class ServiceProposalResponse(BaseModel):
     """Service proposal response."""
     id: str

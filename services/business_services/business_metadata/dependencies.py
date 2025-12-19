@@ -11,12 +11,14 @@ sys.path.insert(0, str(backend_services_path))
 
 from database_service.app.database_manager import DatabaseManager
 from messaging_service.app.event_publisher import EventPublisher
+from database_service.app.messaging_client import MessagingClient
 
 from .config import settings
 
 # Global instances (initialized in main.py startup)
 db_manager: DatabaseManager = None
 event_publisher: EventPublisher = None
+messaging_client: MessagingClient = None
 
 
 async def initialize_backend_services():
@@ -24,7 +26,7 @@ async def initialize_backend_services():
     
     Called during FastAPI startup.
     """
-    global db_manager, event_publisher
+    global db_manager, event_publisher, messaging_client
     
     # Initialize database manager
     db_manager = DatabaseManager(settings)
@@ -34,19 +36,30 @@ async def initialize_backend_services():
     event_publisher = EventPublisher(settings)
     await event_publisher.initialize()
 
+    # Initialize messaging client (consumer)
+    messaging_client = MessagingClient(
+        redis_url=settings.redis_url,
+        service_name=settings.service_name,
+        pool_size=5
+    )
+    await messaging_client.connect()
+
 
 async def shutdown_backend_services():
     """Shutdown backend service connections.
     
     Called during FastAPI shutdown.
     """
-    global db_manager, event_publisher
+    global db_manager, event_publisher, messaging_client
     
     if db_manager:
         await db_manager.shutdown()
     
     if event_publisher:
         await event_publisher.shutdown()
+
+    if messaging_client:
+        await messaging_client.disconnect()
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:

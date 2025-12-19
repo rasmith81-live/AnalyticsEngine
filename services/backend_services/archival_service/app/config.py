@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Redis configuration
     redis_url: str = Field(default="redis://redis:6379/0", description="Redis connection URL")
     redis_pool_size: int = 10
+    CACHE_TTL_SECONDS: int = 300  # Default cache TTL of 5 minutes
     
     # Azure Data Lake Storage configuration
     storage_account: str = Field(default="devstoreaccount1", description="Azure Storage account name")

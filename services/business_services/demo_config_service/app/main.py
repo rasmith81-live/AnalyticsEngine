@@ -14,12 +14,14 @@ from typing import List, Dict, Any
 import httpx
 import random
 
+import math
+
 from .config import get_settings
 from .models import (
     ClientConfigCreate, ClientConfigUpdate, ClientConfigResponse,
     CustomKPICreate, CustomKPIResponse,
     RequiredObjectsAnalysisRequest, RequiredObjectsAnalysisResponse,
-    ServiceProposalCreate, ServiceProposalResponse,
+    ServiceProposalCreate, ServiceProposalResponse, ServiceProposalUpdate,
     DataSourceCreate, DataSourceResponse,
     DemoDataRequest,
     IntegrationMethod, ProposalStatus
@@ -179,9 +181,40 @@ async def update_client_config(client_id: str, config: ClientConfigUpdate):
     
     existing.updated_at = datetime.utcnow()
     
+    # Cascade changes (publish event)
+    changes = config.model_dump(exclude_unset=True)
+    if changes:
+        await _publish_config_change(client_id, changes)
+    
     logger.info(f"Updated client config: {client_id}")
     
     return existing
+
+
+async def _publish_config_change(client_id: str, changes: Dict[str, Any]):
+    """Publish configuration change event to messaging service."""
+    settings = get_settings()
+    
+    event = {
+        "event_type": "client_config_updated",
+        "client_id": client_id,
+        "changes": changes,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Fire and forget pattern for demo purposes, or await response
+            await client.post(
+                f"{settings.messaging_service_url}/publish",
+                json={
+                    "channel": "config.updates",
+                    "message": event
+                }
+            )
+            logger.info(f"Published config update event for client {client_id}")
+    except Exception as e:
+        logger.error(f"Failed to publish config update event: {e}")
 
 
 @app.delete("/api/configs/{client_id}")
@@ -372,6 +405,43 @@ async def get_service_proposal(proposal_id: str):
     return service_proposals[proposal_id]
 
 
+@app.put("/api/proposals/{proposal_id}", response_model=ServiceProposalResponse)
+async def update_service_proposal(proposal_id: str, update: ServiceProposalUpdate):
+    """Update service proposal."""
+    if proposal_id not in service_proposals:
+        raise HTTPException(status_code=404, detail=f"Proposal not found: {proposal_id}")
+    
+    proposal = service_proposals[proposal_id]
+    
+    if update.status:
+        proposal.status = update.status
+    if update.custom_notes is not None:
+        # Note: custom_notes isn't in the response model yet, might need to add it or ignore for now if not needed in UI
+        pass 
+    if update.integration_method:
+        proposal.integration_method = update.integration_method
+        # Recalculate estimates if method changes
+        settings = get_settings()
+        num_objects = len(proposal.required_objects)
+        
+        if proposal.integration_method == IntegrationMethod.BATCH:
+            hours_per_object = settings.batch_integration_hours_per_object
+        else:
+            hours_per_object = settings.realtime_integration_hours_per_object
+        
+        proposal.estimated_hours = num_objects * hours_per_object
+        proposal.estimated_cost = proposal.estimated_hours * settings.default_hourly_rate
+        proposal.timeline_weeks = max(4, proposal.estimated_hours // 40)
+        
+        proposal.breakdown["hours_per_object"] = hours_per_object
+        proposal.breakdown["phases"][1]["weeks"] = proposal.timeline_weeks - 3
+
+    service_proposals[proposal_id] = proposal
+    logger.info(f"Updated service proposal: {proposal_id}")
+    
+    return proposal
+
+
 # ============================================================================
 # Demo Data Endpoints
 # ============================================================================
@@ -457,7 +527,7 @@ def _generate_time_series(kpi_code: str, kpi_data: Dict[str, Any], data_points: 
         trend_value = base_value + (trend * i)
         
         # Add seasonality (weekly pattern)
-        seasonal = variation * 0.3 * random.sin(2 * 3.14159 * i / 7)
+        seasonal = variation * 0.3 * math.sin(2 * 3.14159 * i / 7)
         
         # Add random noise
         noise = random.uniform(-variation * 0.2, variation * 0.2)

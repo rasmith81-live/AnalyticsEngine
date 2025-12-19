@@ -4,7 +4,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { metadataApi } from '../services/api';
+import { metadataApi } from '../api/metadataApi';
 import type { KPI } from '../types';
 
 export function useKPIDetail(kpiCode: string) {

@@ -1,0 +1,33 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+env:
+  DATABASE_SERVICE_URL: http://database_service:8000
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+  LAKEHOUSE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;}
+  LAKEHOUSE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-timescaledb-archive}
+  LAKEHOUSE_STORAGE_ACCOUNT: ${AZURE_STORAGE_ACCOUNT:-devstoreaccount1}
+  OTEL_EXPORTER_OTLP_CERTIFICATE: /certs/server.crt
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://observability_service:4317
+  OTEL_EXPORTER_OTLP_INSECURE: 'false'
+  PYTHONPATH: .
+  REDIS_URL: redis://redis:6379
+  SERVICE_NAME: archival_service
+image:
+  pullPolicy: IfNotPresent
+  repository: analytics-engine/archival_service
+  tag: latest
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  port: 8005
+  targetPort: 8000
+  type: ClusterIP

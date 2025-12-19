@@ -22,7 +22,7 @@ from fastapi.middleware.wsgi import WSGIMiddleware
 
 # Import OpenTelemetry modules
 from opentelemetry.trace import SpanKind
-from .telemetry import initialize_telemetry, instrument_fastapi, extract_correlation_id_from_headers, add_span_attributes, trace_method
+from .telemetry_utils import initialize_telemetry, instrument_fastapi, extract_correlation_id_from_headers, add_span_attributes, trace_method
 
 from .messaging_client import MessagingClient
 from .models import (

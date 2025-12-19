@@ -5,6 +5,45 @@ All notable changes to the Analytics Engine project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2025-12-18] - Metadata Ingestion & Excel Processing
+### Added
+- **Excel Import Pipeline**: Implemented full flow for uploading, validating, and committing KPI definitions from Excel/CSV.
+- **Formula Safety Validation**: Added checks in `KPIExcelProcessor` to reject unsafe Python keywords and unsupported Excel functions (e.g., VLOOKUP, OFFSET).
+- **Bulk Commit Endpoint**: Added `POST /import/{id}/commit` to persist validated KPIs to the Business Metadata Service.
+- **Duplicate Detection**: Integrated `SimilarityEngine` to flag potential duplicate KPIs during import.
+- **Frontend Integration**: Updated `ExcelImportPage` to use real backend endpoints, display duplicate warnings, and show validation errors.
+- **Integration Tests**: Added comprehensive test suite `validate_metadata_ingestion_service.py` covering the upload and commit workflow.
+
+### Changed
+- **CLI Tools**: Updated `generate_models.py` and `validate_schema.py` to align with current service ports (8020) and schema mappings.
+- **Dependencies**: Added `rapidfuzz` and `python-multipart` to Metadata Ingestion Service.
+
+### Technical Details
+- **Formula Safety**: Implemented strict blacklist (VLOOKUP, HLOOKUP, INDIRECT, etc.) and context boundary checks to prevent cross-sheet reference injection.
+- **Import Cache**: Used in-memory caching for import sessions (to be replaced by Redis in production) to allow user review before commit.
+- **Error Handling**: Enhanced exception handling in upload/commit endpoints to provide detailed feedback to the UI.
+
+## [2025-12-18] - API Gateway Validation
+### Validated
+- **Routing Infrastructure**: Confirmed FastAPI app setup with versioned routing (`/api/v1`).
+- **Proxy Logic**: Verified request routing to backend services (mocked Metadata Service) works correctly with authentication.
+- **Documentation**: Confirmed Swagger UI (`/docs`) and OpenAPI schema (`/openapi.json`) are accessible and aggregation works.
+- **Security & Reliability**:
+  - **Authentication**: Verified JWT validation middleware.
+  - **Authorization**: Verified Role-Based Access Control (RBAC) middleware.
+  - **Rate Limiting**: Verified Redis-backed rate limiting (rejected requests over limit).
+  - **Circuit Breaker**: Verified circuit state transitions (Closed -> Open) upon failures.
+  - **HSTS**: Implemented and verified `Strict-Transport-Security` headers with `SecurityHeadersMiddleware`.
+- **Service Clients**: Validated `CalculationEngineClient` and `DemoConfigServiceClient` integration points.
+- **WebSockets**: Verified `/ws/dashboard` endpoint for real-time KPI updates (connection, subscription, ping/pong).
+
+### Technical Details
+- Created `services/frontend_services/api_gateway/tests/validate_api_gateway.py` for basic routing/proxy validation.
+- Created `services/frontend_services/api_gateway/tests/validate_api_gateway_comprehensive.py` for advanced middleware and client validation.
+- Created `services/frontend_services/api_gateway/tests/validate_websockets_security.py` for WebSocket and HSTS validation.
+- Mocked external dependencies (Redis, PubSub, Service Registry, downstream services) to ensure isolated and reliable testing.
+- Implemented `SecurityHeadersMiddleware` to enforce HSTS.
+
 ---
 
 ## [2025-12-06] - Complete Analytics Strategy Ontology

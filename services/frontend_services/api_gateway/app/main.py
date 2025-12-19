@@ -27,6 +27,7 @@ from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.metrics import MetricsMiddleware, setup_metrics
 from app.middleware.rate_limiting import RateLimitingMiddleware
 from app.middleware.tracing import TracingMiddleware, setup_tracing
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.services.health import HealthService
 from app.services.registry import service_registry
 from app.core.cache import CacheService as GatewayCache
@@ -119,15 +120,16 @@ app.add_middleware(
     recovery_timeout=settings.CIRCUIT_BREAKER_RECOVERY_TIME
 )
 app.add_middleware(
-    AuthenticationMiddleware,
-    exclude_paths=["/health", "/metrics", "/docs", "/redoc", "/openapi.json"],
-    exclude_prefixes=["/auth/"]
-)
-app.add_middleware(
     AuthorizationMiddleware,
     exclude_paths=["/health", "/metrics", "/docs", "/redoc", "/openapi.json"],
     exclude_prefixes=["/auth/"]
 )
+app.add_middleware(
+    AuthenticationMiddleware,
+    exclude_paths=["/health", "/metrics", "/docs", "/redoc", "/openapi.json"],
+    exclude_prefixes=["/auth/"]
+)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # The GraphQL app is mounted inside the lifespan, after the service registry is ready.

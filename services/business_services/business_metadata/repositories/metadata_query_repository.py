@@ -290,6 +290,31 @@ class MetadataQueryRepository:
         
         return [self._relationship_to_dict(r) for r in relationships]
     
+    async def check_relationship_exists(
+        self,
+        from_code: str,
+        to_code: str,
+        rel_type: str
+    ) -> bool:
+        """Check if a specific relationship exists.
+        
+        Args:
+            from_code: Source entity code
+            to_code: Target entity code
+            rel_type: Relationship type
+            
+        Returns:
+            True if exists and active
+        """
+        stmt = select(MetadataRelationship).where(
+            MetadataRelationship.from_entity_code == from_code,
+            MetadataRelationship.to_entity_code == to_code,
+            MetadataRelationship.relationship_type == rel_type,
+            MetadataRelationship.is_active == True
+        )
+        result = await self.session.execute(stmt)
+        return result.first() is not None
+
     async def get_relationship_graph(
         self,
         entity_code: str,

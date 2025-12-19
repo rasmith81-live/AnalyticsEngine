@@ -101,5 +101,31 @@ class TestArtifactGeneration(unittest.TestCase):
         self.assertIn("create_hypertable('sensor_readings'", ddl)
         print("✅ TimescaleDB DDL generation correct")
 
+    def test_kpi_view_ddl_generation(self):
+        """Test generating TimescaleDB Continuous Aggregate view DDL for KPIs."""
+        print("\nTesting KPI View DDL Generation...")
+        
+        # Mock a MetricDefinition since we can't easily import it due to circular deps/mocking
+        # We'll use a simple object or MagicMock that mimics the structure
+        metric = MagicMock()
+        metric.code = "REVENUE_DAILY"
+        metric.default_aggregation = "sum"
+        metric.formula = "Entity.amount"
+        metric.dimensions = ["region", "product_category"]
+        
+        generator = CodeGenerator()
+        ddl = generator.generate_kpi_view_ddl(metric, "sales_data")
+        
+        print(f"Generated View DDL:\n{ddl}")
+        
+        self.assertIn("CREATE MATERIALIZED VIEW kpi_revenue_daily_daily", ddl)
+        self.assertIn("WITH (timescaledb.continuous) AS", ddl)
+        self.assertIn("time_bucket('1 day', time)", ddl)
+        self.assertIn("SUM(amount) as value", ddl)
+        self.assertIn("FROM sales_data", ddl)
+        self.assertIn("GROUP BY bucket, region, product_category", ddl)
+        self.assertIn("add_continuous_aggregate_policy", ddl)
+        print("✅ KPI View DDL generation correct")
+
 if __name__ == "__main__":
     unittest.main()

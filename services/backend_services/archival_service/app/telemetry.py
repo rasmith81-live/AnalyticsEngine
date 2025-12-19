@@ -12,19 +12,89 @@ from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, cast
 
 from fastapi import FastAPI, Request, Response
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import grpc
-from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
-from opentelemetry.sdk.trace.sampling import ParentBased, Sampler, SamplingResult, TraceIdRatioBased
-from opentelemetry.trace import SpanKind, Status, StatusCode
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+try:
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    import grpc
+    from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+    from opentelemetry.sdk.trace.sampling import ParentBased, Sampler, SamplingResult, TraceIdRatioBased
+    from opentelemetry.trace import SpanKind, Status, StatusCode
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+    # Define dummy classes/functions if OTel is not available
+    class SpanKind:
+        SERVER = "SERVER"
+        CLIENT = "CLIENT"
+        PRODUCER = "PRODUCER"
+        CONSUMER = "CONSUMER"
+        INTERNAL = "INTERNAL"
+    
+    class Status:
+        def __init__(self, status_code, description=None): pass
+        
+    class StatusCode:
+        OK = "OK"
+        ERROR = "ERROR"
+        
+    class trace:
+        @staticmethod
+        def get_tracer(name): return DummyTracer()
+        @staticmethod
+        def get_current_span(): return DummySpan()
+        
+        class SpanContext:
+            def __init__(self, trace_id=0, span_id=0, is_remote=False, trace_flags=0, trace_state=None):
+                self.trace_id = trace_id
+                self.span_id = span_id
+                self.is_remote = is_remote
+                self.trace_flags = trace_flags
+                self.trace_state = trace_state
+                
+        class TraceFlags:
+            SAMPLED = 0x01
+            DEFAULT = 0x00
+
+    class DummySpan:
+        def set_attribute(self, key, value): pass
+        def set_status(self, status): pass
+        def record_exception(self, e): pass
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc_val, exc_tb): pass
+        def get_span_context(self): return trace.SpanContext()
+        
+    class DummyTracer:
+        def start_as_current_span(self, name, kind=None): return DummySpan()
+
+    # Dummy base classes for inheritance
+    class Sampler:
+        def should_sample(self, parent_context, trace_id, name, kind=None, attributes=None, links=None):
+            return SamplingResult(SamplingDecision.DROP, None)
+        def get_description(self): return "DummySampler"
+
+    class SpanExporter:
+        def export(self, spans): return SpanExportResult.SUCCESS
+        def shutdown(self): pass
+        def force_flush(self, timeout_millis=30000): return SpanExportResult.SUCCESS
+        
+    class SamplingResult:
+        def __init__(self, decision, trace_state): pass
+        
+    class SamplingDecision:
+        RECORD_AND_SAMPLE = 1
+        DROP = 0
+        
+    class SpanExportResult:
+        SUCCESS = 1
+        FAILURE = 0
 
 # Type variables for function decorators
 F = TypeVar("F", bound=Callable[..., Any])

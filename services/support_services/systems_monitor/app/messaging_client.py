@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 from .models import ItemEvent
-from .telemetry import inject_trace_context, trace_method, add_span_attributes
+from .telemetry_utils import inject_trace_context, trace_method, add_span_attributes
 
 logger = logging.getLogger(__name__)
 

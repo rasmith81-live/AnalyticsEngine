@@ -1,75 +1,70 @@
+
 import asyncio
 import logging
-import json
-from typing import Dict, Any, List
+import uuid
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel
-import pandas as pd
-
-from .transformation_engine import TransformationEngine
-# In a real microservice, we'd use an HTTP Client to call Connector Service
-# For this prototype, we assume we receive the data payload directly or via a shared lib
 
 logger = logging.getLogger(__name__)
 
 class IngestionJob(BaseModel):
     job_id: str
-    source_connection_id: str
+    connection_id: str
     target_entity: str
-    schedule_cron: str = None  # e.g. "0 0 * * *"
-    transformation_rules: List[Dict[str, Any]] = []
+    schedule: str  # Cron expression or "immediate"
+    status: str
+    last_run: Optional[datetime] = None
 
 class DataExtractor:
     """
     Responsible for fetching data from the Connector Service.
     """
-    async def fetch_data(self, connection_id: str, entity_name: str) -> List[Dict[str, Any]]:
-        # Placeholder: Call Connector Service API
-        logger.info(f"Fetching data from connection {connection_id} for entity {entity_name}")
-        # Mock data return
-        return [
-            {"raw_col_1": "A", "raw_col_2": 100},
-            {"raw_col_1": "B", "raw_col_2": 200}
-        ]
+    def __init__(self, connector_service_url: str):
+        self.connector_url = connector_service_url
 
-class PipelineExecutor:
-    """
-    Orchestrates the ETL process: Extract -> Transform -> Load (Publish).
-    """
-    
-    def __init__(self, redis_client):
-        self.extractor = DataExtractor()
-        self.transformer = TransformationEngine()
-        self.redis = redis_client
+    async def extract_data(self, connection_id: str, query_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        # In a real impl, this calls Connector Service to get a stream or batch of data
+        logger.info(f"Extracting data from connection {connection_id}")
+        return [{"id": 1, "data": "mock"}]
 
-    async def run_job(self, job: IngestionJob):
-        logger.info(f"Starting Ingestion Job {job.job_id}")
+class PipelineOrchestrator:
+    """
+    Manages ingestion jobs and execution flow.
+    """
+    def __init__(self):
+        self.jobs: Dict[str, IngestionJob] = {}
+        self.extractor = DataExtractor("http://connector_service")
+        
+    async def create_job(self, job: IngestionJob) -> str:
+        if not job.job_id:
+            job.job_id = str(uuid.uuid4())
+        self.jobs[job.job_id] = job
+        logger.info(f"Created ingestion job {job.job_id}")
+        return job.job_id
+        
+    async def run_job(self, job_id: str):
+        job = self.jobs.get(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+            
+        job.status = "RUNNING"
+        logger.info(f"Running job {job_id}")
         
         try:
             # 1. Extract
-            raw_data = await self.extractor.fetch_data(job.source_connection_id, job.target_entity)
-            df = pd.DataFrame(raw_data)
+            data = await self.extractor.extract_data(job.connection_id, {})
             
-            # 2. Transform
-            if job.transformation_rules:
-                df = await self.transformer.apply_transformations(df, job.transformation_rules)
+            # 2. Transform (Transformation Engine integration would be here)
             
-            # 3. Load (Publish Event)
-            records = df.to_dict(orient='records')
+            # 3. Load (Publish to Ingestion Events for Database Service)
             
-            event_payload = {
-                "event_type": "data.ingested",
-                "job_id": job.job_id,
-                "target_entity": job.target_entity,
-                "timestamp": datetime.utcnow().isoformat(),
-                "record_count": len(records),
-                "sample_data": records[:5] # Don't send everything in event payload usually
-            }
-            
-            # Publish to Redis
-            # await self.redis.publish("ingestion.events", json.dumps(event_payload))
-            logger.info(f"Job {job.job_id} completed. Published {len(records)} records.")
-            
+            job.status = "COMPLETED"
+            job.last_run = datetime.utcnow()
         except Exception as e:
-            logger.error(f"Job {job.job_id} failed: {e}")
-            # Publish failure event
+            job.status = "FAILED"
+            logger.error(f"Job {job_id} failed: {e}")
+            
+        return job.status
+
+pipeline_orchestrator = PipelineOrchestrator()

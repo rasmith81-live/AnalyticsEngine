@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { DndContext } from '@dnd-kit/core';
 import SourceSchemaTree from './SourceSchemaTree';
 import TargetOntologyTree from './TargetOntologyTree';
 import { Box, Typography } from '@mui/material';

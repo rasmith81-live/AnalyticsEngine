@@ -550,4 +550,3 @@ async def export_metrics_to_observability(observability_url: str, push_gateway: 
         logger.error(f"Error exporting metrics: {str(e)}")
         raise
 
-# TODO: Implement additional metrics export methods as needed

@@ -1,0 +1,18 @@
+autoscaling:
+  enabled: true
+  maxReplicas: 10
+  minReplicas: 2
+  targetCPUUtilizationPercentage: 75
+env:
+  DEBUG: 'false'
+  LOG_LEVEL: INFO
+image:
+  pullPolicy: Always
+replicaCount: 2
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi

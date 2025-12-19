@@ -50,7 +50,8 @@ class SQLGenerator:
                     raise ValueError("count_distinct takes exactly 1 argument")
                 
                 if self.use_approximate:
-                    return f"approx_count_distinct({args[0]})"
+                    # TimescaleDB Toolkit HyperLogLog
+                    return f"distinct_count(hyperloglog({args[0]}))"
                 else:
                     return f"COUNT(DISTINCT {args[0]})"
             
@@ -59,8 +60,9 @@ class SQLGenerator:
                     raise ValueError("percentile takes exactly 2 arguments (column, percentile)")
                 
                 if self.use_approximate:
-                    # TimescaleDB Toolkit / UDDSketch or t-digest
-                    return f"approx_percentile({args[0]}, {args[1]})"
+                    # TimescaleDB Toolkit t-digest
+                    # approx_percentile(percentile, digest) where digest = percentile_agg(col)
+                    return f"approx_percentile({args[1]}, percentile_agg({args[0]}))"
                 else:
                     # Standard Postgres
                     return f"percentile_cont({args[1]}) WITHIN GROUP (ORDER BY {args[0]})"
@@ -69,7 +71,7 @@ class SQLGenerator:
                 # Explicit approximate call
                 if len(args) != 1:
                     raise ValueError("approx_distinct takes exactly 1 argument")
-                return f"approx_count_distinct({args[0]})"
+                return f"distinct_count(hyperloglog({args[0]}))"
                 
             elif func_name in ["last", "first"]:
                 if len(args) != 2:
