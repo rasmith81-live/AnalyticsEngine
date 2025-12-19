@@ -172,7 +172,7 @@ class TestCalculationEngine(unittest.TestCase):
         sql = generator.generate_query(parsed, table_name="events", approximate=True)
         print(f"   Generated SQL: {sql}")
         
-        self.assertIn("approx_count_distinct(UserId)", sql)
+        self.assertIn("distinct_count(hyperloglog(UserId))", sql)
         print("✅ Approximate SQL generated correctly")
 
     def test_sql_generator_last(self):
@@ -267,6 +267,21 @@ class TestCalculationEngine(unittest.TestCase):
         self.assertIn("'readings_hourly'", ddl)
         self.assertIn("INTERVAL '3 days'", ddl)
         print("✅ Refresh Policy DDL correct")
+
+    def test_retention_policy_ddl(self):
+        """Test generation of Retention Policy DDL."""
+        print("\nTesting Retention Policy DDL...")
+        manager = TimescaleManager()
+        
+        ddl = manager.generate_retention_policy_query(
+            table_name="readings",
+            drop_after="1 year"
+        )
+        
+        self.assertIn("add_retention_policy", ddl)
+        self.assertIn("'readings'", ddl)
+        self.assertIn("INTERVAL '1 year'", ddl)
+        print("✅ Retention Policy DDL correct")
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.core.security import decode_token, TokenPayload
+from app.core.security import verify_token, TokenPayload
 from app.core.cache import CacheService
 
 logger = get_logger(__name__)
@@ -141,7 +141,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         
         # Decode and validate token
         try:
-            payload = decode_token(token)
+            payload = await verify_token(token)
             
             # Cache valid token payload
             ttl = payload.exp - int(time.time())

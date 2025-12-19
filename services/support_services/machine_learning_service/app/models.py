@@ -1,5 +1,5 @@
 """
-Pydantic models for Service A API.
+Pydantic models for Machine Learning Service.
 """
 
 from datetime import datetime
@@ -9,193 +9,125 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, validator
 
 
-class ItemStatus(str, Enum):
-    """Item status enumeration."""
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    PENDING = "pending"
+class ModelType(str, Enum):
+    """Type of ML model."""
+    CLASSIFICATION = "classification"
+    REGRESSION = "regression"
+    CLUSTERING = "clustering"
+    TIME_SERIES = "time_series"
+    NLP = "nlp"
+
+
+class ModelStatus(str, Enum):
+    """Status of a model version."""
+    STAGING = "staging"
+    PRODUCTION = "production"
     ARCHIVED = "archived"
+    DEPRECATED = "deprecated"
 
 
-class ItemPriority(str, Enum):
-    """Item priority enumeration."""
-    LOW = "low"
-    NORMAL = "normal"
-    HIGH = "high"
-    CRITICAL = "critical"
+class JobStatus(str, Enum):
+    """Status of a training job."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 # Domain Models
-class ItemBase(BaseModel):
-    """Base item model."""
-    name: str = Field(..., description="Item name", min_length=1, max_length=255)
-    description: Optional[str] = Field(None, description="Item description", max_length=1000)
-    status: ItemStatus = Field(default=ItemStatus.ACTIVE, description="Item status")
-    priority: ItemPriority = Field(default=ItemPriority.NORMAL, description="Item priority")
+
+class MLModelBase(BaseModel):
+    """Base model for ML Model definition."""
+    name: str = Field(..., description="Model name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Model description")
+    type: ModelType = Field(..., description="Type of problem this model solves")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    
-    @validator('name')
-    def validate_name(cls, v):
-        if not v or len(v.strip()) == 0:
-            raise ValueError("Name cannot be empty")
-        return v.strip()
 
 
-class ItemCreate(ItemBase):
-    """Item creation model."""
+class MLModelCreate(MLModelBase):
+    """Model creation payload."""
     pass
 
 
-class ItemUpdate(BaseModel):
-    """Item update model."""
-    name: Optional[str] = Field(None, description="Item name", min_length=1, max_length=255)
-    description: Optional[str] = Field(None, description="Item description", max_length=1000)
-    status: Optional[ItemStatus] = Field(None, description="Item status")
-    priority: Optional[ItemPriority] = Field(None, description="Item priority")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-    
-    @validator('name')
-    def validate_name(cls, v):
-        if v is not None and (not v or len(v.strip()) == 0):
-            raise ValueError("Name cannot be empty")
-        return v.strip() if v else v
-
-
-class ItemResponse(ItemBase):
-    """Item response model."""
-    id: int = Field(..., description="Item ID")
-    uuid: str = Field(..., description="Item UUID")
+class MLModelResponse(MLModelBase):
+    """Model response."""
+    id: str = Field(..., description="Model UUID")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
-    version: int = Field(default=1, description="Item version for optimistic locking")
+    latest_version: Optional[str] = Field(None, description="Latest version number")
 
 
-class ItemListResponse(BaseModel):
-    """Item list response model."""
-    items: List[ItemResponse] = Field(..., description="List of items")
-    total_count: int = Field(..., description="Total number of items")
-    page: int = Field(..., description="Current page number")
-    page_size: int = Field(..., description="Page size")
-    has_next: bool = Field(..., description="Whether there are more pages")
+class ModelVersionBase(BaseModel):
+    """Base model for a specific version of a model."""
+    version: str = Field(..., description="Version string (e.g. 1.0.0)")
+    status: ModelStatus = Field(default=ModelStatus.STAGING, description="Deployment status")
+    hyperparameters: Dict[str, Any] = Field(default_factory=dict, description="Training hyperparameters")
+    metrics: Dict[str, float] = Field(default_factory=dict, description="Performance metrics (accuracy, etc)")
+    artifact_url: Optional[str] = Field(None, description="URL/Path to the serialized model artifact")
 
 
-# Analytics Models
-class ItemAnalytics(BaseModel):
-    """Item analytics model."""
-    total_items: int = Field(..., description="Total number of items")
-    items_by_status: Dict[str, int] = Field(..., description="Items grouped by status")
-    items_by_priority: Dict[str, int] = Field(..., description="Items grouped by priority")
-    recent_activity: List[Dict[str, Any]] = Field(..., description="Recent activity")
-    trends: Dict[str, Any] = Field(..., description="Trend data")
-    created_at: datetime = Field(..., description="Analytics generation timestamp")
+class ModelVersionCreate(ModelVersionBase):
+    """Payload to register a new version."""
+    model_id: str = Field(..., description="Parent Model ID")
 
 
-class ItemMetrics(BaseModel):
-    """Item metrics model."""
-    service_name: str = Field(..., description="Service name")
-    timestamp: datetime = Field(..., description="Metrics timestamp")
-    total_items: int = Field(..., description="Total items count")
-    active_items: int = Field(..., description="Active items count")
-    items_created_today: int = Field(..., description="Items created today")
-    items_updated_today: int = Field(..., description="Items updated today")
-    avg_processing_time: float = Field(..., description="Average processing time in seconds")
-    error_rate: float = Field(..., description="Error rate percentage")
+class ModelVersionResponse(ModelVersionBase):
+    """Model version response."""
+    id: str = Field(..., description="Version UUID")
+    model_id: str = Field(..., description="Parent Model ID")
+    created_at: datetime = Field(..., description="Creation timestamp")
 
 
-# Event Models
-class ItemEvent(BaseModel):
-    """Item domain event model."""
-    event_type: str = Field(..., description="Event type")
-    item_id: int = Field(..., description="Item ID")
-    item_uuid: str = Field(..., description="Item UUID")
-    event_data: Dict[str, Any] = Field(..., description="Event data")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Event metadata")
-    
-    @validator('event_type')
-    def validate_event_type(cls, v):
-        allowed_types = [
-            "item.created", "item.updated", "item.deleted",
-            "item.status_changed", "item.priority_changed"
-        ]
-        if v not in allowed_types:
-            raise ValueError(f"Event type must be one of: {allowed_types}")
-        return v
+class TrainingJobBase(BaseModel):
+    """Base model for a training job."""
+    model_id: str = Field(..., description="ID of the model to train")
+    dataset_id: str = Field(..., description="ID of the training dataset")
+    hyperparameters: Dict[str, Any] = Field(default_factory=dict, description="Overrides for default hyperparameters")
 
 
-class EventCallback(BaseModel):
-    """Event callback payload model."""
-    subscription_id: str = Field(..., description="Subscription ID")
-    message_id: str = Field(..., description="Message ID")
-    channel: str = Field(..., description="Source channel")
-    payload: Union[Dict[str, Any], str] = Field(..., description="Event payload")
-    metadata: Dict[str, Any] = Field(..., description="Event metadata")
-    delivery_attempt: int = Field(..., description="Delivery attempt number")
-    delivered_at: datetime = Field(..., description="Delivery timestamp")
+class TrainingJobCreate(TrainingJobBase):
+    """Payload to launch a training job."""
+    pass
 
 
-# Command Models (CQRS)
-class CreateItemCommand(BaseModel):
-    """Command to create an item."""
-    command_type: str = Field(default="create_item", description="Command type")
-    data: ItemCreate = Field(..., description="Item creation data")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Command metadata")
+class TrainingJobResponse(TrainingJobBase):
+    """Training job response."""
+    id: str = Field(..., description="Job UUID")
+    status: JobStatus = Field(..., description="Current status")
+    progress: int = Field(default=0, ge=0, le=100, description="Progress percentage")
+    started_at: datetime = Field(..., description="Start timestamp")
+    finished_at: Optional[datetime] = Field(None, description="Completion timestamp")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    resulting_version_id: Optional[str] = Field(None, description="ID of the created model version if successful")
 
 
-class UpdateItemCommand(BaseModel):
-    """Command to update an item."""
-    command_type: str = Field(default="update_item", description="Command type")
-    item_id: int = Field(..., description="Item ID to update")
-    data: ItemUpdate = Field(..., description="Item update data")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Command metadata")
+# Inference Models
+
+class InferenceRequest(BaseModel):
+    """Request for model inference."""
+    model_id: str = Field(..., description="Model ID to predict with")
+    version: Optional[str] = Field(None, description="Specific version to use (default: production)")
+    features: Union[List[Dict[str, Any]], Dict[str, Any]] = Field(..., description="Input features (single dict or list of dicts)")
 
 
-class DeleteItemCommand(BaseModel):
-    """Command to delete an item."""
-    command_type: str = Field(default="delete_item", description="Command type")
-    item_id: int = Field(..., description="Item ID to delete")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Command metadata")
+class PredictionResult(BaseModel):
+    """Single prediction result."""
+    prediction: Any = Field(..., description="The predicted value/class")
+    probability: Optional[float] = Field(None, description="Confidence score/probability")
+    explanation: Optional[Dict[str, float]] = Field(None, description="Feature attribution/explanation")
 
 
-# Query Models (CQRS)
-class GetItemQuery(BaseModel):
-    """Query to get an item by ID."""
-    query_type: str = Field(default="get_item", description="Query type")
-    item_id: int = Field(..., description="Item ID")
-    include_metadata: bool = Field(default=True, description="Include metadata in response")
+class InferenceResponse(BaseModel):
+    """Response from inference endpoint."""
+    model_id: str = Field(..., description="Model ID used")
+    version: str = Field(..., description="Model version used")
+    results: List[PredictionResult] = Field(..., description="List of predictions")
+    inference_time_ms: float = Field(..., description="Time taken to compute predictions")
 
 
-class ListItemsQuery(BaseModel):
-    """Query to list items with filters."""
-    query_type: str = Field(default="list_items", description="Query type")
-    status: Optional[ItemStatus] = Field(None, description="Filter by status")
-    priority: Optional[ItemPriority] = Field(None, description="Filter by priority")
-    search: Optional[str] = Field(None, description="Search term")
-    page: int = Field(default=1, description="Page number", ge=1)
-    page_size: int = Field(default=20, description="Page size", ge=1, le=100)
-    sort_by: str = Field(default="created_at", description="Sort field")
-    sort_order: str = Field(default="desc", description="Sort order")
-    
-    @validator('sort_order')
-    def validate_sort_order(cls, v):
-        if v not in ['asc', 'desc']:
-            raise ValueError("Sort order must be 'asc' or 'desc'")
-        return v
+# Health and Status Models (kept from template)
 
-
-class GetAnalyticsQuery(BaseModel):
-    """Query to get analytics data."""
-    query_type: str = Field(default="get_analytics", description="Query type")
-    start_date: Optional[datetime] = Field(None, description="Start date for analytics")
-    end_date: Optional[datetime] = Field(None, description="End date for analytics")
-    include_trends: bool = Field(default=True, description="Include trend analysis")
-    group_by: Optional[str] = Field(None, description="Group analytics by field")
-
-
-# Health and Status Models
 class DependencyStatus(BaseModel):
     """Dependency status model."""
     service_name: str = Field(..., description="Dependency service name")
@@ -217,7 +149,8 @@ class ServiceHealth(BaseModel):
     error: Optional[str] = Field(None, description="Error message if unhealthy")
 
 
-# Error Models
+# Error Models (kept from template)
+
 class ErrorResponse(BaseModel):
     """Error response model."""
     error: str = Field(..., description="Error message")

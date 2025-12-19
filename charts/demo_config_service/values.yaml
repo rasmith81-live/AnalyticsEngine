@@ -1,0 +1,38 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+env:
+  BATCH_INTEGRATION_HOURS_PER_OBJECT: '8'
+  DATABASE_SERVICE_URL: http://database_service:8000
+  DEFAULT_HOURLY_RATE: '150.0'
+  ENABLE_DISTRIBUTED_TRACING: 'true'
+  ENABLE_PROMETHEUS_METRICS: 'true'
+  MESSAGING_SERVICE_URL: http://messaging_service:8000
+  METADATA_SERVICE_URL: http://business_metadata:8000
+  METRICS_PUSH_INTERVAL: '15'
+  OBSERVABILITY_SERVICE_URL: http://observability_service:8000
+  OTEL_EXPORTER_OTLP_CERTIFICATE: /certs/server.crt
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://observability_service:4317
+  OTEL_EXPORTER_OTLP_INSECURE: 'false'
+  PROMETHEUS_PUSH_GATEWAY: http://prometheus-pushgateway:9091
+  PYTHONPATH: .
+  REALTIME_INTEGRATION_HOURS_PER_OBJECT: '16'
+  SERVICE_NAME: demo_config_service
+image:
+  pullPolicy: IfNotPresent
+  repository: analytics-engine/demo_config_service
+  tag: latest
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  port: 8022
+  targetPort: 8000
+  type: ClusterIP

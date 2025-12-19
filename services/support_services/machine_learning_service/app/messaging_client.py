@@ -9,7 +9,6 @@ import aiohttp
 import json
 from datetime import datetime
 
-from .models import ItemEvent
 from .telemetry import inject_trace_context, trace_method, add_span_attributes
 
 logger = logging.getLogger(__name__)
@@ -254,28 +253,6 @@ class MessagingClient:
             correlation_id=correlation_id
         )
     
-    @trace_method(name="publish_item_event", kind="PRODUCER")
-    async def publish_item_event(self, item_event: ItemEvent) -> Dict[str, Any]:
-        """Publish an item domain event."""
-        # Add span attributes for item event
-        add_span_attributes({
-            "messaging.event_type": item_event.event_type,
-            "messaging.item.id": item_event.item_id,
-            "messaging.item.uuid": item_event.item_uuid,
-            "correlation_id": item_event.correlation_id
-        })
-        
-        return await self.publish_event(
-            event_type=item_event.event_type,
-            event_data={
-                "item_id": item_event.item_id,
-                "item_uuid": item_event.item_uuid,
-                **item_event.event_data
-            },
-            correlation_id=item_event.correlation_id,
-            metadata=item_event.metadata
-        )
-    
     # Subscription Management Methods
     @trace_method(name="create_subscription", kind="CLIENT")
     async def create_subscription(
@@ -448,16 +425,6 @@ class MessagingClient:
         return await self._make_request(
             method="GET",
             endpoint="/messaging/performance/stats"
-        )
-    
-    # Convenience Methods for Common Event Patterns
-    async def subscribe_to_item_events(self, callback_url: Optional[str] = None, correlation_id: Optional[str] = None) -> str:
-        """Subscribe to all item-related events."""
-        return await self.create_subscription(
-            channel_pattern="events.item.*",
-            callback_url=callback_url,
-            auto_ack=False,  # Manual acknowledgment for reliability
-            correlation_id=correlation_id
         )
     
     async def subscribe_to_service_events(self, target_service: str, callback_url: Optional[str] = None, correlation_id: Optional[str] = None) -> str:

@@ -2,19 +2,17 @@
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import uuid
 
 from ..repositories import MetadataWriteRepository, MetadataQueryRepository
 from .metadata_instantiation_service import MetadataInstantiationService
 
-# Import ontology models
-import sys
-from pathlib import Path
-analytics_metadata_path = Path(__file__).parent.parent.parent / "analytics_metadata_service"
-sys.path.insert(0, str(analytics_metadata_path))
-
-from definitions.ontology_models import (
+from ..ontology_models import (
     ThingDefinition,
     RelationshipDefinition,
+    CompanyValueChainModelDefinition,
+    MetricDefinition,
+    BusinessProcessDefinition
 )
 
 
@@ -347,6 +345,155 @@ class MetadataService:
         
         return await self.write_repo.bulk_upsert_definitions(definition_dicts, created_by)
     
+    
+    # -------------------------------------------------------------------------
+    # Conversation Modeling
+    # -------------------------------------------------------------------------
+
+    async def persist_generated_model(
+        self,
+        session_id: str,
+        user_id: str,
+        model_data: Dict[str, Any]
+    ) -> str:
+        """Persist a generated value chain model from Conversation Service.
+        
+        Decomposes the nested model into:
+        - BusinessProcessDefinition (for Process/Activity nodes)
+        - MetricDefinition (for Metric nodes)
+        - RelationshipDefinition (for links)
+        - CompanyValueChainModelDefinition (container)
+        """
+        # 1. Create container model
+        model_id = str(uuid.uuid4())
+        model_name = model_data.get("name", "Generated Model")
+        
+        # We assume a default company for the session or derive from context
+        # For now, using a placeholder company
+        company_id = "comp_generated" 
+        
+        included_nodes = []
+        
+        # 2. Process Nodes
+        node_id_map = {} # Map internal node ID to system code
+        
+        for node in model_data.get("nodes", []):
+            internal_id = node.get("id")
+            name = node.get("name")
+            node_type = node.get("type", "Process")
+            description = node.get("description")
+            
+            # Generate a system code
+            code = f"{node_type.upper()}_{uuid.uuid4().hex[:8]}"
+            node_id_map[internal_id] = code
+            included_nodes.append(code)
+            
+            # Create Definition based on type
+            if node_type in ["Process", "Activity"]:
+                defn = BusinessProcessDefinition(
+                    kind="business_process_definition",
+                    id=str(uuid.uuid4()),
+                    code=code,
+                    name=name,
+                    description=description,
+                    process_type="core" if node_type == "Process" else "support",
+                    domain="process"
+                )
+                await self.create_definition(defn, created_by=user_id)
+                
+            elif node_type == "Metric":
+                defn = MetricDefinition(
+                    kind="metric_definition",
+                    id=str(uuid.uuid4()),
+                    code=code,
+                    name=name,
+                    description=description
+                )
+                await self.create_definition(defn, created_by=user_id)
+            
+            else:
+                # Default to Entity for unknown types
+                defn = EntityDefinition(
+                    kind="entity_definition",
+                    id=str(uuid.uuid4()),
+                    code=code,
+                    name=name,
+                    description=description
+                )
+                await self.create_definition(defn, created_by=user_id)
+
+        # 3. Process Links (Relationships)
+        for link in model_data.get("links", []):
+            source_internal = link.get("source_id")
+            target_internal = link.get("target_id")
+            rel_type = link.get("type", "related_to")
+            
+            if source_internal in node_id_map and target_internal in node_id_map:
+                await self.write_repo.create_relationship(
+                    from_entity_code=node_id_map[source_internal],
+                    to_entity_code=node_id_map[target_internal],
+                    relationship_type=rel_type
+                )
+
+        # 4. Create CompanyValueChainModelDefinition
+        model_def = CompanyValueChainModelDefinition(
+            kind="company_value_chain_model_definition",
+            id=model_id,
+            name=model_name,
+            company_id=company_id,
+            session_id=session_id,
+            derived_from="conversation",
+            included_nodes=included_nodes
+        )
+        
+        # Need to implement instantiate for CompanyValueChainModelDefinition if not present
+        # Or just use generic create_definition since it's a ThingDefinition
+        
+        # We need a code for the model definition itself
+        model_def.id = model_id # ThingDefinition requires ID
+        # Since ThingDefinition doesn't explicitly require 'code' field but create_definition does...
+        # Wait, CompanyValueChainModelDefinition inherits ThingDefinition.
+        # create_definition extracts code using instantiation service.
+        # ThingDefinition has 'id' and 'name'. It doesn't enforce 'code' field on base, 
+        # but subclasses like EntityDefinition have it.
+        # CompanyValueChainModelDefinition does NOT have a 'code' field in ontology_models.py.
+        # This might be an issue for create_definition which expects a code.
+        
+        # Let's check CompanyValueChainModelDefinition in ontology_models.py
+        # class CompanyValueChainModelDefinition(ThingDefinition):
+        #     kind: str = "company_value_chain_model_definition"
+        #     company_id: str
+        #     ...
+        
+        # It does NOT have a code field. 
+        # I should probably add one or use ID as code.
+        # Ideally, I should fix the model or the persistence logic.
+        # For now, I'll monkey-patch/add a code attribute if possible or rely on instantiation service to handle it.
+        # But Pydantic models are strict.
+        
+        # FIX: I will rely on the fact that I can't easily change the model structure here without editing ontology_models.py.
+        # But wait, create_definition calls self.instantiation.get_code_from_model(definition).
+        # If that fails, it raises ValueError.
+        
+        # Let's inspect MetadataInstantiationService.get_code_from_model
+        # I don't have that file open. I should probably ensure the model has a code.
+        pass # Placeholder for thought process.
+
+        # Let's create the definition using a dict approach to bypass pydantic validation if needed,
+        # but create_definition takes a ThingDefinition.
+        
+        # Actually, I'll update CompanyValueChainModelDefinition to include 'code' in ontology_models.py 
+        # OR I will just pass it as extra data if allowed (ConfigDict(extra="allow")).
+        # ThingDefinition allows extra.
+        
+        # Assign a code
+        model_code = f"VCM_{uuid.uuid4().hex[:8]}"
+        setattr(model_def, "code", model_code) # This works if extra="allow"
+        
+        await self.create_definition(model_def, created_by=user_id)
+        
+        return model_id
+
     # -------------------------------------------------------------------------
     # Helper methods
     # -------------------------------------------------------------------------

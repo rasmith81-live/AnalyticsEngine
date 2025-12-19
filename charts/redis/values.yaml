@@ -1,0 +1,22 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+env: {}
+image:
+  pullPolicy: IfNotPresent
+  repository: redis/redis-stack
+  tag: latest
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  port: 6379
+  targetPort: 6379
+  type: ClusterIP

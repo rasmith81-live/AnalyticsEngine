@@ -2,177 +2,78 @@
 
 ## Overview
 
-Service A - Business logic service demonstrating CQRS and event-driven architecture.
+Machine Learning Service - Manages ML Models, Training Jobs, and Inference.
 
 This service:
-- Uses Database Service for all CQRS operations
-- Uses Messaging Service for event publishing and subscription
-- Implements business logic for item management
-- Demonstrates real-time processing and analytics
+- Uses Database Service for metadata persistence (via messaging/CQRS pattern)
+- Uses Messaging Service for event publishing (Training Jobs)
+- Exposes API for Model Registry and Inference
 
 ## Data Models
 
-### `ItemBase`
+### `MLModelBase`
 
-Base item model.
+Base model for ML Model definition.
 
 **Fields:**
 
 - `name`: `str`
 - `description`: `Optional[str]`
-- `status`: `ItemStatus`
-- `priority`: `ItemPriority`
+- `type`: `ModelType`
 - `metadata`: `Dict[str, Any]`
 
-### `ItemUpdate`
+### `ModelVersionBase`
 
-Item update model.
-
-**Fields:**
-
-- `name`: `Optional[str]`
-- `description`: `Optional[str]`
-- `status`: `Optional[ItemStatus]`
-- `priority`: `Optional[ItemPriority]`
-- `metadata`: `Optional[Dict[str, Any]]`
-
-### `ItemListResponse`
-
-Item list response model.
+Base model for a specific version of a model.
 
 **Fields:**
 
-- `items`: `List[ItemResponse]`
-- `total_count`: `int`
-- `page`: `int`
-- `page_size`: `int`
-- `has_next`: `bool`
+- `version`: `str`
+- `status`: `ModelStatus`
+- `hyperparameters`: `Dict[str, Any]`
+- `metrics`: `Dict[str, float]`
+- `artifact_url`: `Optional[str]`
 
-### `ItemAnalytics`
+### `TrainingJobBase`
 
-Item analytics model.
-
-**Fields:**
-
-- `total_items`: `int`
-- `items_by_status`: `Dict[str, int]`
-- `items_by_priority`: `Dict[str, int]`
-- `recent_activity`: `List[Dict[str, Any]]`
-- `trends`: `Dict[str, Any]`
-- `created_at`: `datetime`
-
-### `ItemMetrics`
-
-Item metrics model.
+Base model for a training job.
 
 **Fields:**
 
-- `service_name`: `str`
-- `timestamp`: `datetime`
-- `total_items`: `int`
-- `active_items`: `int`
-- `items_created_today`: `int`
-- `items_updated_today`: `int`
-- `avg_processing_time`: `float`
-- `error_rate`: `float`
+- `model_id`: `str`
+- `dataset_id`: `str`
+- `hyperparameters`: `Dict[str, Any]`
 
-### `ItemEvent`
+### `InferenceRequest`
 
-Item domain event model.
+Request for model inference.
 
 **Fields:**
 
-- `event_type`: `str`
-- `item_id`: `int`
-- `item_uuid`: `str`
-- `event_data`: `Dict[str, Any]`
-- `correlation_id`: `Optional[str]`
-- `metadata`: `Dict[str, Any]`
+- `model_id`: `str`
+- `version`: `Optional[str]`
+- `features`: `Union[List[Dict[str, Any]], Dict[str, Any]]`
 
-### `EventCallback`
+### `PredictionResult`
 
-Event callback payload model.
+Single prediction result.
 
 **Fields:**
 
-- `subscription_id`: `str`
-- `message_id`: `str`
-- `channel`: `str`
-- `payload`: `Union[Dict[str, Any], str]`
-- `metadata`: `Dict[str, Any]`
-- `delivery_attempt`: `int`
-- `delivered_at`: `datetime`
+- `prediction`: `Any`
+- `probability`: `Optional[float]`
+- `explanation`: `Optional[Dict[str, float]]`
 
-### `CreateItemCommand`
+### `InferenceResponse`
 
-Command to create an item.
+Response from inference endpoint.
 
 **Fields:**
 
-- `command_type`: `str`
-- `data`: `ItemCreate`
-- `correlation_id`: `Optional[str]`
-- `metadata`: `Dict[str, Any]`
-
-### `UpdateItemCommand`
-
-Command to update an item.
-
-**Fields:**
-
-- `command_type`: `str`
-- `item_id`: `int`
-- `data`: `ItemUpdate`
-- `correlation_id`: `Optional[str]`
-- `metadata`: `Dict[str, Any]`
-
-### `DeleteItemCommand`
-
-Command to delete an item.
-
-**Fields:**
-
-- `command_type`: `str`
-- `item_id`: `int`
-- `correlation_id`: `Optional[str]`
-- `metadata`: `Dict[str, Any]`
-
-### `GetItemQuery`
-
-Query to get an item by ID.
-
-**Fields:**
-
-- `query_type`: `str`
-- `item_id`: `int`
-- `include_metadata`: `bool`
-
-### `ListItemsQuery`
-
-Query to list items with filters.
-
-**Fields:**
-
-- `query_type`: `str`
-- `status`: `Optional[ItemStatus]`
-- `priority`: `Optional[ItemPriority]`
-- `search`: `Optional[str]`
-- `page`: `int`
-- `page_size`: `int`
-- `sort_by`: `str`
-- `sort_order`: `str`
-
-### `GetAnalyticsQuery`
-
-Query to get analytics data.
-
-**Fields:**
-
-- `query_type`: `str`
-- `start_date`: `Optional[datetime]`
-- `end_date`: `Optional[datetime]`
-- `include_trends`: `bool`
-- `group_by`: `Optional[str]`
+- `model_id`: `str`
+- `version`: `str`
+- `results`: `List[PredictionResult]`
+- `inference_time_ms`: `float`
 
 ### `DependencyStatus`
 

@@ -23,6 +23,10 @@ class BusinessIntent(BaseModel):
     confidence: float
     parameters: Dict[str, Any] = {}
     description: Optional[str] = None
+    # Enhanced fields for Pattern Matching
+    domain: str = "general"
+    target_entities: List[str] = []
+    requested_metrics: List[str] = []
 
 class InterviewSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -63,3 +67,10 @@ class ChatResponse(BaseModel):
     session_id: str
     message: str
     intents: List[BusinessIntent] = []
+
+class MapDefinitionRequest(BaseModel):
+    definition: str
+
+class RecommendStrategyRequest(BaseModel):
+    business_description: str
+    use_cases: List[str]

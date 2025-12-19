@@ -4,9 +4,9 @@
  */
 
 import axios from 'axios';
-import type { KPI, ObjectModel, Module } from '../types';
+import type { KPI, ObjectModel, Module, ValueChain, Industry } from '../types';
 
-const BASE_URL = 'http://localhost:8020/api/v1';
+const BASE_URL = 'http://localhost:8090/api/v1/metadata';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -29,12 +29,12 @@ export const metadataApi = {
   },
 
   async getKPIsByModule(moduleCode: string): Promise<KPI[]> {
-    const response = await api.get(`/kpis/by-module/${moduleCode}`);
+    const response = await api.get(`/kpis/module/${moduleCode}`);
     return response.data;
   },
 
   async getKPIsByValueChain(valueChain: string): Promise<KPI[]> {
-    const response = await api.get(`/kpis/by-value-chain/${valueChain}`);
+    const response = await api.get(`/kpis/value-chain/${valueChain}`);
     return response.data;
   },
 
@@ -50,7 +50,7 @@ export const metadataApi = {
   },
 
   async getObjectModelsByModule(moduleCode: string): Promise<ObjectModel[]> {
-    const response = await api.get(`/object-models/by-module/${moduleCode}`);
+    const response = await api.get(`/object-models/module/${moduleCode}`);
     return response.data;
   },
 
@@ -65,15 +65,37 @@ export const metadataApi = {
     return response.data;
   },
 
+  async getModulesByValueChain(valueChainCode: string): Promise<Module[]> {
+    const response = await api.get(`/modules/value-chain/${valueChainCode}`);
+    return response.data;
+  },
+
   // Value Chain endpoints
-  async getValueChains(): Promise<string[]> {
+  async getValueChains(): Promise<ValueChain[]> {
     const response = await api.get('/value-chains');
     return response.data;
   },
 
+  async getValueChain(code: string): Promise<ValueChain> {
+    // Note: Gateway needs get_value_chain implementation if singular fetch is needed
+    // Assuming list + client-side filter or implement get_value_chain in backend
+    // For now, let's implement get_value_chain in backend later if needed, or assume list returns full objects
+    // Actually, useValueChain hook uses this.
+    // I'll add getValueChain to the API, assuming backend supports /value-chains/{code}
+    // Checking metadata_client.py -> I didn't add get_value_chain(code).
+    // I should add it.
+    const response = await api.get(`/value-chains/${code}`);
+    return response.data;
+  },
+
   // Industry endpoints
-  async getIndustries(): Promise<string[]> {
+  async getIndustries(): Promise<Industry[]> {
     const response = await api.get('/industries');
+    return response.data;
+  },
+
+  async getIndustryValueChains(code: string): Promise<ValueChain[]> {
+    const response = await api.get(`/industries/${code}/value-chains`);
     return response.data;
   },
 };

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Generic Mock Service that can simulate any HTTP dependency
+  mock_service:
+    build:
+      context: tests/mocks
+      dockerfile: Dockerfile
+    ports:
+      - "8099:8000"
+    environment:
+      - SERVICE_NAME=mock_service
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/_mock/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - default
+
+  # Configure API Gateway to use Mock OIDC
+  api_gateway:
+    environment:
+      - AUTH_METHOD=oidc
+      - OIDC_ISSUER=http://mock_service:8000/mock-tenant-id/v2.0
+      - OIDC_JWKS_URI=http://mock_service:8000/mock-tenant-id/discovery/v2.0/keys
+      - OIDC_CLIENT_ID=mock-client-id
+      - OIDC_AUDIENCE=mock-client-id
+
+networks:
+  default:
+    driver: bridge

@@ -1,0 +1,45 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+env:
+  ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+  API_KEYS: '{}'
+  API_KEY_HEADER: X-API-Key
+  BATCH_SIZE: '1000'
+  DEBUG: 'true'
+  ELASTICSEARCH_URL: none
+  HOST: 0.0.0.0
+  LOGS_INDEX: service-logs
+  LOGS_RETENTION_DAYS: '14'
+  MESSAGING_SERVICE_URL: http://messaging_service:8000
+  METRICS_RETENTION_DAYS: '30'
+  NOTIFICATION_ENDPOINTS: '{"email":"none","slack":"none"}'
+  OPENTELEMETRY_ENDPOINT: 0.0.0.0:4317
+  OTLP_ENDPOINT: 0.0.0.0:4317
+  PORT: '8000'
+  PROMETHEUS_ENDPOINT: http://localhost:9090
+  PYTHONPATH: .
+  REDIS_URL: redis://redis:6379/0
+  SERVICE_NAME: observability_service
+  SERVICE_URL: http://observability_service:8000
+  TIMESCALE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+  TRACES_RETENTION_DAYS: '7'
+  WORKER_THREADS: '4'
+image:
+  pullPolicy: IfNotPresent
+  repository: analytics-engine/observability_service
+  tag: latest
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  port: 8080
+  targetPort: 8000
+  type: ClusterIP

@@ -2,8 +2,8 @@
 
 from datetime import datetime
 from uuid import uuid4
-from sqlalchemy import Column, String, Boolean, Index
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB, TIMESTAMPTZ
+from sqlalchemy import Column, String, Boolean, Index, TIMESTAMP
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 import sys
 from pathlib import Path
@@ -28,8 +28,8 @@ class MetadataRelationship(Base):
     relationship_type = Column(String(100), nullable=False, index=True)
     from_cardinality = Column(String(20))
     to_cardinality = Column(String(20))
-    metadata = Column(JSONB)
-    created_at = Column(TIMESTAMPTZ, nullable=False, default=datetime.utcnow)
+    metadata_ = Column("metadata", JSONB)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     
     __table_args__ = (

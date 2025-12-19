@@ -32,7 +32,7 @@ The project uses a microservices architecture with clear separation of concerns:
 
 #### 3. **Archival Service** (`archival_service`)
 - **Purpose**: TimescaleDB data archival to lakehouse
-- **Port**: 8004
+- **Port**: 8005
 - **Features**:
   - Automated data retention policies
   - Lakehouse integration (Azure Storage)
@@ -58,7 +58,7 @@ The project uses a microservices architecture with clear separation of concerns:
 
 ### Business Services (Domain Logic)
 
-#### 1. **Analytics Metadata Service** (`analytics_metadata_service`)
+#### 1. **Business Metadata Service** (`business_metadata`)
 - **Purpose**: Single source of truth for KPI, Object Model, Module, and Value Chain definitions
 - **Port**: 8020
 - **Features**:
@@ -67,23 +67,39 @@ The project uses a microservices architecture with clear separation of concerns:
   - Module and value chain registry
   - Industry standards integration (SCOR, etc.)
 
-#### 2. **Systems Monitor** (`systems_monitor`)
+#### 2. **Demo Config Service** (`demo_config_service`)
+- **Port**: 8022
+- **Purpose**: Simulation configuration, proposals, and scenario generation
+
+#### 3. **Connector Service** (`connector_service`)
+- **Port**: 8023
+- **Purpose**: Data connectivity and adapters for external sources
+
+#### 4. **Ingestion Service** (`ingestion_service`)
+- **Port**: 8024
+- **Purpose**: Data movement, scheduling, and transformation
+
+#### 5. **Metadata Ingestion Service** (`metadata_ingestion_service`)
+- **Port**: 8025
+- **Purpose**: Excel/CSV bulk import, formula validation, and ontology mapping
+
+#### 6. **Conversation Service** (`conversation_service`)
+- **Port**: 8026
+- **Purpose**: Chatbot-driven value chain design and intent extraction
+
+#### 7. **Systems Monitor** (`systems_monitor`)
 - **Port**: 8010
 - **Purpose**: System health and performance monitoring
 
-#### 3. **Controller Service** (`controller_service`)
-- **Port**: 8011
-- **Purpose**: Orchestration and workflow management
-
-#### 4. **Entity Resolution Service** (`entity_resolution_service`)
+#### 8. **Entity Resolution Service** (`entity_resolution_service`)
 - **Port**: 8012
 - **Purpose**: Entity matching and deduplication
 
-#### 5. **Data Governance Service** (`data_governance_service`)
+#### 9. **Data Governance Service** (`data_governance_service`)
 - **Port**: 8013
 - **Purpose**: Data quality and compliance management
 
-#### 6. **Machine Learning Service** (`machine_learning_service`)
+#### 10. **Machine Learning Service** (`machine_learning_service`)
 - **Port**: 8014
 - **Purpose**: ML model training and inference
 

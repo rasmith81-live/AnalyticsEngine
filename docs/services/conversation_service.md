@@ -29,6 +29,9 @@ No overview provided.
 - `confidence`: `float`
 - `parameters`: `Dict[str, Any]`
 - `description`: `Optional[str]`
+- `domain`: `str`
+- `target_entities`: `List[str]`
+- `requested_metrics`: `List[str]`
 
 ### `InterviewSession`
 
@@ -99,4 +102,21 @@ No overview provided.
 - `session_id`: `str`
 - `message`: `str`
 - `intents`: `List[BusinessIntent]`
+
+### `MapDefinitionRequest`
+
+
+
+**Fields:**
+
+- `definition`: `str`
+
+### `RecommendStrategyRequest`
+
+
+
+**Fields:**
+
+- `business_description`: `str`
+- `use_cases`: `List[str]`
 

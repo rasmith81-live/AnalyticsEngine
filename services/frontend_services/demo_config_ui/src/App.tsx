@@ -11,6 +11,12 @@ import ObjectModelsBrowser from './pages/ObjectModelsBrowser';
 import RequiredObjectsView from './pages/RequiredObjectsView';
 import DataSourceConfig from './pages/DataSourceConfig';
 import ServiceProposal from './pages/ServiceProposal';
+import AdminPage from './pages/AdminPage';
+import GovernancePage from './pages/GovernancePage';
+import ExcelImportPage from './pages/ExcelImportPage';
+import OntologyManagerPage from './pages/OntologyManagerPage';
+import SimulationPage from './pages/SimulationPage';
+import MLDashboardPage from './pages/MLDashboardPage';
 import Layout from './components/Layout';
 import { CartProvider } from './contexts/CartContext';
 
@@ -56,6 +62,12 @@ function App() {
                 <Route path="/required-objects-view" element={<RequiredObjectsView />} />
                 <Route path="/data-sources" element={<DataSourceConfig />} />
                 <Route path="/proposal" element={<ServiceProposal />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/governance" element={<GovernancePage />} />
+                <Route path="/excel-import" element={<ExcelImportPage />} />
+                <Route path="/ontology-studio" element={<OntologyManagerPage />} />
+                <Route path="/simulation" element={<SimulationPage />} />
+                <Route path="/ml-registry" element={<MLDashboardPage />} />
               </Routes>
             </Layout>
           </BrowserRouter>

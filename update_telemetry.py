@@ -1,4 +1,7 @@
-"""
+
+import os
+
+content = r'''"""
 Telemetry module for distributed tracing with OpenTelemetry.
 
 This module provides functionality for:
@@ -16,20 +19,114 @@ import inspect
 import uuid
 
 # OpenTelemetry imports
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult, TraceIdRatioBased
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import grpc
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.trace import SpanKind, Status, StatusCode
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult, TraceIdRatioBased
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    import grpc
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.trace import SpanKind, Status, StatusCode
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+    # Define dummy classes and constants
+    class SpanKind:
+        INTERNAL = "INTERNAL"
+        CLIENT = "CLIENT"
+        SERVER = "SERVER"
+        PRODUCER = "PRODUCER"
+        CONSUMER = "CONSUMER"
+        
+    class StatusCode:
+        OK = "OK"
+        ERROR = "ERROR"
+        UNSET = "UNSET"
+        
+    class Status:
+        def __init__(self, status_code, description=None):
+            pass
+
+    class Sampler:
+        pass
+        
+    class SpanExporter:
+        pass
+
+    class SpanExportResult:
+        SUCCESS = 0
+        FAILURE = 1
+
+    class Decision:
+        RECORD_AND_SAMPLE = 2
+
+    class SamplingResult:
+        def __init__(self, decision):
+            pass
+
+    class TraceIdRatioBased(Sampler):
+        def __init__(self, rate):
+            pass
+
+    class ParentBased(Sampler):
+        def __init__(self, root):
+            pass
+
+    class MockSpan:
+        def get_span_context(self):
+            return None
+        def set_attribute(self, key, value):
+            pass
+        def set_status(self, status):
+            pass
+        def record_exception(self, exception):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+        @property
+        def context(self):
+            # Return a dummy context with trace_id for ErrorFilteringExporter
+            class Context:
+                trace_id = 0
+            return Context()
+        @property
+        def status(self):
+            # Return a dummy status
+            class Status:
+                status_code = StatusCode.OK
+            return Status()
+
+    class MockTrace:
+        def get_tracer_provider(self):
+            return None
+        def get_tracer(self, name):
+            return None
+        def get_current_span(self, context=None):
+            return MockSpan()
+        def set_tracer_provider(self, provider):
+            pass
+        def start_span(self, name, kind=None):
+            return MockSpan()
+        def start_as_current_span(self, name, kind=None):
+            return MockSpan()
+
+    trace = MockTrace()
+    
+    # Mock TraceContextTextMapPropagator
+    class TraceContextTextMapPropagator:
+        def inject(self, carrier):
+            pass
+        def extract(self, carrier):
+            return None
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -56,6 +153,10 @@ def initialize_telemetry(
     """
     global tracer
     
+    if not OPENTELEMETRY_AVAILABLE:
+        logger.warning("OpenTelemetry not available. Telemetry will be disabled.")
+        return
+
     # Create resource attributes
     attributes = {
         "service.name": service_name,
@@ -124,6 +225,9 @@ def instrument_fastapi(app):
     Args:
         app: FastAPI application instance
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        return
+
     FastAPIInstrumentor.instrument_app(
         app,
         tracer_provider=trace.get_tracer_provider(),
@@ -156,12 +260,17 @@ def inject_trace_context(headers: Dict[str, str]) -> Dict[str, str]:
     Returns:
         Dict[str, str]: Headers with injected trace context
     """
-    # Get current span context
-    current_context = trace.get_current_span().get_span_context()
-    
     # Create a new headers dict if None was provided
     if headers is None:
         headers = {}
+        
+    if not OPENTELEMETRY_AVAILABLE:
+        if "X-Correlation-ID" not in headers:
+            headers["X-Correlation-ID"] = str(uuid.uuid4())
+        return headers
+
+    # Get current span context
+    current_context = trace.get_current_span().get_span_context()
     
     # Inject trace context into headers
     TraceContextTextMapPropagator().inject(headers)
@@ -375,3 +484,7 @@ class ErrorFilteringExporter(SpanExporter):
 
     def force_flush(self, timeout_millis: int = 30000) -> SpanExportResult:
         return self._underlying_exporter.force_flush(timeout_millis)
+'''
+
+with open("c:\\Users\\Arthu\\CascadeProjects\\AnalyticsEngine\\services\\support_services\\systems_monitor\\app\\telemetry.py", "w") as f:
+    f.write(content)

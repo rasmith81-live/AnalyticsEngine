@@ -12,8 +12,18 @@ import uuid
 from typing import Dict, List, Any, Optional, Union
 
 import pandas as pd
-from azure.storage.filedatalake import DataLakeServiceClient
-from azure.core.exceptions import AzureError
+
+try:
+    from azure.storage.filedatalake import DataLakeServiceClient
+    from azure.core.exceptions import AzureError
+    AZURE_AVAILABLE = True
+except ImportError:
+    AZURE_AVAILABLE = False
+    # Dummy classes for type hinting/mocking if Azure SDK is missing
+    class DataLakeServiceClient:
+        @staticmethod
+        def from_connection_string(conn_str): pass
+    class AzureError(Exception): pass
 
 from .telemetry import trace_method, add_span_attributes, traced_span, inject_trace_context, extract_trace_context
 

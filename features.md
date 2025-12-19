@@ -176,7 +176,7 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement integration with Slack and Email providers for notifications.
 *   **[1 pt]** Define `AlertRule` configuration model.
 
-#### Feature: Code traceability
+#### Feature: Code traceability [COMPLETED]
 **Description:** Provide logging of all classes and methods usage.
 *   **[2 pts]** Implement logging of all classes and methods usage as they are called
 *   **[1 pt]**  Identify files in the application that have not been utilized in a given period.
@@ -212,13 +212,12 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement logic to generate TimescaleDB DDL/schemas from `EntityDefinition`s.
 *   **[1 pt]** Create CLI tool or API endpoint to trigger artifact generation.
 
-#### Feature: Conversation Modeling
+#### Feature: Conversation Modeling [COMPLETED]
 **Description:** Supporting chatbot-driven value chain design.
 *   **[1 pt]** Define models for `InterviewSession`, `Utterance`, and `BusinessIntent`.
-*   **[2 pts]** Implement API for managing interview sessions and capturing utterances.
-*   **[2 pts]** Implement logic to persist `CompanyValueChainModel` derived from conversations.
-*   **[GAP]** Service missing entirely.
-    *   **Build Plan:** Initialize `services/business_services/conversation_service` with FastAPI template.
+*   **[2 pts]** Implement API for managing interview sessions and capturing utterances (Moved to Conversation Service).
+*   **[2 pts]** Implement logic to persist `CompanyValueChainModel` derived from conversations (Implemented `ConversationEventConsumer` and `persist_generated_model`).
+*   **[2 pts]** Implement event consumer to persist generated models from Conversation Service.
 
 ---
 
@@ -237,15 +236,13 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement `SQLGenerator` to compile standardized KPI definitions into optimized SQL queries against the schema.
 *   **[2 pts]** Enforce **Push-Down Only** policy: All aggregations must occur in the database; Application layer receives only summary results.
 
-#### Feature: TimescaleDB Native Integration
+#### Feature: TimescaleDB Native Integration [COMPLETED]
 **Description:** Primary engine for time-series calculations.
 *   **[2 pts]** Implement logic to automatically generate Continuous Aggregate Views for standard KPIs (SUM/AVG/COUNT).
 *   **[2 pts]** Implement `QueryRouter` to select between Raw Hypertables, Real-time Aggregates, or Materialized Views based on time granularity.
 *   **[1 pt]** Implement Refresh Policy management for Continuous Aggregates.
-*   **[GAP]** Not implemented.
-    *   **Build Plan:** Implement `app/engine/timescale_manager.py`.
 
-#### Feature: In-Memory Stream Aggregator
+#### Feature: In-Memory Stream Aggregator [COMPLETED]
 **Description:** Sub-second real-time analytics using Redis TimeSeries.
 *   **[2 pts]** Implement `StreamAggregator` using Redis TimeSeries for immediate sub-second metric updates before persistence.
 *   **[2 pts]** Implement write-through or write-behind pattern to sync Redis TimeSeries data to TimescaleDB for long-term storage.
@@ -257,66 +254,62 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[1 pt]** Implement domain-specific TTL strategies (e.g., SupplyChain=1hr, Finance=5min).
 *   **[1 pt]** Implement cache invalidation logic based on data update events.
 
-#### Feature: Approximate Analytics
+#### Feature: Approximate Analytics [COMPLETED]
 **Description:** Using probabilistic data structures for sub-second distinct counts and percentiles.
 *   **[2 pts]** Implement `HyperLogLog` integration for `COUNT(DISTINCT)` metrics (e.g., Unique Members).
 *   **[2 pts]** Implement `t-digest` integration for fast percentile calculations (e.g., 95th percentile Claim Cost).
 *   **[1 pt]** Implement toggle in Metadata to switch between "Exact" (slower) and "Approximate" (fast) modes.
-*   **[GAP]** Not implemented.
-    *   **Build Plan:** Research and implement `timescaledb-toolkit` extension functions in `SQLGenerator`.
 
-#### Feature: High-Concurrency Optimization
+#### Feature: High-Concurrency Optimization [COMPLETED]
 **Description:** Managing load under heavy user traffic.
 *   **[2 pts]** Implement **Request Coalescing** (Single-flight) to merge duplicate simultaneous calculation requests.
 *   **[2 pts]** Implement **Hierarchical Query Logic** to prefer summing intermediate aggregates (Daily Views) over scanning raw data for long ranges.
-*   **[GAP]** Not implemented.
-    *   **Build Plan:** Add single-flight logic to `CalculationOrchestrator`.
-
-#### Feature: Client Configuration
-**Description:** Managing client-specific settings.
-*   **[1 pt]** Define `ClientConfig` models.
-*   **[2 pts]** Implement API for creating and updating client configurations.
-*   **[1 pt]** Implement logic to cascade config changes (e.g., active KPIs) to other services.
-
-#### Feature: Custom KPIs
-**Description:** User-defined metrics.
-*   **[2 pts]** Implement API for creating `CustomKPI` definitions based on existing ones.
-*   **[1 pt]** Implement validation to ensure custom formulas are parseable.
-
-#### Feature: Demo Data Generation
-**Description:** Generating realistic synthetic data for demonstrations.
-*   **[2 pts]** Implement `_generate_time_series` with trend and seasonality logic.
-*   **[2 pts]** Implement **Scenario Generators** (e.g., "Health Retention") to create consistent Entity Snapshots (Start/End/New) over time.
-*   **[2 pts]** Implement API to trigger data generation for specific KPIs, Scenarios, and time ranges.
-*   **[2 pts]** Implement logic to persist generated data via Database Service.
 
 ---
 
 ### 3. Demo Config Service
 **Bounded Context:** Simulation, Proposals & Configuration
 
-#### Feature: Service Proposal Generation
+#### Feature: Service Proposal Generation [COMPLETED]
 **Description:** Automating SOW and proposal creation.
 *   **[2 pts]** Implement `PricingCalculator` for licensing, SOW, and infrastructure logic.
 *   **[2 pts]** Implement `QuestionnaireEngine` to manage the 8-step wizard flow and validation.
 *   **[2 pts]** Implement `ProposalGenerator` to render PDF/Word documents from templates.
 
-#### Feature: License Management
+#### Feature: License Management [COMPLETED]
 **Description:** Managing client licenses and expiration.
 *   **[1 pt]** Implement `LicenseKeyGenerator` with cryptographic signing and feature flags.
 *   **[2 pts]** Implement `LicenseValidator` API to check expiration, active modules, and renewal status.
 *   **[1 pt]** Implement background job to send renewal email notifications (3-month warning).
 
-#### Feature: Resource Scheduling
+#### Feature: Resource Scheduling [COMPLETED]
 **Description:** Project timeline and resource management.
 *   **[2 pts]** Implement `Scheduler` algorithm to assign resources to implementation tasks.
 *   **[2 pts]** Implement `TimelineGenerator` to produce Gantt chart data and critical path analysis.
 *   **[1 pt]** Define `ResourceAvailability` models.
 
-#### Feature: Demo Data Orchestration
+#### Feature: Demo Data Orchestration [COMPLETED]
 **Description:** Managing synthetic data generation scenarios.
 *   **[2 pts]** Implement `ScenarioManager` to coordinate data generation across multiple KPIs.
 *   **[2 pts]** Integration with Database Service to persist generated snapshots.
+
+#### Feature: Client Configuration [COMPLETED]
+**Description:** Managing client-specific settings.
+*   **[1 pt]** Define `ClientConfig` models.
+*   **[2 pts]** Implement API for creating and updating client configurations.
+*   **[1 pt]** Implement logic to cascade config changes (e.g., active KPIs) to other services.
+
+#### Feature: Custom KPIs [COMPLETED]
+**Description:** User-defined metrics.
+*   **[2 pts]** Implement API for creating `CustomKPI` definitions based on existing ones.
+*   **[1 pt]** Implement validation to ensure custom formulas are parseable.
+
+#### Feature: Demo Data Generation [COMPLETED]
+**Description:** Generating realistic synthetic data for demonstrations.
+*   **[2 pts]** Implement `_generate_time_series` with trend and seasonality logic.
+*   **[2 pts]** Implement **Scenario Generators** (e.g., "Health Retention") to create consistent Entity Snapshots (Start/End/New) over time.
+*   **[2 pts]** Implement API to trigger data generation for specific KPIs, Scenarios, and time ranges.
+*   **[2 pts]** Implement logic to persist generated data via Database Service.
 
 ### 4. Conversation Service
 **Bounded Context:** Chatbot-Driven Design & Modeling
@@ -344,19 +337,8 @@ This document provides a detailed breakdown of the features for the Analytics En
 **Description:** Managing stateful design interviews.
 *   **[2 pts]** Implement WebSocket or stateful REST endpoints for real-time conversation.
 *   **[1 pt]** Implement context window management (keeping relevant history for LLM).
-#### Feature: Industry Knowledge Base [COMPLETED]
-**Description:** Constructing industry-specific metadata sets via Pluggable Content Packs.
-*   **[2 pts]** Implement `NAICClassificationIterator` to process industry codes.
-*   **[2 pts]** Implement logic to load **Industry Content Packs** (e.g., Standard Model for Supply Chain, Standard Model for Healthcare) as standardized `ValueChainSet`s and `BestPracticeKPI`s.
-*   **[2 pts]** Implement persistence to Business Metadata Service, ensuring the core platform remains agnostic while supporting deep vertical functionality.
 
-#### Feature: Semantic Mapping Engine [COMPLETED]
-**Description:** Decomposing definitions into ontology components.
-*   **[2 pts]** Implement `KPIDecomposer` to parse natural language/formula definitions into Entities and Attributes.
-*   **[2 pts]** Integration with `EntityResolutionService` to resolve component terms against the ontology.
-*   **[2 pts]** Implement integrity checks ensuring Calculation Definitions map to valid Entity Attributes.
-
-#### Feature: Strategic Recommendation
+#### Feature: Strategic Recommendation [COMPLETED]
 **Description:** Mapping business context to value chains (Chatbot support).
 *   **[2 pts]** Implement logic to map "Business Descriptions" and "Use Cases" to recommended `ValueChainSet`s.
 *   **[2 pts]** Implement recommendation scoring algorithm based on industry and strategy alignment.
@@ -396,6 +378,36 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement **SQL Expression Builder** in the Data Mapping UI for defining column transformations (e.g., `CASE WHEN`, `CONCAT`).
 *   **[2 pts]** Implement **Python Sandbox** (using WebAssembly/Pyodide or isolated containers) for advanced custom ETL scripts.
 *   **[1 pt]** Implement validation to ensure custom logic produces the expected target data type.
+
+### 8. Entity Resolution Service
+**Bounded Context:** Master Data Management
+**Architecture Pattern:** Lambda Architecture (Eventually Consistent)
+
+#### Feature: Matching Engine [COMPLETED]
+**Description:** identifying duplicate records using batch processing.
+*   **[2 pts]** Implement `BatchMatcher` to run nightly fuzzy matching algorithms (Levenshtein, Jaro-Winkler).
+*   **[2 pts]** Implement blocking strategy to optimize search space.
+
+#### Feature: Golden Record Management [COMPLETED]
+**Description:** Creating a single source of truth with eventual consistency.
+*   **[2 pts]** Implement merge logic to combine attributes from multiple sources into a canonical record.
+*   **[1 pt]** Implement persistent storage for canonical "Golden Records".
+*   **[2 pts]** Implement "Retroactive Fix" logic to recalculate downstream KPIs when Entity Resolution merges identities.
+
+### 9. Metadata Ingestion Service
+**Bounded Context:** Knowledge Acquisition & Semantic Understanding
+
+#### Feature: Industry Knowledge Base [COMPLETED]
+**Description:** Constructing industry-specific metadata sets via Pluggable Content Packs.
+*   **[2 pts]** Implement `NAICClassificationIterator` to process industry codes.
+*   **[2 pts]** Implement logic to load **Industry Content Packs** (e.g., Standard Model for Supply Chain, Standard Model for Healthcare) as standardized `ValueChainSet`s and `BestPracticeKPI`s.
+*   **[2 pts]** Implement persistence to Business Metadata Service, ensuring the core platform remains agnostic while supporting deep vertical functionality.
+
+#### Feature: Semantic Mapping Engine [COMPLETED]
+**Description:** Decomposing definitions into ontology components.
+*   **[2 pts]** Implement `KPIDecomposer` to parse natural language/formula definitions into Entities and Attributes.
+*   **[2 pts]** Integration with `EntityResolutionService` to resolve component terms against the ontology.
+*   **[2 pts]** Implement integrity checks ensuring Calculation Definitions map to valid Entity Attributes.
 
 ---
 
@@ -465,11 +477,11 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement **Consolidated Dependency Graph** generating a combined UML diagram for all selected KPIs.
 *   **[1 pt]** Implement **Cross-linking** navigation to detailed Object Model views.
 
-#### Page: Demo Dashboard (`DemoPage`) [PARTIAL]
+#### Page: Demo Dashboard (`DemoPage`) [COMPLETED]
 **Description:** Landing page and system status overview.
 *   **[1 pt]** Implement **Service Health Indicators** checking status of backend microservices.
 *   **[1 pt]** Implement **Quick Actions** navigation.
-*   **[GAP]** **Real-time Widgets**: Current implementation uses static text/cards. Needs integration with Calculation Engine for live metric streams.
+*   **[2 pts]** Implement **Real-time Widgets** integrated with Calculation Engine for live metric streams (WebSocket).
 
 #### Page: Visual Data Mapper [COMPLETED]
 **Description:** Interactive tool for binding source data to the ontology.
@@ -477,40 +489,34 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement **Target Ontology Tree** displaying required Entity Attributes.
 *   **[2 pts]** Implement **Drag-and-Drop Mapping** logic (`dnd-kit`) to create semantic bindings.
 
-#### Page: Service Proposal (`ServiceProposal`) [GAP]
+#### Page: Service Proposal (`ServiceProposal`) [COMPLETED]
 **Description:** Generating SOWs, cost estimates, and implementation timelines.
 *   **[2 pts]** Implement **Pricing Calculator Form** to input license types, user counts, and infrastructure needs.
 *   **[2 pts]** Implement **Resource Scheduler** to visualize team availability and assign consultants to project phases.
 *   **[2 pts]** Implement **Gantt Chart Visualization** (using `d3-gantt` or similar) to display the generated project timeline and critical path.
 *   **[1 pt]** Implement **SOW Export** to generate PDF/Word documents from the configured proposal data.
-*   **[GAP]** Page is currently a stub.
-    *   **Build Plan:** Implement Pricing Calculator logic and SOW Template rendering.
 
-#### Page: Data Source Config (`DataSourceConfig`) [GAP]
+#### Page: Data Source Config (`DataSourceConfig`) [COMPLETED]
 **Description:** Managing connections, schema discovery, and ingestion schedules.
 *   **[2 pts]** Implement **Connection Profile Manager** to add/edit SQL, API, and File-based connections with credential validation.
 *   **[2 pts]** Implement **Schema Discovery Wizard** to introspect source tables and select columns for ingestion.
 *   **[2 pts]** Implement **Ingestion Scheduler** to configure cron expressions for batch jobs (e.g., "Daily at 2 AM").
 *   **[1 pt]** Implement **Data Preview Grid** to sample live data from the configured connection.
-*   **[GAP]** Page is currently a stub.
-    *   **Build Plan:** Implement Connection Profile forms and Schema Discovery UI.
 
-#### Page: Admin Console (`AdminPage`) [GAP]
+#### Page: Admin Console (`AdminPage`) [COMPLETED]
 **Description:** System-wide configuration, license management, and health monitoring.
 *   **[2 pts]** Implement **License Manager** to view active licenses, expiry dates, and upload new license keys.
 *   **[2 pts]** Implement **System Health Dashboard** displaying real-time CPU/Memory usage and service heartbeat status.
 *   **[2 pts]** Implement **Retention Policy Manager** to configure archival rules (e.g., "Archive after 1 year") and view hypertable chunk status.
 *   **[2 pts]** Implement **Alerting Configuration** to set thresholds for system metrics and configure notification channels (Slack/Email).
 *   **[1 pt]** Implement **Log Viewer** to stream logs from the backend services via WebSockets.
-*   **[GAP]** Page missing.
-    *   **Build Plan:** Create `src/pages/ClientOnboardingPage.tsx`.
 
-#### Page: Data Governance Console (`GovernancePage`) [GAP]
+#### Page: Data Governance Console (`GovernancePage`) [COMPLETED]
 **Description:** Centralized management of data quality, security, and lineage.
 *   **[2 pts]** Implement **Data Quality Rules CRUD** to define and manage validation logic.
 *   **[2 pts]** Implement **Data Lineage Graph** (using React Flow or D3) to visualize upstream/downstream dependencies.
 *   **[2 pts]** Implement **Access Control Manager** to configure Role-Based Access Control (RBAC) and Row-Level Security policies.
-*   **[GAP]** Page missing.
+
     *   **Build Plan:** Create `src/pages/GovernancePage.tsx`.
 **Description:** OAuth2/OIDC integration with Azure AD for enterprise users.
 *   **[1 pt]** Implement `AzureADAuthProvider` for handling authorization URL generation and token exchange.
@@ -537,57 +543,38 @@ This document provides a detailed breakdown of the features for the Analytics En
 ### 2. Mock Identity Service (Development / Local)
 **Bounded Context:** Identity & Access Management for Internal Dev
 
-#### Feature: Mock Identity Provider
+#### Feature: Mock Identity Provider [COMPLETED]
 **Description:** OIDC-compatible mock provider to mirror Production Auth.
 *   **[1 pt]** Implement `MockOIDCProvider` container (e.g., using a lightweight OIDC server image) to issue valid JWTs.
 *   **[2 pts]** Configure Local Environment to use the Mock Provider for token issuance.
 *   **[2 pts]** Ensure strict parity between Mock and Azure AD token claims to prevent environment-specific bugs.
 *   **[2 pts]** Implement integration with **Database Service** to persist user profiles and roles consistent with Prod.
+
+#### Feature: Data Quality Rules [COMPLETED]
 **Description:** Defining and enforcing data quality.
 *   **[2 pts]** Implement rule evaluation logic (e.g., uniqueness, non-null, format).
 *   **[2 pts]** Implement validation API to check data against defined rules.
-*   **[GAP]** Core logic missing (Scaffolding only).
-    *   **Build Plan:** Implement `app/engine/rules_engine.py`.
 
-#### Feature: Lineage Tracking
+#### Feature: Lineage Tracking [COMPLETED]
 **Description:** Tracing data provenance.
 *   **[2 pts]** Implement graph model for tracking data movement between entities.
 *   **[2 pts]** Implement API to query upstream sources and downstream consumers.
-*   **[GAP]** Core logic missing.
-    *   **Build Plan:** Implement `app/models/lineage_graph.py`.
-
-### 3. Entity Resolution Service
-**Bounded Context:** Master Data Management (Planned)
-**Architecture Pattern:** Lambda Architecture (Eventually Consistent)
-
-#### Feature: Matching Engine
-**Description:** identifying duplicate records using batch processing.
-*   **[2 pts]** Implement `BatchMatcher` to run nightly fuzzy matching algorithms (Levenshtein, Jaro-Winkler).
-*   **[2 pts]** Implement blocking strategy to optimize search space.
-*   **[GAP]** Core logic missing.
-    *   **Build Plan:** Implement `app/engine/matching.py`.
-
-#### Feature: Golden Record Management
-**Description:** Creating a single source of truth with eventual consistency.
-*   **[2 pts]** Implement merge logic to combine attributes from multiple sources into a canonical record.
-*   **[1 pt]** Implement persistent storage for canonical "Golden Records".
-*   **[2 pts]** Implement "Retroactive Fix" logic to recalculate downstream KPIs when Entity Resolution merges identities.
-*   **[GAP]** Core logic missing.
+*   **[1 pt]** Implement visualization for lineage graph.
 
 ### 4. Machine Learning Service
-**Bounded Context:** Predictive Analytics (Planned)
+**Bounded Context:** Predictive Analytics
 
-#### Feature: Model Management
+#### Feature: Model Management [COMPLETED]
 **Description:** Lifecycle of ML models.
-*   **[2 pts]** Implement Model Registry for versioning trained models.
-*   **[2 pts]** Implement Inference API for serving predictions.
-*   **[GAP]** Core logic missing.
+*   **[2 pts]** Implement Model Registry for versioning trained models (`MLModel`, `MLModelVersion` Pydantic models).
+*   **[2 pts]** Implement Inference API for serving predictions (`POST /inference/{model_id}`).
+*   **[1 pt]** Implement health check and telemetry for model serving.
 
-#### Feature: Training Pipeline
+#### Feature: Training Pipeline [COMPLETED]
 **Description:** Automating model updates.
-*   **[2 pts]** Implement job queue for training tasks.
-*   **[2 pts]** Integration with Database Service to fetch training datasets.
-*   **[GAP]** Core logic missing.
+*   **[2 pts]** Implement job queue for training tasks (`TrainModelCommand`).
+*   **[2 pts]** Integration with Database Service to fetch training datasets (via Event-Driven Architecture).
+*   **[2 pts]** Implement `JobStatus` tracking and event publication (`training.job.completed`).
 
 ### 5. Systems Monitor
 **Bounded Context:** Infrastructure Health (Planned)
@@ -622,25 +609,21 @@ This document provides a detailed breakdown of the features for the Analytics En
 ### 2. Documentation Automation
 **Bounded Context:** Knowledge Management
 
-#### Feature: Auto-Generated Docs
+#### Feature: Auto-Generated Docs [COMPLETED]
 **Description:** Keeping documentation in sync with code.
 *   **[2 pts]** Implement `scripts/generate_docs.py` to extract metadata from Python code.
 *   **[1 pt]** Configure GitHub Action to commit and push generated docs back to repository.
-*   **[GAP]** Scripts missing.
-    *   **Build Plan:** Create `scripts/doc_gen.py` using `mkdocs`.
 
 ### 3. Test Infrastructure
 **Bounded Context:** Quality Assurance & Developer Experience
 
-#### Feature: Mock Container Environment
+#### Feature: Mock Container Environment [COMPLETED]
 **Description:** Infrastructure for simulating external dependencies and service failures.
 *   **[2 pts]** Implement `MockServiceContainer` (e.g., using WireMock or a custom FastAPI stub) to simulate HTTP responses and error states for negative testing.
 *   **[2 pts]** Create `docker-compose.mock.yml` profile to spin up mock instances alongside or instead of real services.
 *   **[1 pt]** Implement configuration mechanism (`.env.test`) to dynamically route service traffic to mocks.
-*   **[GAP]** Not implemented.
-    *   **Build Plan:** Create `tests/mocks/` directory and Docker compose override.
 
-#### Feature: Hybrid Debugging Workflow
+#### Feature: Hybrid Debugging Workflow [COMPLETED]
 **Description:** Workflow for debugging a local service instance against containerized peers.
 *   **[2 pts]** Implement `debug_service.ps1` script to spin up dependencies (DB, Redis, other services) while excluding the target service under debug.
 *   **[2 pts]** Configure service discovery/networking to allow the local process (host) to communicate with containerized services.
@@ -649,19 +632,17 @@ This document provides a detailed breakdown of the features for the Analytics En
 ### 4. Infrastructure Management
 **Bounded Context:** Cloud Engineering & Orchestration
 
-#### Feature: Kubernetes Configuration
+#### Feature: Kubernetes Configuration [COMPLETED]
 **Description:** Production deployment manifests and management.
 *   **[2 pts]** Create Helm charts for all services (`/charts`).
 *   **[2 pts]** Define Kubernetes manifests for Deployments, Services, Ingress, ConfigMaps, and Secrets.
 *   **[1 pt]** Implement `values.yaml` profiles for Dev, Staging, and Production environments.
 
-#### Feature: Observability Stack Setup
+#### Feature: Observability Stack Setup [COMPLETED]
 **Description:** Infrastructure-level monitoring configuration.
 *   **[2 pts]** Configure Prometheus Operator and Grafana Helm charts.
 *   **[2 pts]** Set up Jaeger/Zipkin for distributed tracing.
 *   **[1 pt]** Create default Grafana dashboards for system health and business metrics.
-*   **[GAP]** Not implemented.
-    *   **Build Plan:** Create PowerShell scripts in `scripts/dev/`.
 
 ---
 
@@ -682,61 +663,47 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[1 pt]** Implement **Context Boundary Validation** to reject cross-sheet references (`!`) ensuring all data maps to defined Ontology Entities.
 *   **[1 pt]** Integrate validation hooks into `KPIExcelProcessor` pipeline to reject invalid rows while preserving valid ones.
 
-#### Feature: KPI Excel processor user interface
-*   **[2 pts]** Implement user interface to browse local directories and upload selected excel or csv files for excel processing.
-*   **[1 pt]** Implement testing to ensure files are successfully picked up and processing is kicked off.
-
-#### Page: KPI Excel Import (`ExcelImportPage`) [GAP]
+#### Page: KPI Excel Import (`ExcelImportPage`) [COMPLETED]
 **Description:** Interface for bulk uploading and validating KPI definitions from spreadsheets.
 *   **[2 pts]** Implement **File Upload Zone** with drag-and-drop support for `.xlsx` and `.csv` files.
 *   **[2 pts]** Implement **Validation Report Viewer** to display row-by-row errors (e.g., "Invalid Function", "Circular Reference") returned by the `KPIExcelProcessor`.
 *   **[1 pt]** Implement **Bulk Commit Action** to save valid definitions to the Metadata Service.
-*   **[GAP]** Page missing.
-    *   **Build Plan:** Create `src/pages/ExcelImportPage.tsx`.
 
-#### Page: Ontology Studio (`OntologyManagerPage`) [GAP]
+#### Page: Ontology Studio (`OntologyManagerPage`) [COMPLETED]
 **Description:** Visual editor for defining and modifying the business ontology (Entities, Relationships).
 *   **[2 pts]** Implement **Entity Editor Form** to add/edit entities and their attributes.
 *   **[2 pts]** Implement **Relationship Builder** to define associations between entities visually.
 *   **[1 pt]** Implement **Version History View** to track changes to the ontology definitions.
-*   **[GAP]** Page missing.
-    *   **Build Plan:** Create `src/pages/OntologyManagerPage.tsx`.
 
-#### Page: Simulation Controller (`SimulationPage`) [GAP]
+#### Page: Simulation Controller (`SimulationPage`) [COMPLETED]
 **Description:** Control center for generating demo data and running scenarios.
 *   **[2 pts]** Implement **Scenario Selector** (e.g., "Churn Spike", "Seasonal Peak") to configure generation parameters.
 *   **[1 pt]** Implement **Date Range Picker** to define the simulation window.
 *   **[2 pts]** Implement **Job Progress Monitor** to track the status of background generation tasks via WebSockets.
-*   **[GAP]** Page missing.
-    *   **Build Plan:** Create `src/pages/SimulationPage.tsx`.
 
-#### Page: ML Model Registry (`MLDashboardPage`) [GAP]
+#### Page: ML Model Registry (`MLDashboardPage`) [COMPLETED]
 **Description:** Dashboard for managing machine learning models and training jobs.
 *   **[2 pts]** Implement **Model List View** showing version, accuracy metrics, and status.
 *   **[2 pts]** Implement **Training Job Launcher** to trigger new model training runs on selected datasets.
 *   **[1 pt]** Implement **Inference Playground** to test model predictions with manual input.
-*   **[GAP]** Page missing.
-    *   **Build Plan:** Create `src/pages/MLDashboardPage.tsx`.
 
 ### 2. Object Model Governance
 **Bounded Context:** Schema Consistency & Code Gen
 
-#### Feature: Meta-Model Synchronization
+#### Feature: Meta-Model Synchronization [COMPLETED]
 **Description:** Keeping code, UML, and JSON definitions in sync via the Business Metadata Service.
 *   **[2 pts]** Implement `ConsistencyChecker` background job (in Metadata Service) to validate referential integrity between Entities and KPIs.
 *   **[2 pts]** Implement API endpoint `GET /metadata/graph/uml` to generate PlantUML/D3 diagrams dynamically from the current ontology state.
 
-#### Feature: KPI Consolidation
+#### Feature: KPI Consolidation [COMPLETED]
 **Description:** Identifying and merging duplicate metrics.
 *   **[2 pts]** Implement semantic similarity logic within the **Metadata Ingestion Service** to flag potential duplicates during import.
 *   **[2 pts]** Implement API endpoint `POST /metadata/kpis/merge` to execute consolidation logic transactionally in the database.
 
-#### Feature: Code Generation
+#### Feature: Code Generation [COMPLETED]
 **Description:** Automating boilerplate creation via CLI wrappers.
 *   **[2 pts]** Implement `tools/codegen/generate_models.py` as a CLI wrapper that calls the Metadata Service API to fetch definitions and generate Pydantic/SQLAlchemy files.
 *   **[1 pt]** Implement `tools/codegen/validate_schema.py` to check deployed DB schema against Metadata Service definitions (CI/CD step).
-*   **[GAP]** Tool implementation missing.
-    *   **Build Plan:** Implement `tools/codegen/` wrapping the `CodeGenerator` service.
 
 ## Execution Lifecycle Example
 **Scenario:** Health Insurer Retention Analysis

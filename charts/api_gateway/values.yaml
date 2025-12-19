@@ -1,0 +1,55 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+env:
+  ARCHIVAL_SERVICE_URL: http://archival_service:8000
+  BUSINESS_METADATA_URL: http://business_metadata:8000
+  CACHE_ENABLED: 'true'
+  CACHE_TTL: '300'
+  CALCULATION_ENGINE_SERVICE_URL: http://calculation_engine_service:8000
+  CIRCUIT_BREAKER_RECOVERY_TIME: '30'
+  CIRCUIT_BREAKER_THRESHOLD: '5'
+  CONNECTOR_SERVICE_URL: http://connector_service:8000
+  CONVERSATION_SERVICE_URL: http://conversation_service:8000
+  CORS_ORIGINS: '["*"]'
+  DATABASE_SERVICE_URL: http://database_service:8000
+  DATA_GOVERNANCE_SERVICE_URL: http://data_governance_service:8000
+  DEBUG: 'true'
+  DEMO_CONFIG_SERVICE_URL: http://demo_config_service:8000
+  ENTITY_RESOLUTION_SERVICE_URL: http://entity_resolution_service:8000
+  HEALTH_CHECK_INTERVAL: '30'
+  HOST: 0.0.0.0
+  INGESTION_SERVICE_URL: http://ingestion_service:8000
+  MACHINE_LEARNING_SERVICE_URL: http://machine_learning_service:8000
+  MESSAGING_SERVICE_URL: http://messaging_service:8000
+  METADATA_INGESTION_SERVICE_URL: http://metadata_ingestion_service:8000
+  OBSERVABILITY_SERVICE_URL: http://observability_service:8000
+  OTEL_EXPORTER_OTLP_CERTIFICATE: /certs/server.crt
+  OTEL_EXPORTER_OTLP_ENDPOINT: https://observability_service:4317
+  OTEL_EXPORTER_OTLP_INSECURE: 'false'
+  PORT: '8000'
+  PYTHONPATH: .
+  QUERY_TIMEOUT: '10'
+  RATE_LIMIT: '100'
+  RATE_LIMIT_WINDOW: '60'
+  REDIS_URL: redis://redis:6379/0
+  SERVICE_NAME: api_gateway
+  SYSTEMS_MONITOR_URL: http://systems_monitor:8000
+image:
+  pullPolicy: IfNotPresent
+  repository: analytics-engine/api_gateway
+  tag: latest
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  port: 8090
+  targetPort: 8000
+  type: ClusterIP

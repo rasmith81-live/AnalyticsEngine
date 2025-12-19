@@ -419,7 +419,7 @@ class ArchivalManager:
                 
             # Import lakehouse client to avoid circular imports
             from app.clients import lakehouse_client, messaging_client as redis_client
-            from app.core.config import settings
+            from app.config import settings
             
             # Use Redis cache to minimize repeated expensive operations if optimize_cost is True
             cache_key = f"archived_data:{table_name}:{start_time}:{end_time}:{limit}:{offset}"

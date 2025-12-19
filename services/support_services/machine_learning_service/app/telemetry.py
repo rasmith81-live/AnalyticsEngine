@@ -16,20 +16,46 @@ import inspect
 import uuid
 
 # OpenTelemetry imports
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult, TraceIdRatioBased
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import grpc
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.trace import SpanKind, Status, StatusCode
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult, TraceIdRatioBased
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    import grpc
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.trace import SpanKind, Status, StatusCode
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+    # Define dummy classes and constants
+    class SpanKind:
+        INTERNAL = "INTERNAL"
+        CLIENT = "CLIENT"
+        SERVER = "SERVER"
+        PRODUCER = "PRODUCER"
+        CONSUMER = "CONSUMER"
+        
+    class StatusCode:
+        OK = "OK"
+        ERROR = "ERROR"
+        UNSET = "UNSET"
+        
+    class Status:
+        def __init__(self, status_code, description=None):
+            pass
+
+    class Sampler:
+        pass
+        
+    class SpanExporter:
+        pass
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -56,6 +82,10 @@ def initialize_telemetry(
     """
     global tracer
     
+    if not OPENTELEMETRY_AVAILABLE:
+        logger.info("OpenTelemetry not available, skipping initialization")
+        return
+
     # Create resource attributes
     attributes = {
         "service.name": service_name,
@@ -110,9 +140,12 @@ def initialize_telemetry(
     # Auto-instrument packages if enabled
     if auto_instrument_packages:
         # These will be initialized when the respective clients are created
-        AioHttpClientInstrumentor().instrument()
-        HTTPXClientInstrumentor().instrument()
-        RedisInstrumentor().instrument()
+        try:
+            AioHttpClientInstrumentor().instrument()
+            HTTPXClientInstrumentor().instrument()
+            RedisInstrumentor().instrument()
+        except Exception as e:
+            logger.warning(f"Failed to auto-instrument packages: {e}")
         # SQLAlchemy instrumentation is done when the engine is created
         
     logger.info(f"OpenTelemetry initialized for service: {service_name}")
@@ -124,6 +157,9 @@ def instrument_fastapi(app):
     Args:
         app: FastAPI application instance
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        return
+
     FastAPIInstrumentor.instrument_app(
         app,
         tracer_provider=trace.get_tracer_provider(),
@@ -162,6 +198,11 @@ def inject_trace_context(headers: Dict[str, str]) -> Dict[str, str]:
     # Create a new headers dict if None was provided
     if headers is None:
         headers = {}
+        
+    if not OPENTELEMETRY_AVAILABLE:
+        if "X-Correlation-ID" not in headers:
+            headers["X-Correlation-ID"] = str(uuid.uuid4())
+        return headers
     
     # Inject trace context into headers
     TraceContextTextMapPropagator().inject(headers)
@@ -186,7 +227,7 @@ def trace_method(name: Optional[str] = None, kind: SpanKind | str = SpanKind.INT
     def decorator(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
-            if not tracer:
+            if not OPENTELEMETRY_AVAILABLE or not tracer:
                 return await func(*args, **kwargs)
             
             # Get span name from function name if not provided
@@ -225,7 +266,7 @@ def trace_method(name: Optional[str] = None, kind: SpanKind | str = SpanKind.INT
         
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
-            if not tracer:
+            if not OPENTELEMETRY_AVAILABLE or not tracer:
                 return func(*args, **kwargs)
             
             # Get span name from function name if not provided
@@ -276,6 +317,9 @@ def add_span_attributes(attributes: Dict[str, Any]) -> None:
     Args:
         attributes: Dictionary of attributes to add
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        return
+
     current_span = trace.get_current_span()
     if current_span:
         for key, value in attributes.items():
@@ -296,7 +340,7 @@ def start_span(name: str, kind: SpanKind = SpanKind.INTERNAL, attributes: Option
     Returns:
         Span: New span
     """
-    if not tracer:
+    if not OPENTELEMETRY_AVAILABLE or not tracer:
         return None
     
     span = tracer.start_span(name, kind=kind)
@@ -317,6 +361,8 @@ def get_current_span_context():
     Returns:
         SpanContext: Current span context
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        return None
     return trace.get_current_span().get_span_context()
 
 class ErrorSampler(Sampler):

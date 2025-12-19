@@ -10,17 +10,48 @@ import json
 import os
 import sys
 from datetime import datetime, timedelta
+from unittest.mock import MagicMock, AsyncMock, patch
 
 # Add parent directory to path to import app modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.management import ArchivalManager
-from app.lakehouse_client import LakehouseClient
 from app.config import settings
 
+# Mock the clients before they are imported/used in management.py
+sys.modules['app.clients'] = MagicMock()
+sys.modules['app.clients'].lakehouse_client = AsyncMock()
+sys.modules['app.clients'].messaging_client = AsyncMock()
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_data_retrieval():
     """Test the data retrieval functionality with various parameters."""
+    
+    # Setup mocks
+    mock_lakehouse = sys.modules['app.clients'].lakehouse_client
+    mock_messaging = sys.modules['app.clients'].messaging_client
+    
+    # Mock Redis responses
+    mock_messaging.get.return_value = None  # Cache miss
+    mock_messaging.set.return_value = True
+    
+    # Mock Lakehouse responses
+    mock_lakehouse.path_exists.return_value = True
+    mock_lakehouse.list_files.return_value = ["file1.parquet", "file2.parquet"]
+    
+    # Mock read_data to return a DataFrame-like object (or list of dicts since we mocked it)
+    # The management code expects read_data to return a DataFrame
+    # and then calls df.to_dict(orient='records')
+    # So we need to mock that behavior
+    mock_df = MagicMock()
+    mock_df.to_dict.return_value = [
+        {"id": 1, "value": 100, "timestamp": datetime.utcnow().isoformat()},
+        {"id": 2, "value": 200, "timestamp": datetime.utcnow().isoformat()}
+    ]
+    mock_lakehouse.read_data.return_value = mock_df
+
     # Create an instance of ArchivalManager
     archival_manager = ArchivalManager()
     
@@ -49,6 +80,8 @@ async def test_data_retrieval():
         print(f"Metadata: {json.dumps(result.get('metadata', {}), indent=2)}")
     except Exception as e:
         print(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     # Test 2: Metadata-only retrieval (lowest cost)
     print(f"\n[TEST 2] Metadata-only retrieval (lowest cost)")
@@ -116,8 +149,10 @@ async def test_data_retrieval():
             offset=0
         )
         print(f"Unexpected success! Retrieved {len(result.get('data', []))} records")
-    except Exception as e:
+    except ValueError as e:
         print(f"Expected error: {str(e)}")
+    except Exception as e:
+        print(f"Unexpected error type: {type(e).__name__}: {str(e)}")
     
     # Test 6: Test with a larger time range in performance mode (should succeed)
     print(f"\n[TEST 6] Large time range in performance mode")

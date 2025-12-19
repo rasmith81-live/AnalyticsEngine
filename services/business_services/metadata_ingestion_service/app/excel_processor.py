@@ -1,0 +1,152 @@
+import pandas as pd
+from typing import List, Dict, Any, BinaryIO, Tuple, Optional
+import re
+import io
+
+class KPIExcelProcessor:
+    """
+    Parses Excel and CSV files to extract KPI definitions.
+    Adapted for use in Metadata Ingestion Service.
+    """
+
+    # Updated column mapping based on "kpidepot.com-sales-training-and-coaching.csv"
+    REQUIRED_COLUMNS = ['KPI', 'Definition', 'Standard Formula']
+    
+    # Formula Validation Rules
+    UNSUPPORTED_FUNCTIONS = ['VLOOKUP', 'HLOOKUP', 'OFFSET', 'INDIRECT', 'INDEX', 'MATCH', 'LOOKUP']
+    FORBIDDEN_KEYWORDS = ['import', 'exec', 'eval', '__', 'lambda']
+
+    def parse_stream(self, file_content: BinaryIO, filename: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Reads the Excel/CSV file content and returns a tuple of (valid_kpis, errors).
+        """
+        try:
+            if filename.endswith('.csv'):
+                df = pd.read_csv(file_content)
+            else:
+                df = pd.read_excel(file_content)
+        except Exception as e:
+            raise ValueError(f"Failed to read file: {e}")
+
+        # Normalize columns (strip whitespace)
+        df.columns = [c.strip() for c in df.columns]
+
+        # Validate columns
+        missing_cols = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
+        if missing_cols:
+            # Fallback to old format if new columns aren't present
+            if 'Code' in df.columns and 'Name' in df.columns:
+                return self._parse_legacy_format(df, filename)
+            raise ValueError(f"Missing required columns: {missing_cols}")
+
+        valid_kpis = []
+        errors = []
+        
+        for index, row in df.iterrows():
+            # Excel row number approx (1 header + 0-based index + 1)
+            row_num = index + 2
+            
+            # Generate code from KPI name (slugify)
+            kpi_name = str(row['KPI']).strip() if pd.notna(row['KPI']) else ""
+            if not kpi_name:
+                errors.append({
+                    "row": row_num,
+                    "column": "KPI",
+                    "message": "KPI name is missing",
+                    "data": {}
+                })
+                continue
+                
+            kpi_code = re.sub(r'[^a-zA-Z0-9]', '_', kpi_name).upper()
+
+            kpi = {
+                "kind": "metric_definition",
+                "code": kpi_code,
+                "name": kpi_name,
+                "description": str(row['Definition']).strip() if pd.notna(row['Definition']) else None,
+                "formula": str(row['Standard Formula']).strip() if pd.notna(row['Standard Formula']) else None,
+                # Map extra fields to metadata
+                "metadata": {
+                    "source_file": filename,
+                    "business_insights": str(row.get('Business Insights', '')),
+                    "measurement_approach": str(row.get('Measurement Approach', '')),
+                    "visualization_suggestions": str(row.get('Visualization Suggestions', '')),
+                    "row_index": row_num
+                }
+            }
+            
+            is_valid, error_msg = self._validate_kpi(kpi)
+            if is_valid:
+                valid_kpis.append(kpi)
+            else:
+                errors.append({
+                    "row": row_num,
+                    "column": "Formula/Validation",
+                    "message": error_msg,
+                    "data": {"Name": kpi_name, "Formula": kpi['formula']}
+                })
+        
+        return valid_kpis, errors
+
+    def _parse_legacy_format(self, df: pd.DataFrame, filename: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Parses the legacy Excel format (Code, Name, Description, Formula).
+        """
+        valid_kpis = []
+        errors = []
+        
+        for index, row in df.iterrows():
+            row_num = index + 2
+            
+            kpi = {
+                "kind": "metric_definition",
+                "code": str(row['Code']).strip(),
+                "name": str(row['Name']).strip(),
+                "description": str(row['Description']).strip() if pd.notna(row['Description']) else None,
+                "formula": str(row['Formula']).strip() if pd.notna(row['Formula']) else None,
+                "metadata": {
+                    "source_file": filename,
+                    "row_index": row_num
+                }
+            }
+            
+            is_valid, error_msg = self._validate_kpi(kpi)
+            if is_valid:
+                valid_kpis.append(kpi)
+            else:
+                errors.append({
+                    "row": row_num,
+                    "column": "Validation",
+                    "message": error_msg,
+                    "data": {"Code": kpi['code'], "Name": kpi['name']}
+                })
+                
+        return valid_kpis, errors
+
+    def _validate_kpi(self, kpi: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """
+        Validation logic including formula safety checks.
+        Returns (is_valid, error_message).
+        """
+        if not kpi['code'] or not kpi['name']:
+            return False, "Missing Code or Name"
+            
+        formula = kpi.get('formula')
+        if formula:
+            formula_upper = formula.upper()
+            
+            # 1. Python Injection Check
+            if any(x in formula for x in self.FORBIDDEN_KEYWORDS):
+                return False, "Security Risk: Formula contains forbidden python keywords (import, exec, etc.)"
+                
+            # 2. Excel Function Blacklist (Functions that don't translate to SQL easily)
+            for func in self.UNSUPPORTED_FUNCTIONS:
+                # Use word boundary to match function names exact
+                if re.search(rf'\b{func}\b', formula_upper):
+                    return False, f"Unsupported Excel function: {func}. Cannot translate to SQL."
+            
+            # 3. Context Boundary Check (Cross-sheet references)
+            if '!' in formula:
+                return False, "Context Error: Cross-sheet references ('!') are not allowed. Use Entity.Attribute syntax."
+                
+        return True, None

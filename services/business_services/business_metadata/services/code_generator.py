@@ -54,6 +54,50 @@ class CodeGenerator:
         
         return "\n".join(lines)
 
+    def generate_kpi_view_ddl(self, metric: MetricDefinition, source_table: str) -> str:
+        """
+        Generates TimescaleDB Continuous Aggregate view for a KPI.
+        """
+        view_name = f"kpi_{metric.code.lower()}_daily"
+        
+        # Determine aggregation function
+        agg_func = metric.default_aggregation.upper()
+        allowed_aggs = ["SUM", "AVG", "MIN", "MAX", "COUNT"]
+        if agg_func not in allowed_aggs:
+            agg_func = "SUM"
+            
+        # Parse column from formula (basic assumption: raw column name or simple path)
+        column = "value"
+        if metric.formula:
+            # Handle Entity.Attribute or just Attribute
+            column = metric.formula.split(".")[-1]
+            
+        lines = [
+            f"CREATE MATERIALIZED VIEW {view_name}",
+            "WITH (timescaledb.continuous) AS",
+            f"SELECT time_bucket('1 day', time) AS bucket,"
+        ]
+        
+        # Add dimensions to SELECT
+        for dim in metric.dimensions:
+            lines.append(f"    {dim},")
+            
+        lines.append(f"    {agg_func}({column}) as value")
+        lines.append(f"FROM {source_table}")
+        
+        # Group By
+        group_cols = ["bucket"] + metric.dimensions
+        lines.append(f"GROUP BY {', '.join(group_cols)}")
+        lines.append("WITH NO DATA;")
+        
+        # Policy
+        lines.append(f"SELECT add_continuous_aggregate_policy('{view_name}',")
+        lines.append("    start_offset => INTERVAL '1 month',")
+        lines.append("    end_offset => INTERVAL '1 hour',")
+        lines.append("    schedule_interval => INTERVAL '1 hour');")
+        
+        return "\n".join(lines)
+
     def _map_type_to_python(self, attr_type: str) -> str:
         mapping = {
             "string": "str", "integer": "int", "decimal": "float", 
