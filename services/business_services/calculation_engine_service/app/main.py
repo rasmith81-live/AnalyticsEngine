@@ -15,6 +15,7 @@ from .orchestrator import CalculationOrchestrator
 from .base_handler import CalculationParams, CalculationResult
 from .handlers.dynamic_handler import DynamicCalculationHandler
 from .stream_processor import StreamProcessor
+from .clients import DatabaseClient, MessagingClientWrapper
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -22,14 +23,30 @@ logger = logging.getLogger(__name__)
 # Global instances
 orchestrator = None
 stream_processor = None
+db_client = None
+msg_client = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
-    global orchestrator, stream_processor
+    global orchestrator, stream_processor, db_client, msg_client
     
     settings = get_settings()
+    
+    # Initialize backend clients
+    db_client = DatabaseClient(
+        base_url=settings.database_service_url,
+        service_name="calculation_engine"
+    )
+    logger.info("DatabaseClient initialized")
+    
+    msg_client = MessagingClientWrapper(
+        redis_url=settings.redis_url,
+        service_name="calculation_engine"
+    )
+    await msg_client.connect()
+    logger.info("MessagingClient connected")
     
     # Initialize orchestrator
     orchestrator = CalculationOrchestrator()
@@ -58,8 +75,8 @@ async def lifespan(app: FastAPI):
     # Initialize stream processor
     stream_processor = StreamProcessor(
         orchestrator=orchestrator,
-        database_service_url=settings.database_service_url,
-        messaging_service_url=settings.messaging_service_url,
+        database_client=db_client,
+        messaging_client=msg_client,
         redis_url=settings.redis_url
     )
     await stream_processor.start()
@@ -74,6 +91,14 @@ async def lifespan(app: FastAPI):
     if stream_processor:
         await stream_processor.stop()
         logger.info("Stream processor stopped")
+    
+    if msg_client:
+        await msg_client.disconnect()
+        logger.info("MessagingClient disconnected")
+    
+    if db_client:
+        await db_client.close()
+        logger.info("DatabaseClient closed")
     
     logger.info("Calculation Engine shutting down")
 

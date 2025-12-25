@@ -4,9 +4,10 @@
  */
 
 import { Box, CircularProgress, Alert, TextField, InputAdornment, IconButton } from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
-import { useValueChainTree } from '../hooks/useValueChainTree';
+import { useValueChainTree, useInfiniteKPIs } from '../hooks/useValueChainTree';
 import { useCart } from '../contexts/CartContext';
 import ValueChainNode from './ValueChainNode';
 import type { TreeMode } from '../types/metricTree';
@@ -27,9 +28,33 @@ export default function MetricTree({
   currentViewKPI = null 
 }: MetricTreeProps) {
   const { treeExpandedNodes, setTreeExpandedNodes, treeSearchQuery, setTreeSearchQuery } = useCart();
+  const queryClient = useQueryClient();
 
   // Fetch data based on mode
-  const { data: valueChains, isLoading, error } = useValueChainTree();
+  const { data: valueChains, isLoading, error, refetch } = useValueChainTree();
+  
+  // Refresh handler for tree nodes - invalidate cache and refetch
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['valueChainTree'] });
+    queryClient.invalidateQueries({ queryKey: ['infiniteKPIs'] });
+    refetch();
+  };
+  
+  // Fetch infinite KPIs for modules that use server-side pagination
+  const { data: infiniteData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteKPIs();
+  
+  // Prepare infinite scroll data for passing to components
+  const infiniteScrollData = infiniteData ? {
+    kpis: infiniteData.pages.flatMap(page => page.kpis.map((k: any) => ({
+      ...k,
+      display_name: k.display_name || k.name,
+      description: k.description || '',
+      module_code: 'imported',
+    }))),
+    fetchNextPage,
+    hasNextPage: hasNextPage || false,
+    isFetchingNextPage
+  } : undefined;
 
   const handleNodeToggle = (nodeId: string) => {
     setTreeExpandedNodes(
@@ -90,9 +115,10 @@ export default function MetricTree({
   }
 
   if (error) {
+    console.error('MetricTree error:', error);
     return (
       <Alert severity="error">
-        Failed to load KPI tree. Please check if the metadata service is running.
+        Failed to load KPI tree: {error instanceof Error ? error.message : 'Unknown error'}
       </Alert>
     );
   }
@@ -151,6 +177,8 @@ export default function MetricTree({
                 selectedKPIs={selectedKPIs}
                 currentViewKPI={currentViewKPI}
                 searchQuery={treeSearchQuery}
+                infiniteScrollData={infiniteScrollData}
+                onRefresh={handleRefresh}
               />
             ))}
           </Box>

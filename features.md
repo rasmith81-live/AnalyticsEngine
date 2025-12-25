@@ -339,9 +339,15 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[1 pt]** Implement context window management (keeping relevant history for LLM).
 
 #### Feature: Strategic Recommendation [COMPLETED]
-**Description:** Mapping business context to value chains (Chatbot support).
-*   **[2 pts]** Implement logic to map "Business Descriptions" and "Use Cases" to recommended `ValueChainSet`s.
-*   **[2 pts]** Implement recommendation scoring algorithm based on industry and strategy alignment.
+**Description:** Mapping business context to value chains using NLP-based semantic search via Entity Resolution Service.
+*   **[2 pts]** Implement `StrategicRecommender` with semantic search using Entity Resolution Service for value chain matching.
+    - Extract semantic entities from business descriptions and use cases via NLP
+    - Index value chain definitions with extracted domain entities and noun phrases
+    - Calculate Jaccard similarity on entity/phrase overlap (not keyword matching)
+    - Return matched entities and phrases as evidence for recommendations
+*   **[2 pts]** Implement strategy alignment scoring using semantic similarity of strategy concepts.
+    - Compare industry domain entities against strategy concept sets
+    - Return matched concepts as rationale for alignment scores
 *   **[1 pt]** Expose API endpoint for Conversation Service to request mappings.
 
 ### 6. Connector Service
@@ -404,10 +410,80 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement persistence to Business Metadata Service, ensuring the core platform remains agnostic while supporting deep vertical functionality.
 
 #### Feature: Semantic Mapping Engine [COMPLETED]
-**Description:** Decomposing definitions into ontology components.
-*   **[2 pts]** Implement `KPIDecomposer` to parse natural language/formula definitions into Entities and Attributes.
-*   **[2 pts]** Integration with `EntityResolutionService` to resolve component terms against the ontology.
-*   **[2 pts]** Implement integrity checks ensuring Calculation Definitions map to valid Entity Attributes.
+**Description:** Decomposing definitions into ontology components using NLP-based semantic analysis via Entity Resolution Service.
+*   **[2 pts]** **Entity Extraction from Descriptions**: Integrate with Entity Resolution Service for NLP-based semantic entity extraction to identify business objects (e.g., "Customer", "Order", "Revenue") from KPI names, descriptions, and formulas.
+    - Use Entity Resolution Service's semantic analysis to extract nouns and domain terms
+    - Leverage NLP models (spaCy/LLM) for Part-of-Speech tagging and noun phrase extraction
+    - Match extracted entities against existing definitions in Business Metadata Service
+    - Populate `required_objects` array with matched entity codes
+    - No predefined keywords - dynamically identifies entities from any business domain
+
+*   **[2 pts]** **Value Chain Inference**: Integrate with Entity Resolution Service for semantic domain classification to map KPIs to appropriate value chains.
+    - Use NLP-based semantic similarity to classify business domain from extracted entities
+    - Query Business Metadata Service for existing value chain definitions
+    - Auto-create value chain definitions if none exist for detected domain
+    - Assign KPI to inferred value chain via metadata
+
+*   **[2 pts]** **Module Assignment**: Integrate with Entity Resolution Service for semantic module clustering to group related KPIs.
+    - Use NLP-based semantic analysis to detect module context from KPI metadata
+    - Create or update module definitions in Business Metadata Service
+    - Populate `modules` array with assigned module codes
+    - Auto-generate module display names from detected business context
+
+*   **[2 pts]** **Formula Decomposition Enhancement**: Extend existing `KPIDecomposer.decompose_formula()` to extract entity.attribute references from formulas.
+    - Parse formula syntax to identify entity references (e.g., "Order.Revenue", "Customer.Count")
+    - Validate extracted entities against ontology
+    - Map formula variables to canonical entity attributes
+    - Store decomposition results in KPI metadata for calculation engine
+
+*   **[1 pt]** **Integration into Excel Upload Flow**: Wire decomposition pipeline into `/import/upload` endpoint.
+    - Call decomposition for each valid KPI after initial parsing
+    - Enrich KPI data structure with extracted metadata before caching
+    - Log decomposition results for debugging and audit
+    - Handle decomposition failures gracefully (continue import with warnings)
+
+*   **[2 pts]** **Ontology Synchronization**: Implement logic to create missing ontology objects discovered during decomposition.
+    - Auto-create entity definitions for newly discovered business objects
+    - Auto-create value chain definitions for new domains
+    - Auto-create/update module definitions with KPI assignments
+    - Publish ontology change events to Business Metadata Service
+
+*   **[1 pt]** **Testing & Validation**: Create integration tests for decomposition pipeline.
+    - Test entity extraction from various KPI description formats
+    - Test value chain inference accuracy
+    - Test module assignment logic
+    - Verify ontology synchronization with Business Metadata Service
+
+*   **[2 pts]** **Time-Agnostic Formula Normalization**: Replace time-specific modifiers with generic "period" placeholders.
+    - Replace duration units (day, week, month, year) with "period" (preserving plurality: days → periods)
+    - Replace over-period terms (YoY, MoM, QoQ) with "Period over Period"
+    - Replace to-date terms (YTD, MTD, QTD) with "Period to Date"
+    - Store original formula in metadata for reference
+    - Enables formulas to be applied to any time granularity
+
+*   **[2 pts]** **Formula-Only Entity Extraction**: Extract only calculation-relevant entities for `required_objects`.
+    - Parse formula syntax to identify business entities (e.g., "Revenue", "Cost", "Customer")
+    - Filter out common terms (Total, Number, Sum, Average, etc.) using stop word list
+    - Separate description entities (for domain inference) from formula entities (for calculations)
+    - Only formula entities populate `required_objects` array
+
+*   **[2 pts]** **LLM Fallback for Domain Inference**: Use LLM when spaCy NLP is unavailable.
+    - Primary: spaCy word vector similarity for semantic domain classification
+    - Fallback: OpenAI/Azure OpenAI LLM-based domain inference
+    - Valid domains: supply_chain, sales, marketing, finance, hr, operations, customer_service, sustainability
+    - Returns domain and confidence score
+
+*   **[1 pt]** **Sustainability Domain Support**: Added sustainability as a recognized business domain.
+    - Domain seed concepts: emission, carbon, environmental, ESG, CSR, climate, biodiversity, welfare, ethics, diversity, inclusion
+    - Maps to "sustainability" value chain
+    - Properly classifies CSR and environmental KPIs
+
+*   **[1 pt]** **spaCy Model Caching**: Persist NLP models in Docker volume for faster startup.
+    - spaCy models stored in `spacy_models` volume
+    - Model downloaded on first startup, cached for subsequent restarts
+    - Fallback to smaller model (en_core_web_sm) if primary (en_core_web_md) fails
+
+**Expected Outcome:** Imported KPIs automatically organized into hierarchical structure (Value Chain → Module → KPI) with proper entity relationships, time-agnostic formulas, and accurate domain classification including sustainability, enabling immediate use in Config Page tree view without manual categorization.
 
 ---
 
@@ -696,14 +772,53 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement API endpoint `GET /metadata/graph/uml` to generate PlantUML/D3 diagrams dynamically from the current ontology state.
 
 #### Feature: KPI Consolidation [COMPLETED]
-**Description:** Identifying and merging duplicate metrics.
-*   **[2 pts]** Implement semantic similarity logic within the **Metadata Ingestion Service** to flag potential duplicates during import.
+**Description:** Identifying and merging duplicate metrics using NLP-based semantic similarity.
+*   **[2 pts]** Implement `SimilarityEngine` in **Metadata Ingestion Service** integrating with **Entity Resolution Service** for NLP-based duplicate detection.
+    - Use Entity Resolution Service's semantic extraction to compare KPI names and descriptions
+    - Calculate Jaccard similarity on extracted entities and noun phrases (not string fuzzy matching)
+    - Return shared entities and phrases as evidence for duplicate candidates
+    - Fallback to rapidfuzz when Entity Resolution Service is unavailable
 *   **[2 pts]** Implement API endpoint `POST /metadata/kpis/merge` to execute consolidation logic transactionally in the database.
 
 #### Feature: Code Generation [COMPLETED]
 **Description:** Automating boilerplate creation via CLI wrappers.
 *   **[2 pts]** Implement `tools/codegen/generate_models.py` as a CLI wrapper that calls the Metadata Service API to fetch definitions and generate Pydantic/SQLAlchemy files.
 *   **[1 pt]** Implement `tools/codegen/validate_schema.py` to check deployed DB schema against Metadata Service definitions (CI/CD step).
+
+### 3. Migration & Schema Utilities
+**Bounded Context:** Database Schema Management & Automation
+
+#### Feature: Schema Extraction [COMPLETED]
+**Description:** Extract table schemas from object models to JSON files for CQRS automation.
+*   **[2 pts]** Implement `extract_table_schemas.py` to read object models and generate JSON schema definitions.
+*   **[1 pt]** Support extraction for specific domains (e.g., SCOR) or all object models.
+*   **[1 pt]** Generate schema files with metadata (entity name, code, description, module).
+
+#### Feature: CQRS Schema Generation [COMPLETED]
+**Description:** Automate addition of schema objects with proper CQRS pattern.
+*   **[2 pts]** Implement `add_cqrs_schema.ps1` to add write models to `app/models.py` and read models to domain folders.
+*   **[2 pts]** Implement automatic Alembic migration generation with validation.
+*   **[1 pt]** Implement duplicate detection and import conflict prevention.
+*   **[1 pt]** Support dry-run mode for previewing changes.
+
+#### Feature: CQRS Validation [COMPLETED]
+**Description:** Validate CQRS model consistency across services.
+*   **[2 pts]** Implement `validate_cqrs_models.ps1` to check write/read model alignment.
+*   **[1 pt]** Validate field names, data types, and model completeness.
+*   **[1 pt]** Generate validation reports with actionable recommendations.
+
+#### Feature: Migration Management [COMPLETED]
+**Description:** Helper scripts for Alembic migration lifecycle management.
+*   **[1 pt]** Implement `create_revision_clean.ps1` for creating clean Alembic migrations.
+*   **[1 pt]** Implement `upgrade_service.ps1` for upgrading service migrations.
+*   **[1 pt]** Implement `run_migration_reset.ps1` for development migration resets.
+*   **[1 pt]** Implement `resolve_service_heads.ps1` for resolving migration conflicts.
+
+#### Feature: CI/CD Integration [COMPLETED]
+**Description:** Integration scripts for continuous integration and deployment.
+*   **[2 pts]** Implement `ci_cd_integration.ps1` for automated migration validation.
+*   **[2 pts]** Implement `enhanced_docker_deploy.ps1` for deployment with migrations.
+*   **[1 pt]** Support migration validation in GitHub Actions workflows.
 
 ## Execution Lifecycle Example
 **Scenario:** Health Insurer Retention Analysis

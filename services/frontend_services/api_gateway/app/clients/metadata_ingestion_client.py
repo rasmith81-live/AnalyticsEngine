@@ -30,5 +30,29 @@ class MetadataIngestionServiceClient:
         response.raise_for_status()
         return response.json()
 
+    async def upload_excel(self, file) -> Dict[str, Any]:
+        # Read file content to avoid stream exhaustion issues
+        content = await file.read()
+        await file.seek(0)  # Reset for potential re-reads
+        
+        files = {"file": (file.filename, content, file.content_type)}
+        response = await self.client.post(f"{self.base_url}/import/upload", files=files)
+        response.raise_for_status()
+        return response.json()
+
+    async def enrich_import(self, import_id: str) -> Dict[str, Any]:
+        """Call AI enrichment endpoint with extended timeout."""
+        response = await self.client.post(
+            f"{self.base_url}/import/{import_id}/enrich",
+            timeout=300.0  # 5 minutes for LLM processing
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def commit_import(self, import_id: str) -> Dict[str, Any]:
+        response = await self.client.post(f"{self.base_url}/import/{import_id}/commit")
+        response.raise_for_status()
+        return response.json()
+
     async def close(self):
         await self.client.aclose()

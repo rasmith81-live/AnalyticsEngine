@@ -21,7 +21,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PolicyIcon from '@mui/icons-material/Policy';
 import ModelTrainingIcon from '@mui/icons-material/ModelTraining';
-
+import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 interface LayoutProps {
@@ -37,6 +37,7 @@ const menuItems = [
   { text: 'Ontology Studio', icon: <AccountTreeIcon />, path: '/ontology-studio' },
   { text: 'Simulation Controller', icon: <SettingsIcon />, path: '/simulation' },
   { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
+  { text: 'System Monitor', icon: <MonitorHeartIcon />, path: '/system-monitor' },
   { text: 'Object Models', icon: <AccountTreeIcon />, path: '/object-models' },
   { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
   { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },

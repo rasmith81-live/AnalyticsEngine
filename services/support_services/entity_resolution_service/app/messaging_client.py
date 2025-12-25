@@ -587,3 +587,21 @@ class MessagingClient:
             },
             correlation_id=correlation_id
         )
+
+
+# Singleton instance and dependency injection
+_messaging_client: Optional[MessagingClient] = None
+
+
+def get_messaging_client() -> MessagingClient:
+    """Get or create the messaging client singleton."""
+    global _messaging_client
+    if _messaging_client is None:
+        from .config import get_settings
+        settings = get_settings()
+        messaging_url = getattr(settings, 'MESSAGING_SERVICE_URL', 'http://messaging_service:8000')
+        _messaging_client = MessagingClient(
+            base_url=messaging_url,
+            service_name="entity_resolution_service"
+        )
+    return _messaging_client

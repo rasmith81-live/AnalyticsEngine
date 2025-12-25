@@ -9,13 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import uuid
+import sys
+import os
+from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import httpx
 import random
 
 import math
 
+# Add backend services to path
+backend_services_path = Path(__file__).parent.parent.parent.parent.parent / "backend_services"
+sys.path.insert(0, str(backend_services_path))
+
+from database_service.app.messaging_client import MessagingClient
+from .database_client import DatabaseClient
 from .config import get_settings
 from .models import (
     ClientConfigCreate, ClientConfigUpdate, ClientConfigResponse,
@@ -34,21 +43,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# In-memory storage (replace with database in production)
-client_configs = {}
+# Global instances
+messaging_client: Optional[MessagingClient] = None
+db_client: Optional[DatabaseClient] = None
+
+# In-memory storage for custom KPIs (TODO: move to database)
 custom_kpis = {}
-service_proposals = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
+    global messaging_client
     settings = get_settings()
     
     logger.info(f"Starting {settings.service_name} v{settings.version}")
     logger.info(f"Environment: {settings.environment}")
     
+    # Initialize messaging client
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    messaging_client = MessagingClient(
+        redis_url=redis_url,
+        service_name="demo_config_service",
+        pool_size=5
+    )
+    await messaging_client.connect()
+    logger.info("MessagingClient connected")
+    
+    # Initialize database client
+    database_service_url = os.getenv("DATABASE_SERVICE_URL", "http://database_service:8000")
+    db_client = DatabaseClient(
+        base_url=database_service_url,
+        service_name="demo_config_service"
+    )
+    logger.info("DatabaseClient initialized for persistent storage")
+    
     yield
+    
+    # Cleanup
+    if messaging_client:
+        await messaging_client.disconnect()
+        logger.info("MessagingClient disconnected")
+    
+    if db_client:
+        await db_client.close()
+        logger.info("DatabaseClient closed")
     
     logger.info("Shutting down Demo/Config Service")
 
@@ -101,15 +140,10 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    settings = get_settings()
-    
     return {
         "status": "healthy",
-        "service": settings.service_name,
-        "version": settings.version,
-        "configs_count": len(client_configs),
-        "custom_kpis_count": len(custom_kpis),
-        "proposals_count": len(service_proposals)
+        "service": "demo_config_service",
+        "custom_kpis_count": len(custom_kpis)
     }
 
 
@@ -120,16 +154,21 @@ async def health_check():
 @app.get("/api/configs", response_model=List[ClientConfigResponse])
 async def list_client_configs():
     """List all client configurations."""
-    return list(client_configs.values())
+    if db_client:
+        configs = await db_client.list_client_configs()
+        return [ClientConfigResponse(**c["config_data"]) for c in configs]
+    return []
 
 
 @app.get("/api/configs/{client_id}", response_model=ClientConfigResponse)
 async def get_client_config(client_id: str):
     """Get client configuration by ID."""
-    if client_id not in client_configs:
-        raise HTTPException(status_code=404, detail=f"Client config not found: {client_id}")
-    
-    return client_configs[client_id]
+    if db_client:
+        config_data = await db_client.get_client_config(client_id)
+        if not config_data:
+            raise HTTPException(status_code=404, detail=f"Client config not found: {client_id}")
+        return ClientConfigResponse(**config_data)
+    raise HTTPException(status_code=503, detail="Database client not available")
 
 
 @app.post("/api/configs", response_model=ClientConfigResponse)
@@ -154,7 +193,14 @@ async def create_client_config(config: ClientConfigCreate):
         updated_at=now
     )
     
-    client_configs[client_id] = client_config
+    # Store in database
+    if db_client:
+        success = await db_client.store_client_config(
+            client_id=client_id,
+            config_data=client_config.model_dump()
+        )
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to store client config")
     
     logger.info(f"Created client config: {client_id} - {config.client_name}")
     
@@ -164,10 +210,14 @@ async def create_client_config(config: ClientConfigCreate):
 @app.put("/api/configs/{client_id}", response_model=ClientConfigResponse)
 async def update_client_config(client_id: str, config: ClientConfigUpdate):
     """Update client configuration."""
-    if client_id not in client_configs:
+    if not db_client:
+        raise HTTPException(status_code=503, detail="Database client not available")
+    
+    config_data = await db_client.get_client_config(client_id)
+    if not config_data:
         raise HTTPException(status_code=404, detail=f"Client config not found: {client_id}")
     
-    existing = client_configs[client_id]
+    existing = ClientConfigResponse(**config_data)
     
     # Update fields
     if config.client_name is not None:
@@ -181,6 +231,14 @@ async def update_client_config(client_id: str, config: ClientConfigUpdate):
     
     existing.updated_at = datetime.utcnow()
     
+    # Store updated config
+    success = await db_client.store_client_config(
+        client_id=client_id,
+        config_data=existing.model_dump()
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update client config")
+    
     # Cascade changes (publish event)
     changes = config.model_dump(exclude_unset=True)
     if changes:
@@ -193,37 +251,33 @@ async def update_client_config(client_id: str, config: ClientConfigUpdate):
 
 async def _publish_config_change(client_id: str, changes: Dict[str, Any]):
     """Publish configuration change event to messaging service."""
-    settings = get_settings()
-    
     event = {
-        "event_type": "client_config_updated",
         "client_id": client_id,
         "changes": changes,
         "timestamp": datetime.utcnow().isoformat()
     }
     
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            # Fire and forget pattern for demo purposes, or await response
-            await client.post(
-                f"{settings.messaging_service_url}/publish",
-                json={
-                    "channel": "config.updates",
-                    "message": event
-                }
+        if messaging_client:
+            await messaging_client.publish_event(
+                event_type="config.updated",
+                payload=event,
+                correlation_id=client_id
             )
-            logger.info(f"Published config update event for client {client_id}")
+            logger.info(f"Published config.updated event for client {client_id}")
     except Exception as e:
-        logger.error(f"Failed to publish config update event: {e}")
+        logger.error(f"Failed to publish config change: {e}")
 
 
 @app.delete("/api/configs/{client_id}")
 async def delete_client_config(client_id: str):
     """Delete client configuration."""
-    if client_id not in client_configs:
-        raise HTTPException(status_code=404, detail=f"Client config not found: {client_id}")
+    if not db_client:
+        raise HTTPException(status_code=503, detail="Database client not available")
     
-    del client_configs[client_id]
+    success = await db_client.delete_client_config(client_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Client config not found: {client_id}")
     
     # Also delete associated custom KPIs
     client_custom_kpis = [k for k, v in custom_kpis.items() if v.client_id == client_id]

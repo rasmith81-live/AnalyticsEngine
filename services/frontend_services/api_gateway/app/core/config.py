@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     CIRCUIT_BREAKER_THRESHOLD: int = Field(5, description="Failures before circuit opens")
     CIRCUIT_BREAKER_RECOVERY_TIME: int = Field(30, description="Seconds before attempting recovery")
     
+    # Debug mode
+    DEBUG: bool = Field(default_factory=lambda: os.getenv("DEBUG", "false").lower() == "true")
+    
     # Caching
     CACHE_ENABLED: bool = Field(True, description="Enable response caching")
     CACHE_TTL: int = Field(300, description="Cache TTL in seconds")
@@ -81,7 +84,7 @@ class Settings(BaseSettings):
         },
         # Business Services
         "business_metadata_service": {
-            "url": os.getenv("BUSINESS_METADATA_SERVICE_URL", "http://analytics_metadata_service:8023"),
+            "url": os.getenv("BUSINESS_METADATA_SERVICE_URL", "http://business_metadata:8000"),
             "timeout": 30.0,
             "health_endpoint": "/health",
         },
@@ -139,12 +142,23 @@ class Settings(BaseSettings):
     )
     
     # CORS settings
-    CORS_ORIGINS: list = Field(
-        default_factory=lambda: [
-            origin.strip()
-            for origin in os.getenv("CORS_ORIGINS", "*").split(",")
-        ]
-    )
+    CORS_ORIGINS: list = Field(default_factory=lambda: ["*"])
+    
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            # Try to parse as JSON first
+            import json
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except (json.JSONDecodeError, ValueError):
+                pass
+            # Fall back to comma-separated parsing
+            return [origin.strip() for origin in v.split(",")]
+        return v
     
     @field_validator('REDIS_URL')
     @classmethod

@@ -28,6 +28,9 @@ class BusinessMetadataSettings(DatabaseServiceSettings):
     service_name: str = "business_metadata"
     service_port: int = 8023
     
+    # CORS settings
+    cors_origins: list = ["*"]  # Allow all origins for development
+    
     # Metadata-specific settings
     cache_ttl: int = 3600  # 1 hour default for metadata cache
     enable_versioning: bool = True  # Track version history
@@ -40,6 +43,8 @@ class BusinessMetadataSettings(DatabaseServiceSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        case_sensitive = False
+        extra = "allow"
 
 
 # Global settings instance

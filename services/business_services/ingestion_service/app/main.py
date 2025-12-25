@@ -1,19 +1,61 @@
 
 import logging
-from typing import List, Dict, Any
+import sys
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
+import os
 
-from app.pipeline import pipeline_orchestrator, IngestionJob
+# Add backend services to path
+backend_services_path = Path(__file__).parent.parent.parent.parent / "backend_services"
+sys.path.insert(0, str(backend_services_path))
+
+from database_service.app.messaging_client import MessagingClient
+from app.pipeline import PipelineOrchestrator, IngestionJob
 from app.transformation_engine import TransformationEngine
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Ingestion Service", version="1.0.0")
-
+# Global instances
+messaging_client: Optional[MessagingClient] = None
+pipeline_orchestrator: Optional[PipelineOrchestrator] = None
 transformation_engine = TransformationEngine()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    global messaging_client, pipeline_orchestrator
+    
+    # Initialize messaging client
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    messaging_client = MessagingClient(
+        redis_url=redis_url,
+        service_name="ingestion_service",
+        pool_size=5
+    )
+    await messaging_client.connect()
+    logger.info("MessagingClient connected")
+    
+    # Initialize pipeline orchestrator with messaging client
+    pipeline_orchestrator = PipelineOrchestrator(messaging_client=messaging_client)
+    logger.info("PipelineOrchestrator initialized")
+    
+    yield
+    
+    # Cleanup
+    if messaging_client:
+        await messaging_client.disconnect()
+        logger.info("MessagingClient disconnected")
+
+app = FastAPI(
+    title="Ingestion Service",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 @app.get("/health")
 async def health_check():

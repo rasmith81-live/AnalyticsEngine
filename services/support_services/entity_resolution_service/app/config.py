@@ -34,6 +34,13 @@ class Settings(BaseSettings):
         description="Threshold for fuzzy matching (0.0 - 1.0)"
     )
     
+    # External Service URLs
+    business_metadata_url: str = Field(
+        default="http://business_metadata:8000",
+        env="BUSINESS_METADATA_URL",
+        description="URL of Business Metadata Service for value chain queries"
+    )
+    
     # Distributed Tracing Configuration
     enable_distributed_tracing: bool = Field(
         default=True,

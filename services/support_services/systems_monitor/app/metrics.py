@@ -484,68 +484,114 @@ def set_service_ready(ready: bool):
 async def export_metrics_to_observability(observability_url: str, push_gateway: str = None, job_name: str = "systems_monitor"):
     """Export collected metrics to the Observability Service.
     
-    This function sends the collected Prometheus metrics to the Observability Service
-    for centralized storage and analysis. It supports two export methods:
-    1. Direct HTTP POST to the Observability Service's metrics ingestion endpoint
-    2. Push to a Prometheus Pushgateway (if configured)
+    This function parses Prometheus metrics and sends them as structured MetricData
+    to the Observability Service for centralized storage, analysis, and alerting.
     
     Args:
         observability_url: URL of the Observability Service
         push_gateway: Optional URL of Prometheus Pushgateway
         job_name: Job name for metrics export
     """
-    import aiohttp
-    from io import StringIO
-    from prometheus_client import generate_latest, REGISTRY
-    import json
+    from .observability_client import ObservabilityClient, MetricData
+    from prometheus_client import REGISTRY
     from datetime import datetime
+    import re
     
-    # Generate metrics in Prometheus text format
-    output = StringIO()
-    output.write(generate_latest(REGISTRY).decode('utf-8'))
-    prometheus_data = output.getvalue()
-    
-    # Prepare metrics data for Observability Service
-    metrics_data = {
-        "service": metrics.service_name,
-        "timestamp": datetime.utcnow().isoformat(),
-        "metrics": prometheus_data,
-        "format": "prometheus"
-    }
-    
-    # Export metrics to Observability Service
     try:
-        async with aiohttp.ClientSession() as session:
-            # Send to Observability Service metrics ingestion endpoint
-            async with session.post(
-                f"{observability_url}/metrics/ingest",
-                json=metrics_data,
-                headers={"Content-Type": "application/json"},
-                timeout=10
-            ) as response:
-                if response.status != 200 and response.status != 202:
-                    response_text = await response.text()
-                    logger.warning(f"Failed to export metrics to Observability Service: {response.status} - {response_text}")
-                else:
-                    logger.debug(f"Successfully exported metrics to Observability Service")
-                    
-            # If push gateway is configured, also push metrics there
-            if push_gateway:
-                import requests
-                from prometheus_client import push_to_gateway
-                try:
-                    # This is synchronous but we're running in an async context
-                    # Use a thread pool executor for this operation
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        await asyncio.get_event_loop().run_in_executor(
-                            executor,
-                            lambda: push_to_gateway(push_gateway, job=job_name, registry=REGISTRY)
-                        )
-                    logger.debug(f"Successfully pushed metrics to Pushgateway")
-                except Exception as e:
-                    logger.warning(f"Failed to push metrics to Pushgateway: {str(e)}")
-    
+        # Create Observability Client
+        client = ObservabilityClient(
+            base_url=observability_url,
+            service_name=metrics.service_name
+        )
+        
+        # Collect current metric values from Prometheus registry
+        structured_metrics = []
+        current_time = datetime.utcnow()
+        
+        # Extract system metrics
+        try:
+            structured_metrics.append(MetricData(
+                name="system_cpu_usage",
+                value=metrics.system_cpu_usage._value.get(),
+                service_name=metrics.service_name,
+                aggregation="gauge",
+                labels={},
+                timestamp=current_time
+            ))
+        except Exception:
+            pass
+            
+        try:
+            structured_metrics.append(MetricData(
+                name="system_memory_usage",
+                value=metrics.system_memory_usage._value.get(),
+                service_name=metrics.service_name,
+                aggregation="gauge",
+                labels={},
+                timestamp=current_time
+            ))
+        except Exception:
+            pass
+            
+        try:
+            structured_metrics.append(MetricData(
+                name="system_disk_usage",
+                value=metrics.system_disk_usage._value.get(),
+                service_name=metrics.service_name,
+                aggregation="gauge",
+                labels={},
+                timestamp=current_time
+            ))
+        except Exception:
+            pass
+        
+        # Extract service health metrics
+        try:
+            structured_metrics.append(MetricData(
+                name="service_health",
+                value=metrics.service_health._value.get(),
+                service_name=metrics.service_name,
+                aggregation="gauge",
+                labels={},
+                timestamp=current_time
+            ))
+        except Exception:
+            pass
+            
+        try:
+            structured_metrics.append(MetricData(
+                name="service_ready",
+                value=metrics.service_ready._value.get(),
+                service_name=metrics.service_name,
+                aggregation="gauge",
+                labels={},
+                timestamp=current_time
+            ))
+        except Exception:
+            pass
+        
+        # Send metrics to Observability Service
+        if structured_metrics:
+            success_count = await client.send_metrics_batch(structured_metrics)
+            logger.debug(f"Exported {success_count}/{len(structured_metrics)} metrics to Observability Service")
+        
+        # If push gateway is configured, also push raw Prometheus metrics there
+        if push_gateway:
+            from prometheus_client import push_to_gateway
+            try:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    await asyncio.get_event_loop().run_in_executor(
+                        executor,
+                        lambda: push_to_gateway(push_gateway, job=job_name, registry=REGISTRY)
+                    )
+                logger.debug(f"Successfully pushed metrics to Pushgateway")
+            except Exception as e:
+                logger.warning(f"Failed to push metrics to Pushgateway: {str(e)}")
+        
+        # Close client
+        await client.close()
+        
     except Exception as e:
         logger.error(f"Error exporting metrics: {str(e)}")
         raise

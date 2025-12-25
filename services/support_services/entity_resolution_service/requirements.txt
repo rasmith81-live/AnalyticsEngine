@@ -1,11 +1,12 @@
-fastapi==0.109.0
-uvicorn==0.27.0
-pydantic==2.6.0
-pydantic-settings==2.1.0
-python-dotenv==1.0.1
-redis==5.0.1
-prometheus-client==0.19.0
-opentelemetry-api==1.22.0
-opentelemetry-sdk==1.22.0
-opentelemetry-exporter-otlp==1.22.0
-opentelemetry-instrumentation-fastapi==0.43b0
+# Entity Resolution Service Dependencies
+fastapi>=0.100.0
+uvicorn>=0.23.0
+httpx>=0.24.0
+pydantic>=2.0.0
+redis>=4.5.0
+
+# LLM for entity extraction and domain inference (no spaCy)
+openai>=1.0.0
+
+# Fuzzy matching
+rapidfuzz>=3.0.0

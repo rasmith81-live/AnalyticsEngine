@@ -7,13 +7,14 @@ import logging
 import json
 from typing import Dict, Optional, Set, Callable, Any
 from datetime import datetime
-import httpx
 import redis.asyncio as redis
+import httpx
 
 from .base_handler import CalculationParams, CalculationResult
 from .orchestrator import CalculationOrchestrator
 from .engine.stream_aggregator import StreamAggregator
 from .engine.storage_sync import StorageSyncManager
+from .clients import DatabaseClient, MessagingClientWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +36,32 @@ class StreamProcessor:
     def __init__(
         self,
         orchestrator: CalculationOrchestrator,
-        database_service_url: str,
-        messaging_service_url: str,
+        database_client: DatabaseClient,
+        messaging_client: MessagingClientWrapper,
         redis_url: str,
-        subscriber_id: Optional[str] = None
+        subscriber_id: Optional[str] = None,
+        database_service_url: Optional[str] = None
     ):
         """
         Initialize stream processor
         
         Args:
             orchestrator: Calculation orchestrator for KPI calculations
-            database_service_url: URL of database service
-            messaging_service_url: URL of messaging service
+            database_client: Database client for queries
+            messaging_client: Messaging client for events
             redis_url: Redis connection URL for StreamAggregator
             subscriber_id: Optional subscriber ID (generated if not provided)
+            database_service_url: URL for database service (for heartbeat)
         """
         self.orchestrator = orchestrator
-        self.database_service_url = database_service_url
-        self.messaging_service_url = messaging_service_url
+        self.database_client = database_client
+        self.messaging_client = messaging_client
         self.redis_url = redis_url
         self.subscriber_id = subscriber_id or f"calc_engine_{id(self)}"
+        self.database_service_url = database_service_url or database_client.base_url
+        
+        # HTTP client for direct API calls (heartbeat, subscriptions)
+        self._http_client: Optional[httpx.AsyncClient] = None
         
         # Initialize Stream Aggregator
         self.aggregator = StreamAggregator(redis_url=redis_url)
@@ -62,7 +69,7 @@ class StreamProcessor:
         # Initialize Storage Sync Manager (Write-Behind)
         self.sync_manager = StorageSyncManager(
             stream_aggregator=self.aggregator,
-            database_service_url=database_service_url
+            database_client=database_client
         )
         
         # Track active subscriptions: stream_key -> subscription_info
@@ -74,9 +81,6 @@ class StreamProcessor:
         # Control flag
         self._running = False
         
-        # HTTP client for API calls
-        self._http_client: Optional[httpx.AsyncClient] = None
-        
         # Heartbeat task
         self._heartbeat_task: Optional[asyncio.Task] = None
         
@@ -86,7 +90,7 @@ class StreamProcessor:
         """Start the stream processor"""
         self._running = True
         
-        # Initialize HTTP client
+        # Initialize HTTP client for API calls
         self._http_client = httpx.AsyncClient(timeout=30.0)
         
         # Start heartbeat task

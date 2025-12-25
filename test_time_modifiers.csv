@@ -1,0 +1,3 @@
+KPI,Definition,Standard Formula,Business Insights,Measurement Approach,Visualization Suggestions
+YoY Revenue Growth,Year over year revenue growth rate,YoY Growth = (Current Year Revenue - Previous Year Revenue) / Previous Year Revenue,Shows growth trends,Calculate annually,Line chart
+Daily Sales Rate,Sales per day,Total Sales / Number of Days,Shows daily performance,Calculate daily,Bar chart

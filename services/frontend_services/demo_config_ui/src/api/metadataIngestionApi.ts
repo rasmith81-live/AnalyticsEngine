@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8090/api/v1/metadata-ingestion';
+const BASE_URL = 'http://127.0.0.1:8090/api/v1/metadata-ingestion';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -36,7 +36,7 @@ export const metadataIngestionApi = {
     return response.data;
   },
 
-  // KPI Excel Import
+  // KPI Excel Import (fast - no LLM)
   async uploadExcel(file: File): Promise<{
     importId: string;
     totalRows: number;
@@ -44,6 +44,8 @@ export const metadataIngestionApi = {
     errors: Array<{ row: number; column: string; message: string; data: any }>;
     preview: any[];
     duplicates: Array<{ kpi: any; matches: any[] }>;
+    enriched: boolean;
+    allKpiCodes?: string[];
   }> {
     const formData = new FormData();
     formData.append('file', file);
@@ -52,12 +54,44 @@ export const metadataIngestionApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 60000, // 1 minute - fast parsing only
     });
     return response.data;
   },
 
-  async commitImport(importId: string): Promise<{ success: boolean; count: number; ids: string[] }> {
-    const response = await api.post(`/import/${importId}/commit`);
+  // Optional AI enrichment (uses LLM)
+  async enrichImport(importId: string): Promise<{
+    importId: string;
+    enriched: boolean;
+    kpiCount: number;
+    preview: any[];
+    ontology_sync?: {
+      value_chains_created: string[];
+      modules_created: string[];
+      entities_created: string[];
+      relationships_created: string[];
+      errors: string[];
+    };
+    allKpiCodes?: string[];
+  }> {
+    const response = await api.post(`/import/${importId}/enrich`, null, {
+      timeout: 300000, // 5 minutes for LLM processing
+    });
+    return response.data;
+  },
+
+  async commitImport(importId: string, ontologyEdits?: any): Promise<{ success: boolean; count: number; ids: string[] }> {
+    const response = await api.post(`/import/${importId}/commit`, ontologyEdits ? { ontology: ontologyEdits } : undefined);
+    return response.data;
+  },
+
+  async getValueChains(): Promise<Array<{ code: string; name: string; description?: string }>> {
+    const response = await axios.get('http://127.0.0.1:8090/api/v1/metadata/definitions/value_chain_pattern_definition');
+    return response.data;
+  },
+
+  async getModules(): Promise<Array<{ code: string; name: string }>> {
+    const response = await axios.get('http://127.0.0.1:8090/api/v1/metadata/definitions/business_process_definition');
     return response.data;
   }
 };

@@ -1,6 +1,6 @@
 
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
 from ...clients.metadata_ingestion_client import MetadataIngestionServiceClient
 from ...api.dependencies import get_metadata_ingestion_client
 
@@ -33,3 +33,25 @@ async def decompose_kpi(
 ):
     formula = payload.get("formula")
     return await client.decompose_kpi(formula)
+
+@router.post("/import/upload")
+async def upload_excel(
+    file: UploadFile = File(...),
+    client: MetadataIngestionServiceClient = Depends(get_metadata_ingestion_client)
+):
+    return await client.upload_excel(file)
+
+@router.post("/import/{import_id}/enrich")
+async def enrich_import(
+    import_id: str,
+    client: MetadataIngestionServiceClient = Depends(get_metadata_ingestion_client)
+):
+    """Optional AI enrichment - extracts entities using LLM."""
+    return await client.enrich_import(import_id)
+
+@router.post("/import/{import_id}/commit")
+async def commit_import(
+    import_id: str,
+    client: MetadataIngestionServiceClient = Depends(get_metadata_ingestion_client)
+):
+    return await client.commit_import(import_id)

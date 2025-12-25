@@ -17,7 +17,11 @@ from app.transformation_engine import TransformationEngine
 class TestIngestionService(unittest.TestCase):
     
     def setUp(self):
-        self.orchestrator = PipelineOrchestrator()
+        # Mock MessagingClient since PipelineOrchestrator now requires it
+        mock_messaging_client = AsyncMock()
+        mock_messaging_client.publish_event = AsyncMock(return_value=True)
+        
+        self.orchestrator = PipelineOrchestrator(messaging_client=mock_messaging_client)
         self.transformer = TransformationEngine()
 
     def test_pipeline_job_creation(self):

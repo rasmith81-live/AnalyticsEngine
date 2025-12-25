@@ -241,7 +241,7 @@ async def setup_event_subscriptions(messaging_client: MessagingClient):
 # Initialize FastAPI app with lifespan management
 app = FastAPI(
     title="Machine Learning Service",
-    description="Manages ML Models, Training Jobs, and Inference",
+    description="ML model training and inference service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -257,6 +257,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API router
+app.include_router(api_router, prefix="/api")
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": "machine_learning_service"
+    }
 
 # Initialize OpenTelemetry FastAPI instrumentation
 settings = get_settings()

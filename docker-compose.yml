@@ -48,7 +48,7 @@ services:
       args:
         SERVICE_DIR: services/backend_services/messaging_service
     ports:
-      - "8001:8000"
+      - "8002:8000"
     environment:
       - SERVICE_NAME=messaging_service
       - REDIS_URL=redis://redis:6379
@@ -59,7 +59,7 @@ services:
       - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
       - ENABLE_DISTRIBUTED_TRACING=true
       - METRICS_EXPORT_TIMEOUT=5
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/backend_services/messaging_service:/app
     depends_on:
       redis:
         condition: service_healthy
@@ -177,6 +177,8 @@ services:
       - "8020:8000"
     environment:
       - SERVICE_NAME=business_metadata
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
@@ -189,7 +191,7 @@ services:
       - METRICS_PUSH_INTERVAL=15
       - ENABLE_CACHE=true
       - CACHE_TTL=3600
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/business_services:/app
     depends_on:
       database_service:
         condition: service_healthy
@@ -234,7 +236,7 @@ services:
       - METRICS_PUSH_INTERVAL=15
       - CACHE_ENABLED=true
       - CACHE_TTL=3600
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
     depends_on:
       database_service:
         condition: service_healthy
@@ -267,6 +269,8 @@ services:
       - "8022:8000"
     environment:
       - SERVICE_NAME=demo_config_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
       - METADATA_SERVICE_URL=http://business_metadata:8000
@@ -281,7 +285,7 @@ services:
       - DEFAULT_HOURLY_RATE=150.0
       - BATCH_INTEGRATION_HOURS_PER_OBJECT=8
       - REALTIME_INTEGRATION_HOURS_PER_OBJECT=16
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
     depends_on:
       database_service:
         condition: service_healthy
@@ -314,13 +318,15 @@ services:
       - "8023:8000"
     environment:
       - SERVICE_NAME=connector_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
       - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
       - OTEL_EXPORTER_OTLP_INSECURE=false
       - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
     depends_on:
       database_service:
         condition: service_healthy
@@ -347,13 +353,16 @@ services:
       - "8024:8000"
     environment:
       - SERVICE_NAME=ingestion_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - CONNECTOR_SERVICE_URL=http://connector_service:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
       - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
       - OTEL_EXPORTER_OTLP_INSECURE=false
       - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
-      - PYTHONPATH=.
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
     depends_on:
       database_service:
         condition: service_healthy
@@ -383,17 +392,22 @@ services:
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
       - BUSINESS_METADATA_URL=http://business_metadata:8000
+      - ENTITY_RESOLUTION_SERVICE_URL=http://entity_resolution_service:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
       - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
       - OTEL_EXPORTER_OTLP_INSECURE=false
       - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
-      - PYTHONPATH=.
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
     depends_on:
       database_service:
         condition: service_healthy
       messaging_service:
         condition: service_healthy
       business_metadata:
+        condition: service_healthy
+      entity_resolution_service:
         condition: service_healthy
     volumes:
       - .:/app
@@ -414,6 +428,10 @@ services:
         SERVICE_DIR: services/business_services/conversation_service
     ports:
       - "8026:8000"
+    env_file:
+      - .env
+      - path: .env.secrets
+        required: false
     environment:
       - SERVICE_NAME=conversation_service
       - DATABASE_SERVICE_URL=http://database_service:8000
@@ -491,11 +509,22 @@ services:
         SERVICE_DIR: services/support_services/entity_resolution_service
     ports:
       - "8012:8000"
+    env_file:
+      - .env
+      - path: .env.secrets
+        required: false
     environment:
       - SERVICE_NAME=entity_resolution_service
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - BUSINESS_METADATA_URL=http://business_metadata:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - MOCK_LLM=${MOCK_LLM:-false}
       - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
       - OTEL_EXPORTER_OTLP_INSECURE=false
       - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
@@ -517,12 +546,13 @@ services:
     volumes:
       - .:/app
       - ./certs:/certs
+      - spacy_models:/root/.cache/spacy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # Data Governance Service
   data_governance_service:
@@ -623,7 +653,6 @@ services:
       - PORT=8000
       - DEBUG=true
       - REDIS_URL=redis://redis:6379/0
-      - CORS_ORIGINS=["*"]
       - RATE_LIMIT=100
       - RATE_LIMIT_WINDOW=60
       - CIRCUIT_BREAKER_THRESHOLD=5
@@ -757,13 +786,16 @@ services:
     ports:
       - "6379:6379"
       - "8001:8001" # RedisInsight port
-    command: >
-      redis-stack-server
-      --requirepass "" 
-      --dir /data 
-      --maxmemory 256mb 
-      --maxmemory-policy allkeys-lru 
-      --appendonly yes
+    command:
+      - redis-stack-server
+      - --dir
+      - /data
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -806,6 +838,8 @@ volumes:
   azurite_data:
     driver: local
   prometheus_data:
+    driver: local
+  spacy_models:
     driver: local
 
 networks:

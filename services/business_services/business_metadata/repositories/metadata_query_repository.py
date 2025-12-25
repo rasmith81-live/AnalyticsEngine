@@ -26,15 +26,25 @@ class MetadataQueryRepository:
     - Full-text search
     """
     
-    def __init__(self, session: AsyncSession, redis_client=None):
+    def __init__(self, db_manager_or_session, redis_client=None):
         """Initialize query repository.
         
         Args:
-            session: Database session from database_service
+            db_manager_or_session: DatabaseManager instance or AsyncSession
             redis_client: Redis client from database_service (optional)
         """
-        self.session = session
-        self.redis = redis_client
+        # Support both DatabaseManager and AsyncSession for backwards compatibility
+        if hasattr(db_manager_or_session, 'execute_query'):
+            # It's a DatabaseManager
+            self.db_manager = db_manager_or_session
+            self.session = None
+            self.redis = redis_client or getattr(db_manager_or_session, 'redis_client', None)
+        else:
+            # It's an AsyncSession
+            self.session = db_manager_or_session
+            self.db_manager = None
+            self.redis = redis_client
+        
         self.cache_ttl = 3600  # 1 hour
     
     async def get_by_id(self, id: UUID) -> Optional[Dict[str, Any]]:
@@ -250,6 +260,30 @@ class MetadataQueryRepository:
         
         return [self._to_dict(d) for d in definitions]
     
+    async def get_all_relationships(
+        self,
+        relationship_types: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all relationships in the system.
+        
+        Args:
+            relationship_types: Filter by specific types
+            
+        Returns:
+            List of all relationship dicts
+        """
+        conditions = [MetadataRelationship.is_active == True]
+        
+        if relationship_types:
+            conditions.append(MetadataRelationship.relationship_type.in_(relationship_types))
+        
+        stmt = select(MetadataRelationship).where(and_(*conditions))
+        
+        result = await self.session.execute(stmt)
+        relationships = result.scalars().all()
+        
+        return [self._relationship_to_dict(r) for r in relationships]
+
     async def get_relationships(
         self,
         entity_code: str,
@@ -451,20 +485,149 @@ class MetadataQueryRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one()
     
+    async def get_entity_by_code(self, entity_code: str):
+        """Get entity definition by code.
+        
+        Args:
+            entity_code: Entity code to retrieve
+            
+        Returns:
+            EntityDefinition object or None
+        """
+        if self.db_manager:
+            # Use DatabaseManager for direct query
+            query = """
+                SELECT * FROM metadata_definitions 
+                WHERE code = :code AND kind = 'entity_definition' AND is_active = true
+                ORDER BY version DESC LIMIT 1
+            """
+            result = await self.db_manager.execute_query(query, {"code": entity_code})
+            if result and len(result) > 0:
+                return self._row_to_entity(result[0])
+            return None
+        else:
+            # Use session for SQLAlchemy query
+            return await self.get_by_code(entity_code, "entity_definition")
+    
+    async def get_entities_by_module(self, module_code: str):
+        """Get all entities for a module.
+        
+        Args:
+            module_code: Module code to filter by
+            
+        Returns:
+            List of EntityDefinition objects
+        """
+        if self.db_manager:
+            # Use DatabaseManager for direct query
+            query = """
+                SELECT * FROM metadata_definitions 
+                WHERE kind = 'entity_definition' 
+                AND is_active = true
+                AND data->>'module_code' = :module_code
+                ORDER BY code
+            """
+            result = await self.db_manager.execute_query(query, {"module_code": module_code})
+            return [self._row_to_entity(row) for row in result]
+        else:
+            # Use session for SQLAlchemy query
+            stmt = select(MetadataDefinition).where(
+                MetadataDefinition.kind == "entity_definition",
+                MetadataDefinition.is_active == True,
+                MetadataDefinition.data['module_code'].astext == module_code
+            ).order_by(MetadataDefinition.code)
+            
+            result = await self.session.execute(stmt)
+            definitions = result.scalars().all()
+            return [self._row_to_entity(self._to_dict(d)) for d in definitions]
+    
+    async def get_all_entities(self):
+        """Get all entity definitions.
+        
+        Returns:
+            List of EntityDefinition objects
+        """
+        if self.db_manager:
+            # Use DatabaseManager for direct query
+            query = """
+                SELECT * FROM metadata_definitions 
+                WHERE kind = 'entity_definition' AND is_active = true
+                ORDER BY code
+            """
+            result = await self.db_manager.execute_query(query)
+            return [self._row_to_entity(row) for row in result]
+        else:
+            # Use session for SQLAlchemy query
+            return await self.get_all_by_kind("entity_definition")
+    
+    def _row_to_entity(self, row):
+        """Convert database row to EntityDefinition object.
+        
+        Args:
+            row: Database row (dict or object)
+            
+        Returns:
+            EntityDefinition object
+        """
+        from ..ontology_models import EntityDefinition, TableSchemaDefinition, ColumnDefinition
+        
+        # Handle both dict and object rows
+        if isinstance(row, dict):
+            data = row.get('data', {})
+            code = row.get('code')
+            name = row.get('name')
+            description = row.get('description')
+        else:
+            data = row.data if hasattr(row, 'data') else {}
+            code = row.code if hasattr(row, 'code') else None
+            name = row.name if hasattr(row, 'name') else None
+            description = row.description if hasattr(row, 'description') else None
+        
+        # Extract table_schema if present
+        table_schema = None
+        if 'table_schema' in data:
+            schema_data = data['table_schema']
+            columns = [
+                ColumnDefinition(**col) for col in schema_data.get('columns', [])
+            ]
+            table_schema = TableSchemaDefinition(
+                table_name=schema_data.get('table_name'),
+                class_name=schema_data.get('class_name'),
+                columns=columns
+            )
+        
+        return EntityDefinition(
+            id=str(row.get('id') if isinstance(row, dict) else row.id),
+            code=code,
+            name=name,
+            description=description,
+            table_schema=table_schema,
+            module_code=data.get('module_code'),
+            metadata_=data.get('metadata_', {})
+        )
+    
     def _to_dict(self, definition: MetadataDefinition) -> Dict[str, Any]:
-        """Convert SQLAlchemy model to dict."""
+        """Convert MetadataDefinition to dict.
+        
+        Args:
+            definition: MetadataDefinition instance
+            
+        Returns:
+            Dict representation
+        """
         return {
             "id": str(definition.id),
-            "kind": definition.kind,
             "code": definition.code,
+            "kind": definition.kind,
             "name": definition.name,
-            "version": definition.version,
+            "description": definition.data.get("description") if definition.data else None,
             "data": definition.data,
-            "created_at": definition.created_at.isoformat(),
-            "updated_at": definition.updated_at.isoformat(),
-            "created_by": definition.created_by,
+            "version": definition.version,
             "is_active": definition.is_active,
-            "metadata_hash": definition.metadata_hash
+            "created_at": definition.created_at.isoformat() if definition.created_at else None,
+            "updated_at": definition.updated_at.isoformat() if definition.updated_at else None,
+            "created_by": definition.created_by,
+            "updated_by": getattr(definition, 'updated_by', None)
         }
     
     def _relationship_to_dict(self, relationship: MetadataRelationship) -> Dict[str, Any]:
@@ -476,8 +639,8 @@ class MetadataQueryRepository:
             "relationship_type": relationship.relationship_type,
             "from_cardinality": relationship.from_cardinality,
             "to_cardinality": relationship.to_cardinality,
-            "metadata": relationship.metadata,
-            "created_at": relationship.created_at.isoformat(),
+            "metadata_": relationship.metadata_,
+            "created_at": relationship.created_at.isoformat() if relationship.created_at else None,
             "is_active": relationship.is_active
         }
     

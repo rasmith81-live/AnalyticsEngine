@@ -105,3 +105,41 @@ async def get_value_chains_by_industry(
     client: MetadataServiceClient = Depends(get_metadata_client)
 ):
     return await client.get_value_chains_by_industry(code)
+
+@router.get("/definitions/{kind}")
+async def get_definitions_by_kind(
+    kind: str,
+    limit: int = 100,
+    offset: int = 0,
+    client: MetadataServiceClient = Depends(get_metadata_client)
+):
+    """Proxy to business_metadata definitions endpoint."""
+    return await client.get_definitions(kind, limit, offset)
+
+@router.get("/relationships")
+async def get_all_relationships(
+    relationship_type: str = None,
+    client: MetadataServiceClient = Depends(get_metadata_client)
+):
+    """Get all relationships, optionally filtered by type."""
+    return await client.get_all_relationships(relationship_type)
+
+@router.get("/relationships/{entity_code}")
+async def get_entity_relationships(
+    entity_code: str,
+    direction: str = "both",
+    relationship_type: str = None,
+    client: MetadataServiceClient = Depends(get_metadata_client)
+):
+    """Get relationships for a specific entity."""
+    return await client.get_entity_relationships(entity_code, direction, relationship_type)
+
+@router.delete("/definitions/{kind}/{code}")
+async def delete_definition(
+    kind: str,
+    code: str,
+    deleted_by: str = "admin",
+    client: MetadataServiceClient = Depends(get_metadata_client)
+):
+    """Proxy DELETE to business_metadata definitions endpoint."""
+    return await client.delete_definition(kind, code, deleted_by)

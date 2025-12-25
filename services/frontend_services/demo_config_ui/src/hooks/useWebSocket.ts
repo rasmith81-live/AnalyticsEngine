@@ -17,7 +17,7 @@ interface UseWebSocketOptions {
 
 export const useWebSocket = (options: UseWebSocketOptions = {}) => {
   const {
-    url = 'ws://localhost:8020/ws', // Default to local API Gateway
+    url = 'ws://127.0.0.1:8090/ws', // Default to local API Gateway
     onOpen,
     onClose,
     onError,

@@ -24,16 +24,20 @@ from pydantic import BaseModel, ConfigDict
 
 
 class ThingDefinition(BaseModel):
-    """Base ontology class for all definitions."""
+    """Base ontology class for all definitions.
+    
+    Note: relationships are NOT embedded here to avoid circular references.
+    They are stored separately in the relationships table and fetched via
+    the relationships API endpoints.
+    """
 
     model_config = ConfigDict(extra="allow")
 
+    id: Optional[str] = None
     kind: str
-    id: str
     name: str
     description: Optional[str] = None
     metadata_: Dict[str, Any] = {}
-    relationships: List["RelationshipDefinition"] = []  # Outbound relationships
 
 
 class ColumnDefinition(BaseModel):
@@ -71,15 +75,24 @@ class EntityDefinition(ThingDefinition):
     schema_definition: Optional[str] = None  # UML / graph snippet
 
 
-class RelationshipDefinition(ThingDefinition):
-    """Ontology representation of a relationship between entities."""
+class RelationshipDefinition(BaseModel):
+    """Ontology representation of a relationship between entities.
+    
+    Note: Inherits from BaseModel (not ThingDefinition) to avoid circular reference
+    since ThingDefinition has relationships: List[RelationshipDefinition].
+    """
+    model_config = ConfigDict(extra="allow")
 
+    id: Optional[str] = None
     kind: str = "relationship_definition"
+    name: str = ""
+    description: Optional[str] = None
     from_entity: str
     to_entity: str
     relationship_type: str
     from_cardinality: Optional[str] = None
     to_cardinality: Optional[str] = None
+    metadata_: Dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------------------

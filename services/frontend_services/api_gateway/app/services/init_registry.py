@@ -46,9 +46,9 @@ async def initialize_service_registry() -> List[ServiceInfo]:
         except Exception as e:
             logger.error(f"Failed to register service {service_name}: {str(e)}")
     
-    # Check health of all services
-    logger.info("Checking health of all registered services")
-    await service_registry.check_all_services_health()
+    # Check health of all services - DISABLED: Blocking startup
+    # logger.info("Checking health of all registered services")
+    # await service_registry.check_all_services_health()
     
     return registered_services
 
