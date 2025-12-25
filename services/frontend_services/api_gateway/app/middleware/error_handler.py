@@ -88,11 +88,20 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             error_id=error_id
         )
         
+        # Add CORS headers to error response
+        headers = dict(exc.headers) if exc.headers else {}
+        headers.update({
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*"
+        })
+        
         # Return JSON response
         return JSONResponse(
             status_code=exc.status_code,
             content=error_response.model_dump(),
-            headers=exc.headers
+            headers=headers
         )
     
     async def _handle_unexpected_exception(self, request: Request, exc: Exception, error_id: str) -> Response:

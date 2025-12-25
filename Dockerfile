@@ -36,9 +36,10 @@ COPY . .
 ARG SERVICE_DIR
 ENV SERVICE_DIR=${SERVICE_DIR}
 
-# Create a non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Create a non-root user with home directory
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
 RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /home/appuser
 
 # Expose port
 EXPOSE 8000
@@ -52,13 +53,20 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 # Run the application
 # Dynamic entrypoint detection:
 # 1. Install service-specific requirements if present
-# 2. Check for main.py in root (Business Metadata style) vs app/main.py (Standard style)
+# 2. Check for __init__.py (module pattern) vs app/ subdirectory (app pattern)
 CMD ["sh", "-c", "cd ${SERVICE_DIR} && \
-    if [ -f requirements.txt ]; then echo 'Installing service dependencies...'; pip install --no-cache-dir -r requirements.txt; fi && \
-    if [ -f main.py ]; then \
+    if [ -f requirements.txt ]; then echo 'Installing service dependencies...'; pip install --no-cache-dir --user -r requirements.txt; fi && \
+    export PATH=\"/home/appuser/.local/bin:$PATH\" && \
+    if [ -f __init__.py ] && [ -f main.py ]; then \
+        echo 'Starting service as Python module...'; \
+        SERVICE_NAME=$(basename $(pwd)) && \
+        cd /app/services/$(dirname ${SERVICE_DIR#services/}) && \
+        uvicorn ${SERVICE_NAME}.main:app --host 0.0.0.0 --port 8000; \
+    elif [ -d app ]; then \
+        echo 'Starting service from app.main...'; \
+        export PYTHONPATH=$(pwd):$PYTHONPATH && \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000; \
+    else \
         echo 'Starting service from root main.py...'; \
         uvicorn main:app --host 0.0.0.0 --port 8000; \
-    else \
-        echo 'Starting service from app.main...'; \
-        uvicorn app.main:app --host 0.0.0.0 --port 8000; \
     fi"]

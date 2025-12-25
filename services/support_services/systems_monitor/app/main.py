@@ -1,11 +1,12 @@
 """
-Service A - Business logic service demonstrating CQRS and event-driven architecture.
+Systems Monitor - System-level metrics collection and health monitoring service.
 
 This service:
-- Uses Database Service for all CQRS operations
-- Uses Messaging Service for event publishing and subscription
-- Implements business logic for item management
-- Demonstrates real-time processing and analytics
+- Collects system metrics (CPU, memory, disk usage)
+- Monitors service health and dependencies
+- Exports structured metrics to Observability Service for alerting
+- Provides Prometheus metrics endpoint for scraping
+- Integrates with OpenTelemetry for distributed tracing
 """
 
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request, Response
@@ -26,8 +27,7 @@ from .telemetry_utils import initialize_telemetry, instrument_fastapi, extract_c
 
 from .messaging_client import MessagingClient
 from .models import (
-    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse, ItemAnalytics,
-    ItemMetrics, ItemEvent, EventCallback, ServiceHealth, DependencyStatus,
+    EventCallback, ServiceHealth, DependencyStatus,
     ErrorResponse, ValidationErrorResponse
 )
 from .config import get_settings
@@ -209,8 +209,8 @@ async def setup_event_subscriptions():
 
 # Initialize FastAPI app with lifespan management
 app = FastAPI(
-    title="Service A",
-    description="Business logic service demonstrating CQRS and event-driven architecture",
+    title="Systems Monitor",
+    description="System-level metrics collection and health monitoring service",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -378,168 +378,11 @@ async def health_check(
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
 
 
-# Item management endpoints
-@app.post("/items", status_code=202)
-@trace_method(name="create_item_endpoint", kind=SpanKind.SERVER)
-async def create_item(
-    item: ItemCreate,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client),
-    request: Request = None
-):
-    """Create a new item."""
-    try:
-        # Get correlation ID from request state or generate a new one
-        correlation_id = getattr(request.state, "correlation_id", None) if request else None
-        if not correlation_id:
-            correlation_id = str(uuid.uuid4())
-        
-        # Add span attributes for item creation
-        add_span_attributes({
-            "endpoint": "create_item",
-            "correlation_id": correlation_id,
-            "item_type": item.item_type if hasattr(item, "item_type") else "unknown"
-        })
-        
-        # Publish a command to create the item
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="CreateItemCommand",
-            payload=item.dict(),
-            correlation_id=correlation_id
-        )
-        
-        logger.info(f"Published CreateItemCommand with correlation ID {correlation_id}")
-        return {"message": "Create item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create item: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/items/{item_id}", response_model=ItemResponse, status_code=501)
-@trace_method(name="get_item_endpoint", kind=SpanKind.SERVER)
-async def get_item(item_id: int):
-    """Get an item by ID."""
-    try:
-        # Get correlation ID from request state or generate a new one
-        correlation_id = getattr(request.state, "correlation_id", None) if request else None
-        
-        # Add span attributes for item retrieval
-        add_span_attributes({
-            "endpoint": "get_item",
-            "item.id": item_id,
-            "correlation_id": correlation_id
-        })
-        
-        # This endpoint is not implemented in a pure event-driven model.
-        # Service A should maintain its own read model populated by events.
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.put("/items/{item_id}", status_code=202)
-async def update_item(
-    item_id: int,
-    item_update: ItemUpdate,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client)
-):
-    """Update an existing item."""
-    try:
-        correlation_id = str(uuid.uuid4())
-        
-        # Publish a command to update the item
-        payload = {"item_id": item_id, "update_data": item_update.dict(exclude_unset=True)}
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="UpdateItemCommand",
-            payload=payload,
-            correlation_id=correlation_id
-        )
-
-        logger.info(f"Published UpdateItemCommand for item {item_id} with correlation ID {correlation_id}")
-        return {"message": "Update item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to update item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.delete("/items/{item_id}", status_code=202)
-async def delete_item(
-    item_id: int,
-    background_tasks: BackgroundTasks,
-    msg_client: MessagingClient = Depends(get_messaging_client)
-):
-    """Delete an item."""
-    try:
-        correlation_id = str(uuid.uuid4())
-        
-        # Publish a command to delete the item
-        payload = {"item_id": item_id}
-        background_tasks.add_task(
-            msg_client.publish_command,
-            command_type="DeleteItemCommand",
-            payload=payload,
-            correlation_id=correlation_id
-        )
-        
-        logger.info(f"Published DeleteItemCommand for item {item_id} with correlation ID {correlation_id}")
-        return {"message": "Delete item command received", "correlation_id": correlation_id}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete item {item_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/items", response_model=ItemListResponse, status_code=501)
-async def list_items():
-    """List items with filters and pagination."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to list items: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-# Analytics endpoints
-@app.get("/analytics", response_model=ItemAnalytics, status_code=501)
-async def get_analytics():
-    """Get item analytics."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Service A does not support synchronous queries.")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get analytics: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-
-@app.get("/metrics", response_model=ItemMetrics, status_code=501)
-async def get_metrics():
-    """Get service metrics."""
-    try:
-        raise HTTPException(status_code=501, detail="Not Implemented: Metrics are not available through this endpoint in an event-driven model.")
-        
-    except Exception as e:
-        logger.error(f"Failed to get metrics: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+# Systems Monitor has no business logic endpoints
+# All functionality is provided through:
+# - /health - Health check endpoint
+# - /metrics - Prometheus metrics endpoint (mounted via WSGI)
+# - /events/callback - Event callback handler for messaging integration
 
 
 # Event handling endpoints

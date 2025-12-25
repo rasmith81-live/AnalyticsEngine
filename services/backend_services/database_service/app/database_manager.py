@@ -787,9 +787,11 @@ class DatabaseManager:
                 ts_result = await session.execute(text("SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'"))
                 ts_version = ts_result.scalar()
                 
-                # Check hypertables count
-                ht_result = await session.execute(text("SELECT count(*) FROM timescaledb_information.hypertables"))
-                hypertables_count = ht_result.scalar() or 0
+                # Get existing hypertables
+                result = await session.execute(
+                    text("SELECT hypertable_name FROM timescaledb_information.hypertables")
+                )
+                hypertables_count = len(result.fetchall()) or 0
                 
                 result = {
                     "status": "healthy",
@@ -924,7 +926,7 @@ class DatabaseManager:
                 potential_hypertables = result.fetchall()
                 
                 # Check which tables are already hypertables
-                hypertable_query = "SELECT table_name FROM timescaledb_information.hypertables"
+                hypertable_query = "SELECT hypertable_name FROM timescaledb_information.hypertables"
                 result = await conn.execute(text(hypertable_query))
                 existing_hypertables = {row[0] for row in result.fetchall()}
                 

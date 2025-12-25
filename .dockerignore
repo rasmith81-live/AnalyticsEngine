@@ -1,0 +1,141 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+LICENSE
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+tests/
+test_*.py
+*_test.py
+.pytest_cache/
+coverage/
+.coverage.*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Docker
+.dockerignore
+docker-compose*.yml
+# Don't exclude Dockerfiles - they're needed for builds
+# Dockerfile*
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Node (for frontend services - exclude from backend builds)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Scripts (utility scripts not needed in containers)
+scripts/
+
+# Alembic (migrations run separately)
+alembic.ini
+alembic/
+
+# Certificates (mounted as volumes)
+certs/
+*.pem
+*.key
+*.crt
+
+# Environment files (passed as env vars)
+.env
+.env.*
+
+# Output and generated files
+output/
+*.csv
+*.xlsx
+*.json
+schemas/
+
+# Backup files
+backup/
+*.backup
+
+# Large data files
+data/
+*.parquet
+*.arrow
+
+# Service-specific exclusions
+services/frontend_services/
+services/backend_services/
+services/business_services/
+services/support_services/
+
+# Keep only the specific service being built
+# This will be overridden by context-specific .dockerignore files

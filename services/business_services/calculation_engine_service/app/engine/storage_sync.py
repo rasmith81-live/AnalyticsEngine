@@ -2,7 +2,6 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime
-import httpx
 from .stream_aggregator import StreamAggregator
 
 logger = logging.getLogger(__name__)
@@ -15,15 +14,22 @@ class StorageSyncManager:
     def __init__(
         self, 
         stream_aggregator: StreamAggregator, 
-        database_service_url: str,
+        database_client,
         sync_interval_seconds: int = 60
     ):
+        """
+        Initialize Storage Sync Manager.
+        
+        Args:
+            stream_aggregator: StreamAggregator instance
+            database_client: DatabaseClient instance
+            sync_interval_seconds: Interval between syncs
+        """
         self.aggregator = stream_aggregator
-        self.database_service_url = database_service_url
+        self.database_client = database_client
         self.sync_interval = sync_interval_seconds
         self._running = False
         self._task: Optional[asyncio.Task] = None
-        self._http_client: Optional[httpx.AsyncClient] = None
         
         # Track last synced timestamp for each metric stream
         # key: metric_key (kpi:entity), value: timestamp_ms
@@ -32,7 +38,6 @@ class StorageSyncManager:
     async def start(self):
         """Start the sync loop."""
         self._running = True
-        self._http_client = httpx.AsyncClient()
         self._task = asyncio.create_task(self._sync_loop())
         logger.info("StorageSyncManager started")
 
@@ -45,8 +50,6 @@ class StorageSyncManager:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        if self._http_client:
-            await self._http_client.aclose()
         logger.info("StorageSyncManager stopped")
 
     async def register_stream(self, metric_name: str, entity_id: str):

@@ -56,7 +56,7 @@ export default function SimulationPage() {
   const [activeJobs, setActiveJobs] = useState<SimulationJob[]>([]);
   
   const { isConnected, lastMessage } = useWebSocket({
-    url: 'ws://localhost:8022/ws/simulation', // Config Service WebSocket
+    url: 'ws://127.0.0.1:8090/ws/simulation', // Config Service WebSocket via Gateway
   });
 
   // Handle incoming websocket updates

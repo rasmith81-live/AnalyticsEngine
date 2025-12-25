@@ -2,9 +2,17 @@
 import asyncio
 import logging
 import uuid
+import sys
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel
+
+# Add backend services to path
+backend_services_path = Path(__file__).parent.parent.parent.parent / "backend_services"
+sys.path.insert(0, str(backend_services_path))
+
+from database_service.app.messaging_client import MessagingClient
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +40,10 @@ class PipelineOrchestrator:
     """
     Manages ingestion jobs and execution flow.
     """
-    def __init__(self):
+    def __init__(self, messaging_client: Optional[MessagingClient] = None):
         self.jobs: Dict[str, IngestionJob] = {}
         self.extractor = DataExtractor("http://connector_service")
+        self.messaging_client = messaging_client
         
     async def create_job(self, job: IngestionJob) -> str:
         if not job.job_id:
@@ -58,6 +67,18 @@ class PipelineOrchestrator:
             # 2. Transform (Transformation Engine integration would be here)
             
             # 3. Load (Publish to Ingestion Events for Database Service)
+            if self.messaging_client:
+                await self.messaging_client.publish_event(
+                    event_type="data.ingestion.completed",
+                    payload={
+                        "job_id": job_id,
+                        "target_entity": job.target_entity,
+                        "rows_ingested": len(data),
+                        "timestamp": datetime.utcnow().isoformat()
+                    },
+                    correlation_id=job_id
+                )
+                logger.info(f"Published data.ingestion.completed event for job {job_id}")
             
             job.status = "COMPLETED"
             job.last_run = datetime.utcnow()
@@ -66,5 +87,3 @@ class PipelineOrchestrator:
             logger.error(f"Job {job_id} failed: {e}")
             
         return job.status
-
-pipeline_orchestrator = PipelineOrchestrator()

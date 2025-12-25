@@ -35,6 +35,15 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+# Event Models
+
+class EventCallback(BaseModel):
+    """Event callback model for messaging."""
+    event_type: str
+    payload: Dict[str, Any]
+    timestamp: Optional[datetime] = None
+
+
 # Domain Models
 
 class MLModelBase(BaseModel):

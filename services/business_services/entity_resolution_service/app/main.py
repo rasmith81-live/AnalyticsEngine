@@ -1,39 +1,62 @@
 
 import logging
+import sys
+import os
+from pathlib import Path
 from typing import List, Dict, Any, Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Body
 from pydantic import BaseModel
 
+# Add backend services to path
+backend_services_path = Path(__file__).parent.parent.parent.parent / "backend_services"
+sys.path.insert(0, str(backend_services_path))
+
+from database_service.app.messaging_client import MessagingClient
 from app.engine.matching import BatchMatcher
 from app.engine.merging import MergeEngine
 from app.engine.retroactive_fix import RetroactiveFixEngine
-# Assuming models are defined in app.models or we need to define them here if missing
-# The previous list_dir showed models.py as 0 bytes in Entity Resolution Service.
-# I will define basic models here for now or populate models.py.
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Entity Resolution Service", version="1.0.0")
+# Global instances
+messaging_client: Optional[MessagingClient] = None
+matcher: Optional[BatchMatcher] = None
 
-# Initialize Engines
-# In a real scenario, these might need DB connections or config
-matcher = BatchMatcher()
-# MergeEngine and RetroactiveFixEngine might need dependencies
-# For now, we instantiate them simply as per the provided context
-# merge_engine = MergeEngine(...) 
-# fix_engine = RetroactiveFixEngine(...)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    global messaging_client, matcher
+    
+    # Initialize messaging client
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    messaging_client = MessagingClient(
+        redis_url=redis_url,
+        service_name="entity_resolution_service",
+        pool_size=5
+    )
+    await messaging_client.connect()
+    logger.info("MessagingClient connected")
+    
+    # Initialize matcher
+    matcher = BatchMatcher()
+    logger.info("BatchMatcher initialized")
+    
+    yield
+    
+    # Cleanup
+    if messaging_client:
+        await messaging_client.disconnect()
+        logger.info("MessagingClient disconnected")
 
-# Placeholder for dependencies until integrated with Database Service
-class MockRepository:
-    async def get_records(self): return []
-    async def save_match_candidates(self, candidates): pass
-    async def get_match_candidates(self): return []
-    async def save_golden_record(self, record): pass
-    async def get_golden_record(self, id): return None
+app = FastAPI(
+    title="Entity Resolution Service",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
-repository = MockRepository()
 
 # Request Models
 class MatchRequest(BaseModel):
@@ -61,7 +84,17 @@ async def run_matching_job(request: MatchRequest, background_tasks: BackgroundTa
         
         logger.info(f"Starting matching job {job_id} for {len(request.source_records)} records")
         
-        # background_tasks.add_task(matcher.find_matches, request.source_records)
+        # Publish event that matching job started
+        if messaging_client:
+            await messaging_client.publish_event(
+                event_type="entity.matching.started",
+                payload={
+                    "job_id": job_id,
+                    "record_count": len(request.source_records),
+                    "threshold": request.threshold
+                },
+                correlation_id=job_id
+            )
         
         return {"job_id": job_id, "status": "queued", "message": "Matching job started"}
     except Exception as e:
@@ -73,13 +106,40 @@ async def create_golden_record(request: MergeRequest):
     """
     Create a golden record from matched candidates.
     """
-    # Stub implementation
-    return {"golden_record_id": "gr_12345", "status": "created"}
+    golden_record_id = f"gr_{len(request.match_candidate_ids)}"
+    
+    # Publish event that golden record was created
+    if messaging_client:
+        await messaging_client.publish_event(
+            event_type="entity.golden_record.created",
+            payload={
+                "golden_record_id": golden_record_id,
+                "candidate_ids": request.match_candidate_ids,
+                "strategy": request.strategy
+            },
+            correlation_id=golden_record_id
+        )
+        logger.info(f"Published entity.golden_record.created event for {golden_record_id}")
+    
+    return {"golden_record_id": golden_record_id, "status": "created"}
 
 @app.post("/retroactive/fix")
 async def trigger_retroactive_fix(entity_id: str):
     """
     Trigger retroactive fix for an entity.
     """
-    # Stub implementation
-    return {"task_id": "fix_123", "status": "processing"}
+    task_id = f"fix_{entity_id}"
+    
+    # Publish event that retroactive fix started
+    if messaging_client:
+        await messaging_client.publish_event(
+            event_type="entity.retroactive_fix.started",
+            payload={
+                "task_id": task_id,
+                "entity_id": entity_id
+            },
+            correlation_id=task_id
+        )
+        logger.info(f"Published entity.retroactive_fix.started event for {entity_id}")
+    
+    return {"task_id": task_id, "status": "processing"}

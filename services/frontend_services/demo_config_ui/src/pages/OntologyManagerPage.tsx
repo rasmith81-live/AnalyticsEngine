@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -10,51 +10,42 @@ import {
   CardContent,
   Button,
   TextField,
-  List,
-  ListItem,
-  ListItemText,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
-  Divider,
-  Stack
+  CircularProgress,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Add as AddIcon,
-  History as HistoryIcon,
-  AccountTree as GraphIcon,
-  Schema as SchemaIcon,
-  Save as SaveIcon
+  Business as ValueChainIcon,
+  Category as ModuleIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
+import axios from 'axios';
 
-// Mock Data
-const INITIAL_ENTITIES = [
-  { id: 'ent_customer', name: 'Customer', attributes: ['customer_id', 'name', 'segment', 'signup_date'] },
-  { id: 'ent_order', name: 'Order', attributes: ['order_id', 'customer_id', 'order_date', 'total_amount'] },
-  { id: 'ent_product', name: 'Product', attributes: ['product_id', 'sku', 'price', 'category'] },
-  { id: 'ent_inventory', name: 'Inventory', attributes: ['inventory_id', 'product_id', 'warehouse_id', 'quantity'] },
-];
+const BASE_URL = 'http://127.0.0.1:8090/api/v1/metadata';
 
-const INITIAL_RELATIONSHIPS = [
-  { id: 'rel_cust_ord', source: 'Customer', target: 'Order', type: 'One-to-Many' },
-  { id: 'rel_ord_prod', source: 'Order', target: 'Product', type: 'Many-to-Many' },
-  { id: 'rel_prod_inv', source: 'Product', target: 'Inventory', type: 'One-to-Many' },
-];
+interface ValueChain {
+  code: string;
+  name: string;
+  description?: string;
+  domain?: string;
+  metadata_?: Record<string, any>;
+}
 
-const HISTORY_LOG = [
-  { id: 1, action: 'Added Attribute', detail: 'added "email" to Customer', user: 'admin', timestamp: '2023-12-18 10:30' },
-  { id: 2, action: 'Created Entity', detail: 'created "Supplier" entity', user: 'admin', timestamp: '2023-12-17 14:15' },
-  { id: 3, action: 'Modified Relationship', detail: 'changed Order-Product to Many-to-Many', user: 'system', timestamp: '2023-12-16 09:00' },
-];
+interface Module {
+  code: string;
+  name: string;
+  description?: string;
+  process_type?: string;
+  metadata_?: Record<string, any>;
+}
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -83,66 +74,90 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function OntologyManagerPage() {
-  const [value, setValue] = useState(0);
-  const [entities, setEntities] = useState(INITIAL_ENTITIES);
-  const [relationships, setRelationships] = useState(INITIAL_RELATIONSHIPS);
-  
-  // Entity Dialog State
-  const [openEntityDialog, setOpenEntityDialog] = useState(false);
-  const [currentEntity, setCurrentEntity] = useState({ name: '', attributes: '' });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
+  const [valueChains, setValueChains] = useState<ValueChain[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error'}>({open: false, message: '', severity: 'success'});
 
-  // Relationship Dialog State
-  const [openRelDialog, setOpenRelDialog] = useState(false);
-  const [currentRel, setCurrentRel] = useState({ source: '', target: '', type: 'One-to-Many' });
+  // Edit Dialog State
+  const [editDialog, setEditDialog] = useState<{open: boolean, type: 'valueChain' | 'module', item: any}>({open: false, type: 'valueChain', item: null});
+  const [editForm, setEditForm] = useState({name: '', description: ''});
 
-  const handleChange = (_: React.SyntheticEvent, newValue: number) => {
-    setValue(newValue);
+  // Fetch data on mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [vcRes, modRes] = await Promise.all([
+        axios.get(`${BASE_URL}/definitions/value_chain_pattern_definition`, { params: { limit: 100 } }),
+        axios.get(`${BASE_URL}/definitions/business_process_definition`, { params: { limit: 100 } })
+      ]);
+      setValueChains(vcRes.data || []);
+      setModules(modRes.data || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveEntity = () => {
-    const attributesArray = currentEntity.attributes.split(',').map(s => s.trim()).filter(Boolean);
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleEdit = (type: 'valueChain' | 'module', item: any) => {
+    setEditForm({ name: item.name || '', description: item.description || '' });
+    setEditDialog({ open: true, type, item });
+  };
+
+  const handleSaveEdit = async () => {
+    const { type, item } = editDialog;
+    const kind = type === 'valueChain' ? 'value_chain_pattern_definition' : 'business_process_definition';
     
-    if (editingId) {
-      setEntities(entities.map(e => e.id === editingId ? { ...e, name: currentEntity.name, attributes: attributesArray } : e));
-    } else {
-      setEntities([...entities, {
-        id: `ent_${currentEntity.name.toLowerCase().replace(/\s+/g, '_')}`,
-        name: currentEntity.name,
-        attributes: attributesArray
-      }]);
-    }
-    setOpenEntityDialog(false);
-    setEditingId(null);
-    setCurrentEntity({ name: '', attributes: '' });
-  };
-
-  const handleEditEntity = (entity: any) => {
-    setEditingId(entity.id);
-    setCurrentEntity({ name: entity.name, attributes: entity.attributes.join(', ') });
-    setOpenEntityDialog(true);
-  };
-
-  const handleDeleteEntity = (id: string) => {
-    if (window.confirm('Delete this entity?')) {
-      setEntities(entities.filter(e => e.id !== id));
+    try {
+      const updatedData = { ...item, name: editForm.name, description: editForm.description };
+      await axios.put(`${BASE_URL}/definitions/${kind}/${item.code}`, updatedData, {
+        params: { changed_by: 'admin' }
+      });
+      
+      setSnackbar({ open: true, message: `${type === 'valueChain' ? 'Value Chain' : 'Module'} updated successfully`, severity: 'success' });
+      setEditDialog({ open: false, type: 'valueChain', item: null });
+      fetchData(); // Refresh data
+    } catch (err: any) {
+      setSnackbar({ open: true, message: `Failed to update: ${err.message}`, severity: 'error' });
     }
   };
 
-  const handleSaveRelationship = () => {
-    setRelationships([...relationships, {
-      id: `rel_${Date.now()}`,
-      source: currentRel.source,
-      target: currentRel.target,
-      type: currentRel.type
-    }]);
-    setOpenRelDialog(false);
-    setCurrentRel({ source: '', target: '', type: 'One-to-Many' });
+  const handleDelete = async (type: 'valueChain' | 'module', code: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    
+    const kind = type === 'valueChain' ? 'value_chain_pattern_definition' : 'business_process_definition';
+    
+    try {
+      await axios.delete(`${BASE_URL}/definitions/${kind}/${code}`, {
+        params: { deleted_by: 'admin' }
+      });
+      
+      setSnackbar({ open: true, message: `${type === 'valueChain' ? 'Value Chain' : 'Module'} deleted successfully`, severity: 'success' });
+      fetchData(); // Refresh data
+    } catch (err: any) {
+      setSnackbar({ open: true, message: `Failed to delete: ${err.message}`, severity: 'error' });
+    }
   };
 
-  const handleDeleteRelationship = (id: string) => {
-    setRelationships(relationships.filter(r => r.id !== id));
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -150,200 +165,157 @@ export default function OntologyManagerPage() {
         <Typography variant="h4">
           Ontology Studio
         </Typography>
-        <Button variant="outlined" startIcon={<SaveIcon />}>
-          Commit Changes
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchData}>
+          Refresh
         </Button>
       </Box>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+      )}
+
       <Paper sx={{ width: '100%', mb: 2 }}>
-        <Tabs value={value} onChange={handleChange} aria-label="ontology tabs">
-          <Tab icon={<SchemaIcon />} label="Entities" />
-          <Tab icon={<GraphIcon />} label="Relationships" />
-          <Tab icon={<HistoryIcon />} label="Version History" />
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="ontology tabs">
+          <Tab icon={<ValueChainIcon />} label="Value Chains" />
+          <Tab icon={<ModuleIcon />} label="Modules" />
         </Tabs>
       </Paper>
 
-      {/* Entity Editor */}
-      <TabPanel value={value} index={0}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
-            setEditingId(null);
-            setCurrentEntity({ name: '', attributes: '' });
-            setOpenEntityDialog(true);
-          }}>
-            New Entity
-          </Button>
-        </Box>
+      {/* Value Chains Tab */}
+      <TabPanel value={tabValue} index={0}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Manage value chains - click edit to rename or delete to remove.
+        </Typography>
         <Grid container spacing={3}>
-          {entities.map((entity) => (
-            <Grid item xs={12} md={6} lg={4} key={entity.id}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h6">{entity.name}</Typography>
-                    <Box>
-                      <IconButton size="small" onClick={() => handleEditEntity(entity)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleDeleteEntity(entity.id)} color="error">
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" gutterBottom>
-                    ID: {entity.id}
-                  </Typography>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Attributes:</Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {entity.attributes.map(attr => (
-                      <Chip key={attr} label={attr} size="small" variant="outlined" />
-                    ))}
-                  </Box>
-                </CardContent>
-              </Card>
+          {valueChains.length === 0 ? (
+            <Grid item xs={12}>
+              <Alert severity="info">No value chains found.</Alert>
             </Grid>
-          ))}
+          ) : (
+            valueChains.map((vc) => (
+              <Grid item xs={12} md={6} lg={4} key={vc.code}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box>
+                        <Typography variant="h6">{vc.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Code: {vc.code}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <IconButton size="small" onClick={() => handleEdit('valueChain', vc)} title="Edit">
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleDelete('valueChain', vc.code, vc.name)} color="error" title="Delete">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                    {vc.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        {vc.description}
+                      </Typography>
+                    )}
+                    {vc.domain && (
+                      <Chip label={vc.domain} size="small" sx={{ mt: 1 }} />
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
         </Grid>
       </TabPanel>
 
-      {/* Relationship Builder */}
-      <TabPanel value={value} index={1}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenRelDialog(true)}>
-            Add Relationship
-          </Button>
-        </Box>
-        <Paper variant="outlined">
-          <List>
-            {relationships.map((rel) => (
-              <React.Fragment key={rel.id}>
-                <ListItem
-                  secondaryAction={
-                    <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteRelationship(rel.id)}>
-                      <DeleteIcon />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" alignItems="center" spacing={2}>
-                        <Typography variant="subtitle1" fontWeight="bold">{rel.source}</Typography>
-                        <Chip label={rel.type} size="small" color="primary" variant="outlined" />
-                        <Typography variant="subtitle1" fontWeight="bold">{rel.target}</Typography>
-                      </Stack>
-                    }
-                    secondary={`ID: ${rel.id}`}
-                  />
-                </ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-            {relationships.length === 0 && (
-              <ListItem>
-                <ListItemText primary="No relationships defined." />
-              </ListItem>
-            )}
-          </List>
-        </Paper>
+      {/* Modules Tab */}
+      <TabPanel value={tabValue} index={1}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Manage modules (business processes) - click edit to rename or delete to remove.
+        </Typography>
+        <Grid container spacing={3}>
+          {modules.length === 0 ? (
+            <Grid item xs={12}>
+              <Alert severity="info">No modules found.</Alert>
+            </Grid>
+          ) : (
+            modules.map((mod) => (
+              <Grid item xs={12} md={6} lg={4} key={mod.code}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box>
+                        <Typography variant="h6">{mod.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Code: {mod.code}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <IconButton size="small" onClick={() => handleEdit('module', mod)} title="Edit">
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleDelete('module', mod.code, mod.name)} color="error" title="Delete">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                    {mod.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        {mod.description}
+                      </Typography>
+                    )}
+                    {mod.metadata_?.value_chain && (
+                      <Chip label={`Value Chain: ${mod.metadata_.value_chain}`} size="small" sx={{ mt: 1 }} variant="outlined" />
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
+        </Grid>
       </TabPanel>
 
-      {/* Version History */}
-      <TabPanel value={value} index={2}>
-        <List>
-          {HISTORY_LOG.map((log) => (
-            <ListItem key={log.id}>
-              <ListItemText 
-                primary={log.action} 
-                secondary={
-                  <React.Fragment>
-                    <Typography component="span" variant="body2" color="text.primary">
-                      {log.user}
-                    </Typography>
-                    {` — ${log.detail} (${log.timestamp})`}
-                  </React.Fragment>
-                } 
-              />
-            </ListItem>
-          ))}
-        </List>
-      </TabPanel>
-
-      {/* Entity Dialog */}
-      <Dialog open={openEntityDialog} onClose={() => setOpenEntityDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Edit Entity' : 'New Entity'}</DialogTitle>
+      {/* Edit Dialog */}
+      <Dialog open={editDialog.open} onClose={() => setEditDialog({...editDialog, open: false})} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Edit {editDialog.type === 'valueChain' ? 'Value Chain' : 'Module'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField
-              label="Entity Name"
-              value={currentEntity.name}
-              onChange={(e) => setCurrentEntity({ ...currentEntity, name: e.target.value })}
+              label="Name"
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               fullWidth
+              autoFocus
             />
             <TextField
-              label="Attributes (comma separated)"
-              value={currentEntity.attributes}
-              onChange={(e) => setCurrentEntity({ ...currentEntity, attributes: e.target.value })}
+              label="Description"
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               fullWidth
               multiline
               rows={3}
-              helperText="e.g. id, name, created_at"
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEntityDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveEntity}>Save</Button>
+          <Button onClick={() => setEditDialog({...editDialog, open: false})}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveEdit}>Save</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Relationship Dialog */}
-      <Dialog open={openRelDialog} onClose={() => setOpenRelDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Add Relationship</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <FormControl fullWidth>
-              <InputLabel>Source Entity</InputLabel>
-              <Select
-                value={currentRel.source}
-                label="Source Entity"
-                onChange={(e) => setCurrentRel({ ...currentRel, source: e.target.value })}
-              >
-                {entities.map(e => <MenuItem key={e.id} value={e.name}>{e.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Relationship Type</InputLabel>
-              <Select
-                value={currentRel.type}
-                label="Relationship Type"
-                onChange={(e) => setCurrentRel({ ...currentRel, type: e.target.value })}
-              >
-                <MenuItem value="One-to-One">One-to-One</MenuItem>
-                <MenuItem value="One-to-Many">One-to-Many</MenuItem>
-                <MenuItem value="Many-to-One">Many-to-One</MenuItem>
-                <MenuItem value="Many-to-Many">Many-to-Many</MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Target Entity</InputLabel>
-              <Select
-                value={currentRel.target}
-                label="Target Entity"
-                onChange={(e) => setCurrentRel({ ...currentRel, target: e.target.value })}
-              >
-                {entities.map(e => <MenuItem key={e.id} value={e.name}>{e.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenRelDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveRelationship}>Add</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={() => setSnackbar({...snackbar, open: false})}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({...snackbar, open: false})}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

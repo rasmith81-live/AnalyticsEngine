@@ -30,10 +30,15 @@ class TestCalculationEngine(unittest.TestCase):
         """Test StreamProcessor initialization."""
         print("\nTesting Stream Processor Init...")
         orchestrator = MagicMock(spec=CalculationOrchestrator)
+        
+        # Mock DatabaseClient and MessagingClient
+        mock_db_client = MagicMock()
+        mock_msg_client = MagicMock()
+        
         processor = StreamProcessor(
             orchestrator=orchestrator,
-            database_service_url="http://db",
-            messaging_service_url="http://msg",
+            database_client=mock_db_client,
+            messaging_client=mock_msg_client,
             redis_url="redis://localhost"
         )
         self.assertIsNotNone(processor.subscriber_id)
@@ -44,19 +49,16 @@ class TestCalculationEngine(unittest.TestCase):
         print("\nTesting Stream Subscription...")
         orchestrator = MagicMock(spec=CalculationOrchestrator)
         
-        # Mock httpx client
-        mock_client = AsyncMock()
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"channel": "test_channel"}
-        mock_client.post.return_value = mock_response
+        # Mock DatabaseClient and MessagingClient
+        mock_db_client = MagicMock()
+        mock_msg_client = MagicMock()
         
         processor = StreamProcessor(
             orchestrator=orchestrator,
-            database_service_url="http://db",
-            messaging_service_url="http://msg",
+            database_client=mock_db_client,
+            messaging_client=mock_msg_client,
             redis_url="redis://localhost"
         )
-        processor._http_client = mock_client
         
         # Mock message consumer starter to avoid background tasks in test
         processor._start_message_consumer = AsyncMock()

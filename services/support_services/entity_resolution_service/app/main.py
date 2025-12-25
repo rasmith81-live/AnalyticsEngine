@@ -8,6 +8,7 @@ from datetime import datetime
 from .config import get_settings
 from .models import EntityRecord, MatchCandidate
 from .engine.matching import MatchingEngine
+from .api import router as api_router
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -20,10 +21,10 @@ matching_engine = MatchingEngine(threshold=settings.MATCHING_THRESHOLD if hasatt
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Load initial data or connect to DB if needed
-    logger.info("Entity Resolution Service Starting...")
+    # Startup (LLM-only, no spaCy)
+    logger.info("Entity Resolution Service Starting (LLM-only mode)...")
     yield
-    # Shutdown: Clean up resources
+    # Shutdown
     logger.info("Entity Resolution Service Shutting Down...")
 
 app = FastAPI(
@@ -36,6 +37,9 @@ app = FastAPI(
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": settings.service_name}
+
+# Include API router with semantic extraction endpoints
+app.include_router(api_router, prefix="/api/v1/entity-resolution")
 
 @app.post("/api/v1/resolve", response_model=List[Dict[str, Any]])
 async def resolve_entity(record: EntityRecord):

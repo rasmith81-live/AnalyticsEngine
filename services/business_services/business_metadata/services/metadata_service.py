@@ -40,6 +40,66 @@ class MetadataService:
     # Generic CRUD operations (work for all definition types)
     # -------------------------------------------------------------------------
     
+    async def create_definition_from_dict(
+        self,
+        kind: str,
+        code: str,
+        name: str,
+        data: Dict[str, Any],
+        created_by: str
+    ) -> UUID:
+        """Create a metadata definition directly from a dict (bypasses Pydantic validation).
+        
+        Use for auto-generated definitions where full model validation isn't needed.
+        
+        Args:
+            kind: Definition type
+            code: Business identifier
+            name: Display name
+            data: Raw definition data
+            created_by: User creating the definition
+            
+        Returns:
+            UUID of created definition
+        """
+        if not code:
+            raise ValueError(f"Definition must have a 'code' field: {kind}")
+        
+        return await self.write_repo.create_definition(
+            kind=kind,
+            code=code,
+            name=name,
+            data=data,
+            created_by=created_by
+        )
+    
+    async def update_definition_from_dict(
+        self,
+        code: str,
+        kind: str,
+        data: Dict[str, Any],
+        changed_by: str,
+        change_description: Optional[str] = None
+    ) -> None:
+        """Update a metadata definition directly from a dict (bypasses Pydantic validation).
+        
+        Use for updates where full model validation isn't needed.
+        
+        Args:
+            code: Business identifier
+            kind: Type of definition
+            data: Raw definition data
+            changed_by: User making the change
+            change_description: Optional description
+        """
+        await self.write_repo.update_definition(
+            code=code,
+            kind=kind,
+            data=data,
+            changed_by=changed_by,
+            change_description=change_description
+        )
+    
     async def create_definition(
         self,
         definition: ThingDefinition,
@@ -232,6 +292,28 @@ class MetadataService:
             self.instantiation.instantiate(kind, r['data'])
             for r in results
         ]
+    
+    async def get_all_by_kind_raw(
+        self,
+        kind: str,
+        limit: Optional[int] = None,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get all definitions of a specific kind as raw dicts (no Pydantic validation).
+        
+        Use this for endpoints that need to return data that may not conform to 
+        strict Pydantic model requirements.
+        
+        Args:
+            kind: Type of definition
+            limit: Max results
+            offset: Pagination offset
+            
+        Returns:
+            List of raw definition dicts
+        """
+        results = await self.query_repo.get_all_by_kind(kind, limit=limit, offset=offset)
+        return [r['data'] for r in results]
     
     async def get_all_by_kind(
         self,

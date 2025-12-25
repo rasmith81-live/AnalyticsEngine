@@ -1,8 +1,21 @@
-# MarketNovaTrader
+# Analytics Engine
 
 ## Overview
 
-This project extends the base-platforn into an automated trading platform called MarketNovaTrader.
+Analytics Engine is a real-time, microservices-based analytics platform that provides on-demand KPI calculations across multiple business value chains (Supply Chain, CRM, Sales, Financial).
+
+## 📚 Documentation
+
+**Complete documentation available in [`docs/`](./docs/INDEX.md)**
+
+### Quick Links
+- **[Getting Started](./docs/getting-started/README.md)** - Setup guide (includes 5-minute quick start)
+- **[Architecture Overview](./docs/architecture/README.md)** - System design and patterns
+- **[Database Guide](./docs/database/README.md)** - Database and migrations
+- **[Operations Guide](./docs/operations/README.md)** - Deployment and operations
+- **[Development Guide](./docs/development/README.md)** - Development standards
+- **[API Documentation](./docs/api/README.md)** - API reference
+- **[Service Documentation](./docs/services/)** - Individual service docs
 
 ## Architecture
 

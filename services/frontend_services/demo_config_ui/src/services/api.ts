@@ -5,7 +5,7 @@
 import axios from 'axios';
 import type { KPI, ObjectModel, Module, ValueChain, Industry, ClientConfig, ServiceProposal } from '@/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8020';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8090';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -145,7 +145,7 @@ export const metadataApi = {
 };
 
 // Demo/Config Service APIs
-const CONFIG_API_URL = import.meta.env.VITE_CONFIG_API_URL || 'http://localhost:8022';
+const CONFIG_API_URL = import.meta.env.VITE_CONFIG_API_URL || 'http://127.0.0.1:8090/api/v1/config';
 
 const configClient = axios.create({
   baseURL: CONFIG_API_URL,

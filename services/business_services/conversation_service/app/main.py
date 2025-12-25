@@ -7,17 +7,18 @@ import logging
 import asyncio
 from datetime import datetime
 
-# Import standardized clients (assuming they are available in the python path or vendored)
-# In a real monorepo with PYTHONPATH=. this would be installed as a package.
-try:
-    from services.backend_services.database_service.app.messaging_client import MessagingClient
-except ImportError:
-    # Fallback/Mock for standalone dev without full path setup
-    logging.warning("Could not import MessagingClient from backend_services. Using mock.")
-    class MessagingClient:
-        def __init__(self, *args, **kwargs): pass
-        async def connect(self): pass
-        async def publish_event(self, *args, **kwargs): return True
+# Import standardized clients
+import sys
+from pathlib import Path
+
+# Add backend services to path
+backend_services_path = Path(__file__).parent.parent.parent.parent / "backend_services"
+sys.path.insert(0, str(backend_services_path))
+
+from database_service.app.messaging_client import MessagingClient
+
+from contextlib import asynccontextmanager
+from typing import Optional
 
 from .config import settings
 from .models import (
@@ -33,30 +34,41 @@ from .engine.strategic_recommender import StrategicRecommender, StrategyScore
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("conversation_service")
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
-)
-
-# Initialize Engines
+# Global instances
+messaging_client: Optional[MessagingClient] = None
 pattern_matcher = PatternMatcher()
 design_suggester = DesignSuggester()
 strategic_recommender = StrategicRecommender()
 
-# Initialize Messaging Client
-messaging_client = MessagingClient(
-    redis_url=settings.REDIS_URL,
-    service_name="conversation_service"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    global messaging_client
+    
+    # Initialize messaging client
+    try:
+        messaging_client = MessagingClient(
+            redis_url=settings.REDIS_URL,
+            service_name="conversation_service"
+        )
+        await messaging_client.connect()
+        logger.info("MessagingClient connected")
+    except Exception as e:
+        logger.error(f"Failed to initialize MessagingClient: {e}")
+        raise RuntimeError("MessagingClient initialization failed - cannot start service") from e
+    
+    yield
+    
+    # Cleanup
+    if messaging_client:
+        await messaging_client.disconnect()
+        logger.info("MessagingClient disconnected")
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    await messaging_client.connect()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    # Cleanup logic if needed
-    pass
 
 # CORS
 app.add_middleware(

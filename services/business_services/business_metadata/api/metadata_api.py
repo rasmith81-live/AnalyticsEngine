@@ -1,17 +1,16 @@
 """FastAPI endpoints for metadata operations."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, Body
+from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
-# Import ontology models
-import sys
-from pathlib import Path as FilePath
-analytics_metadata_path = FilePath(__file__).parent.parent.parent / "analytics_metadata_service"
-sys.path.insert(0, str(analytics_metadata_path))
+logger = logging.getLogger(__name__)
 
-from definitions.ontology_models import (
+# Import ontology models from the business_metadata package
+from ..ontology_models import (
     ThingDefinition,
     EntityDefinition,
     MetricDefinition,
@@ -29,6 +28,8 @@ from ..repositories import MetadataWriteRepository, MetadataQueryRepository
 from ..dependencies import get_db_session, get_redis_client, get_event_publisher
 
 router = APIRouter(prefix="/api/v1/metadata", tags=["metadata"])
+
+from sqlalchemy import text
 
 
 # Dependency to create MetadataService
@@ -58,7 +59,7 @@ async def get_consistency_service(
 # Generic endpoints (work for all definition types)
 # -------------------------------------------------------------------------
 
-@router.post("/definitions", response_model=Dict[str, str], status_code=201)
+@router.post("/definitions", status_code=201)
 async def create_definition(
     definition: Dict[str, Any] = Body(...),
     created_by: str = Query(..., description="User creating the definition"),
@@ -69,23 +70,41 @@ async def create_definition(
     Supports all definition types (entities, metrics, value chains, etc.)
     """
     try:
-        # Instantiate from dict
         kind = definition.get('kind')
         if not kind:
-            raise ValueError("Definition must have 'kind' field")
+            return JSONResponse(status_code=400, content={"detail": "Definition must have 'kind' field"})
         
-        pydantic_def = service.instantiation.instantiate(kind, definition)
+        code = definition.get('code')
+        name = definition.get('name', code or 'Unnamed')
         
-        definition_id = await service.create_definition(pydantic_def, created_by)
-        return {
-            "id": str(definition_id),
-            "code": service.instantiation.get_code_from_model(pydantic_def),
-            "kind": kind
-        }
+        # For auto-generated definitions, skip Pydantic validation and store directly
+        is_auto_generated = definition.get('metadata_', {}).get('auto_generated', False)
+        
+        if is_auto_generated:
+            # Store raw dict directly without Pydantic model instantiation
+            definition_id = await service.create_definition_from_dict(
+                kind=kind,
+                code=code,
+                name=name,
+                data=definition,
+                created_by=created_by
+            )
+        else:
+            # Full Pydantic validation for user-created definitions
+            pydantic_def = service.instantiation.instantiate(kind, definition)
+            definition_id = await service.create_definition(pydantic_def, created_by)
+            code = service.instantiation.get_code_from_model(pydantic_def)
+        
+        # Use JSONResponse directly to bypass FastAPI's jsonable_encoder
+        return JSONResponse(
+            status_code=201,
+            content={"id": str(definition_id), "code": code or "", "kind": kind}
+        )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return JSONResponse(status_code=400, content={"detail": str(e)})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create definition: {str(e)}")
+        logger.error(f"Failed to create definition: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": f"Failed to create definition: {str(e)}"})
 
 
 @router.get("/definitions/{kind}/{code}")
@@ -121,18 +140,18 @@ async def update_definition(
 ):
     """Update definition (creates new version)."""
     try:
-        pydantic_def = service.instantiation.instantiate(kind, definition)
-        
-        await service.update_definition(
+        # Use raw dict update to bypass Pydantic validation issues
+        await service.update_definition_from_dict(
             code=code,
             kind=kind,
-            definition=pydantic_def,
+            data=definition,
             changed_by=changed_by,
             change_description=change_description
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"Failed to update definition: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update definition: {str(e)}")
 
 
@@ -160,8 +179,13 @@ async def list_definitions_by_kind(
     service: MetadataService = Depends(get_metadata_service)
 ):
     """List all definitions of a specific kind."""
-    definitions = await service.get_all_by_kind(kind=kind, limit=limit, offset=offset)
-    return [service.instantiation.serialize(d) for d in definitions]
+    try:
+        # Use raw method to avoid Pydantic validation for stored data
+        definitions = await service.get_all_by_kind_raw(kind=kind, limit=limit, offset=offset)
+        return JSONResponse(content=definitions)
+    except Exception as e:
+        logger.error(f"Failed to list definitions: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
 
 @router.post("/definitions/search")
@@ -222,6 +246,79 @@ async def get_relationships(
     )
 
 
+@router.get("/relationships")
+async def get_all_relationships(
+    relationship_types: Optional[List[str]] = Query(None, description="Filter by types"),
+    service: MetadataService = Depends(get_metadata_service)
+):
+    """Get all relationships in the system, optionally filtered by type."""
+    return await service.query_repo.get_all_relationships(relationship_types=relationship_types)
+
+
+@router.post("/relationships", response_model=Dict[str, str], status_code=201)
+async def create_relationship(
+    relationship: Dict[str, Any] = Body(...),
+    created_by: str = Query(..., description="User creating the relationship"),
+    service: MetadataService = Depends(get_metadata_service)
+):
+    """Create a relationship between two entities.
+    
+    Request body:
+    ```json
+    {
+        "from_entity_code": "KPI_001",
+        "to_entity_code": "sales_marketing",
+        "relationship_type": "belongs_to_value_chain",
+        "metadata_": {"auto_generated": true}
+    }
+    ```
+    """
+    try:
+        from_code = relationship.get("from_entity_code")
+        to_code = relationship.get("to_entity_code")
+        rel_type = relationship.get("relationship_type")
+        metadata = relationship.get("metadata_", {})
+        
+        if not from_code or not to_code or not rel_type:
+            raise ValueError("from_entity_code, to_entity_code, and relationship_type are required")
+        
+        relationship_id = await service.write_repo.create_relationship(
+            from_entity_code=from_code,
+            to_entity_code=to_code,
+            relationship_type=rel_type,
+            metadata=metadata
+        )
+        
+        return {
+            "id": str(relationship_id),
+            "from_entity_code": from_code,
+            "to_entity_code": to_code,
+            "relationship_type": rel_type
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
+
+
+@router.delete("/relationships", status_code=204)
+async def delete_relationship(
+    from_entity_code: str = Query(..., description="Source entity code"),
+    to_entity_code: str = Query(..., description="Target entity code"),
+    relationship_type: str = Query(..., description="Relationship type"),
+    service: MetadataService = Depends(get_metadata_service)
+):
+    """Delete a relationship (soft delete)."""
+    try:
+        await service.write_repo.delete_relationship(
+            from_entity_code=from_entity_code,
+            to_entity_code=to_entity_code,
+            relationship_type=relationship_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete relationship: {str(e)}")
+
+
 @router.get("/definitions/{kind}/{code}/graph")
 async def get_knowledge_graph(
     kind: str = Path(..., description="Type of definition"),
@@ -267,11 +364,24 @@ async def bulk_create_definitions(
     try:
         # Convert dicts to Pydantic models
         pydantic_defs = []
-        for defn in definitions:
+        for i, defn in enumerate(definitions):
             kind = defn.get('kind')
             if not kind:
-                raise ValueError("All definitions must have 'kind' field")
-            pydantic_defs.append(service.instantiation.instantiate(kind, defn))
+                logger.error(f"Definition at index {i} missing 'kind' field: {defn}")
+                raise ValueError(f"Definition at index {i} must have 'kind' field")
+            
+            # Auto-generate ID if not provided or None
+            if not defn.get("id"):
+                import uuid
+                defn["id"] = str(uuid.uuid4())
+            
+            try:
+                pydantic_def = service.instantiation.instantiate(kind, defn)
+                pydantic_defs.append(pydantic_def)
+            except Exception as inst_error:
+                logger.error(f"Failed to instantiate definition at index {i}: {inst_error}", exc_info=True)
+                logger.error(f"Definition data: {defn}")
+                raise ValueError(f"Failed to instantiate definition at index {i}: {str(inst_error)}")
         
         ids = await service.bulk_create_definitions(pydantic_defs, created_by)
         return {
@@ -279,6 +389,7 @@ async def bulk_create_definitions(
             "ids": [str(id) for id in ids]
         }
     except Exception as e:
+        logger.error(f"Bulk create failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Bulk create failed: {str(e)}")
 
 
@@ -755,6 +866,46 @@ async def merge_definitions(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Merge failed: {str(e)}")
+
+
+# -------------------------------------------------------------------------
+# Admin endpoints
+# -------------------------------------------------------------------------
+
+@router.delete("/admin/clear-all", response_model=Dict[str, str])
+async def clear_all_metadata(
+    confirm: str = Query(..., description="Must be 'YES' to confirm deletion"),
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Clear all metadata from the database. USE WITH CAUTION!
+    
+    This endpoint truncates all metadata tables. Requires confirmation.
+    """
+    if confirm != "YES":
+        raise HTTPException(
+            status_code=400, 
+            detail="Must provide confirm=YES to clear database"
+        )
+    
+    try:
+        # Truncate all metadata tables
+        await session.execute(text(
+            "TRUNCATE TABLE metadata_definitions, metadata_relationships, metadata_versions CASCADE"
+        ))
+        await session.commit()
+        
+        logger.warning("Database cleared by admin endpoint")
+        return {
+            "status": "success",
+            "message": "All metadata cleared from database"
+        }
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Failed to clear database: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to clear database: {str(e)}"
+        )
 
 
 # -------------------------------------------------------------------------

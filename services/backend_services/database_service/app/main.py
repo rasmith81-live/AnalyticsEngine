@@ -35,6 +35,7 @@ from .subscriber_manager import SubscriberManager
 from .stream_publisher import StreamPublisher
 from .query_builder import QueryBuilder
 from .secure_storage_manager import SecureStorageManager
+from .api.migration_utilities_api import router as migration_utilities_router
 from .models import (
     QueryRequest, QueryResponse, AdHocQueryRequest, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
@@ -404,6 +405,9 @@ app.add_middleware(PrometheusMiddleware)
 # Expose Prometheus metrics endpoint
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
+
+# Include migration utilities router
+app.include_router(migration_utilities_router)
 
 def get_database_manager() -> DatabaseManager:
     """Dependency to get database manager instance."""

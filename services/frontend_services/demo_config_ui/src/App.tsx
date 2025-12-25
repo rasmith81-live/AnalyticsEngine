@@ -17,8 +17,11 @@ import ExcelImportPage from './pages/ExcelImportPage';
 import OntologyManagerPage from './pages/OntologyManagerPage';
 import SimulationPage from './pages/SimulationPage';
 import MLDashboardPage from './pages/MLDashboardPage';
+import SystemMonitorPage from './pages/SystemMonitorPage';
 import Layout from './components/Layout';
 import { CartProvider } from './contexts/CartContext';
+import { TreeActionsProvider } from './contexts/TreeActionsContext';
+import TreeActionsDialogs from './components/TreeActionsDialogs';
 
 // Create theme
 const theme = createTheme({
@@ -50,27 +53,31 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <CartProvider>
-          <BrowserRouter>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/demo" replace />} />
-                <Route path="/demo" element={<DemoPage />} />
-                <Route path="/config" element={<ConfigPage />} />
-                <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
-                <Route path="/object-models" element={<ObjectModelsBrowser />} />
-                <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
-                <Route path="/required-objects-view" element={<RequiredObjectsView />} />
-                <Route path="/data-sources" element={<DataSourceConfig />} />
-                <Route path="/proposal" element={<ServiceProposal />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/governance" element={<GovernancePage />} />
-                <Route path="/excel-import" element={<ExcelImportPage />} />
-                <Route path="/ontology-studio" element={<OntologyManagerPage />} />
-                <Route path="/simulation" element={<SimulationPage />} />
-                <Route path="/ml-registry" element={<MLDashboardPage />} />
-              </Routes>
-            </Layout>
-          </BrowserRouter>
+          <TreeActionsProvider>
+            <BrowserRouter>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/demo" replace />} />
+                  <Route path="/demo" element={<DemoPage />} />
+                  <Route path="/config" element={<ConfigPage />} />
+                  <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
+                  <Route path="/object-models" element={<ObjectModelsBrowser />} />
+                  <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
+                  <Route path="/required-objects-view" element={<RequiredObjectsView />} />
+                  <Route path="/data-sources" element={<DataSourceConfig />} />
+                  <Route path="/proposal" element={<ServiceProposal />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/governance" element={<GovernancePage />} />
+                  <Route path="/excel-import" element={<ExcelImportPage />} />
+                  <Route path="/ontology-studio" element={<OntologyManagerPage />} />
+                  <Route path="/simulation" element={<SimulationPage />} />
+                  <Route path="/ml-registry" element={<MLDashboardPage />} />
+                  <Route path="/system-monitor" element={<SystemMonitorPage />} />
+                </Routes>
+              </Layout>
+            </BrowserRouter>
+            <TreeActionsDialogs />
+          </TreeActionsProvider>
         </CartProvider>
       </ThemeProvider>
     </QueryClientProvider>

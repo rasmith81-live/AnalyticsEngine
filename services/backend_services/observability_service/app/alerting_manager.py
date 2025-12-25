@@ -23,7 +23,8 @@ class AlertingManager:
     def __init__(self, notification_endpoints: Dict[str, str] = None):
         self.rules: Dict[str, AlertRule] = {}
         self.notification_endpoints = notification_endpoints or {}
-        # Example hardcoded rule for demo
+        
+        # Business metric alert rules
         self.add_rule(AlertRule(
             id="retention_drop",
             name="Retention Rate Drop",
@@ -31,6 +32,57 @@ class AlertingManager:
             condition="<",
             threshold=0.85,
             channels=["slack"]
+        ))
+        
+        # System-level alert rules for Systems Monitor
+        self.add_rule(AlertRule(
+            id="high_cpu_usage",
+            name="High CPU Usage",
+            metric_name="system_cpu_usage",
+            condition=">",
+            threshold=80.0,
+            channels=["slack"],
+            enabled=True
+        ))
+        
+        self.add_rule(AlertRule(
+            id="high_memory_usage",
+            name="High Memory Usage",
+            metric_name="system_memory_usage",
+            condition=">",
+            threshold=85.0,
+            channels=["slack"],
+            enabled=True
+        ))
+        
+        self.add_rule(AlertRule(
+            id="high_disk_usage",
+            name="High Disk Usage",
+            metric_name="system_disk_usage",
+            condition=">",
+            threshold=90.0,
+            channels=["slack"],
+            enabled=True
+        ))
+        
+        self.add_rule(AlertRule(
+            id="service_unhealthy",
+            name="Service Unhealthy",
+            metric_name="service_health",
+            condition="<",
+            threshold=1.0,
+            channels=["slack"],
+            enabled=True
+        ))
+        
+        self.add_rule(AlertRule(
+            id="service_not_ready",
+            name="Service Not Ready",
+            metric_name="service_ready",
+            condition="<",
+            threshold=1.0,
+            channels=["slack"],
+            enabled=True
         ))
 
     def add_rule(self, rule: AlertRule):

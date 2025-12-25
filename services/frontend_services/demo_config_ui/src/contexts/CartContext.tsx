@@ -23,7 +23,6 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'analytics_kpi_cart';
-const VIEW_KPI_STORAGE_KEY = 'analytics_current_view_kpi';
 const TREE_EXPANDED_STORAGE_KEY = 'analytics_tree_expanded';
 const TREE_SEARCH_STORAGE_KEY = 'analytics_tree_search';
 
@@ -39,16 +38,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // Initialize currentViewKPI from localStorage
-  const [currentViewKPI, setCurrentViewKPIState] = useState<string | null>(() => {
-    try {
-      const stored = localStorage.getItem(VIEW_KPI_STORAGE_KEY);
-      return stored || null;
-    } catch (error) {
-      console.error('Error loading current view KPI from localStorage:', error);
-      return null;
-    }
-  });
+  // Start with no KPI selected - user must explicitly click to view details
+  const [currentViewKPI, setCurrentViewKPIState] = useState<string | null>(null);
 
   // Initialize tree expanded nodes from localStorage
   const [treeExpandedNodes, setTreeExpandedNodesState] = useState<string[]>(() => {
@@ -81,18 +72,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedKPIs]);
 
-  // Persist currentViewKPI to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      if (currentViewKPI) {
-        localStorage.setItem(VIEW_KPI_STORAGE_KEY, currentViewKPI);
-      } else {
-        localStorage.removeItem(VIEW_KPI_STORAGE_KEY);
-      }
-    } catch (error) {
-      console.error('Error saving current view KPI to localStorage:', error);
-    }
-  }, [currentViewKPI]);
+  // Note: currentViewKPI is intentionally NOT persisted - always starts fresh
 
   // Persist tree expanded nodes to localStorage whenever they change
   useEffect(() => {

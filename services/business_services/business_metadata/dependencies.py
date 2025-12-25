@@ -32,8 +32,10 @@ async def initialize_backend_services():
     db_manager = DatabaseManager(settings)
     await db_manager.initialize()
     
-    # Initialize event publisher
-    event_publisher = EventPublisher(settings)
+    # Initialize event publisher with redis_url string
+    event_publisher = EventPublisher(
+        redis_url=settings.redis_url
+    )
     await event_publisher.initialize()
 
     # Initialize messaging client (consumer)
@@ -52,11 +54,11 @@ async def shutdown_backend_services():
     """
     global db_manager, event_publisher, messaging_client
     
-    if db_manager:
-        await db_manager.shutdown()
-    
-    if event_publisher:
-        await event_publisher.shutdown()
+    # DatabaseManager doesn't have shutdown/close methods - connections are managed by pool
+    # EventPublisher also doesn't have shutdown method - connections managed by pool
+    # Just set to None to release references
+    db_manager = None
+    event_publisher = None
 
     if messaging_client:
         await messaging_client.disconnect()
@@ -110,3 +112,31 @@ def get_event_publisher() -> EventPublisher:
         raise RuntimeError("EventPublisher not initialized.")
     
     return event_publisher
+
+
+def get_database_manager() -> DatabaseManager:
+    """Get database manager instance.
+    
+    FastAPI dependency for database operations.
+    
+    Returns:
+        DatabaseManager instance
+    """
+    if not db_manager:
+        raise RuntimeError("DatabaseManager not initialized.")
+    
+    return db_manager
+
+
+def get_messaging_client() -> MessagingClient:
+    """Get messaging client instance.
+    
+    FastAPI dependency for event consumption.
+    
+    Returns:
+        MessagingClient instance
+    """
+    if not messaging_client:
+        raise RuntimeError("MessagingClient not initialized.")
+    
+    return messaging_client

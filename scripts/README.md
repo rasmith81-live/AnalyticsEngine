@@ -18,6 +18,12 @@ scripts/
 │   ├── run_full_sync.py        ← Full sync orchestrator
 │   └── README.md               ← Documentation
 │
+├── utils/                      ← Migration & Schema Utilities
+│   ├── extract_table_schemas.py ← Extract schemas from object models
+│   ├── add_cqrs_schema.ps1     ← Add CQRS schema objects
+│   ├── validate_cqrs_models.ps1 ← Validate CQRS consistency
+│   └── [migration scripts]     ← Alembic migration helpers
+│
 ├── QUICK_REFERENCE.md          ← Quick command reference
 └── README.md                   ← This file
 ```
@@ -116,6 +122,27 @@ notepad output\kpi_consolidation_recommendations.md
 
 ---
 
+### Migration & Schema Utilities
+**Purpose**: Database schema management and CQRS pattern automation
+
+**Features**:
+- ✅ Extract table schemas from object models to JSON
+- ✅ Add CQRS schema objects with proper pattern
+- ✅ Validate CQRS model consistency
+- ✅ Alembic migration helpers (create, upgrade, reset, resolve)
+- ✅ CI/CD integration scripts
+
+**Location**: `utils/`
+
+**Key Tools**:
+- `extract_table_schemas.py` - Generate JSON schemas from object models
+- `add_cqrs_schema.ps1` - Automate CQRS schema addition
+- `validate_cqrs_models.ps1` - Validate write/read model alignment
+- `create_revision_clean.ps1` - Create Alembic migrations
+- `upgrade_service.ps1` - Upgrade service migrations
+
+---
+
 ## 📖 Documentation
 
 | Document | Description |
@@ -124,6 +151,7 @@ notepad output\kpi_consolidation_recommendations.md
 | [kpiExcelProcessor/README.md](./kpiExcelProcessor/README.md) | KPI processor documentation |
 | [kpiExcelProcessor/KPI_EXCEL_PROCESSOR_GUIDE.md](./kpiExcelProcessor/KPI_EXCEL_PROCESSOR_GUIDE.md) | Comprehensive KPI processor guide |
 | [objectModelSync/README.md](./objectModelSync/README.md) | Governance suite documentation |
+| [MIGRATION_UTILITIES_GUIDE.md](./MIGRATION_UTILITIES_GUIDE.md) | Migration utilities usage guide |
 
 ---
 
@@ -184,5 +212,5 @@ cd objectModelSync
 
 ---
 
-**Last Updated**: November 8, 2025  
-**Version**: 1.0
+**Last Updated**: December 19, 2025  
+**Version**: 1.1
