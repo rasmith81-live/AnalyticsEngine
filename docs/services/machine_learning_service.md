@@ -11,6 +11,16 @@ This service:
 
 ## Data Models
 
+### `EventCallback`
+
+Event callback model for messaging.
+
+**Fields:**
+
+- `event_type`: `str`
+- `payload`: `Dict[str, Any]`
+- `timestamp`: `Optional[datetime]`
+
 ### `MLModelBase`
 
 Base model for ML Model definition.

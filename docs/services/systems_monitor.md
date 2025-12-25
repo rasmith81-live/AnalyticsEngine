@@ -2,13 +2,14 @@
 
 ## Overview
 
-Service A - Business logic service demonstrating CQRS and event-driven architecture.
+Systems Monitor - System-level metrics collection and health monitoring service.
 
 This service:
-- Uses Database Service for all CQRS operations
-- Uses Messaging Service for event publishing and subscription
-- Implements business logic for item management
-- Demonstrates real-time processing and analytics
+- Collects system metrics (CPU, memory, disk usage)
+- Monitors service health and dependencies
+- Exports structured metrics to Observability Service for alerting
+- Provides Prometheus metrics endpoint for scraping
+- Integrates with OpenTelemetry for distributed tracing
 
 ## Data Models
 
