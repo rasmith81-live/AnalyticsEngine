@@ -92,6 +92,7 @@ No overview provided.
 - `session_id`: `Optional[str]`
 - `user_id`: `str`
 - `message`: `str`
+- `skip_response`: `bool`
 
 ### `ChatResponse`
 
