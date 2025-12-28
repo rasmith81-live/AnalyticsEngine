@@ -8,3 +8,8 @@ pydantic>=2.0.0
 
 # NLP for entity extraction
 spacy>=3.7.0
+# spaCy English LARGE model for better noun phrase extraction (pip-installable)
+https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
+# Formula parsing for math expression generation
+pyparsing>=3.1.0

@@ -65,12 +65,14 @@ class DecompositionOrchestrator:
             # 4. Decompose formula (if present)
             formula_entities = []
             normalized_formula = None
+            math_expression = None
             if kpi_data.get("formula"):
                 try:
                     decomposed = await self.kpi_decomposer.decompose_formula(kpi_data["formula"])
                     formula_entities = decomposed.get("identified_attributes", [])
                     normalized_formula = decomposed.get("normalized_formula")
-                    logger.info(f"Formula decomposition found: {formula_entities}")
+                    math_expression = decomposed.get("math_expression")
+                    logger.info(f"Formula decomposition found: entities={formula_entities}, math='{math_expression}'")
                     if normalized_formula != kpi_data["formula"]:
                         logger.info(f"Formula normalized: '{kpi_data['formula']}' -> '{normalized_formula}'")
                 except Exception as e:
@@ -83,8 +85,11 @@ class DecompositionOrchestrator:
             if normalized_formula:
                 enriched_kpi["formula"] = normalized_formula
             
-            # Update required_objects - ONLY use formula entities (entities needed for calculation)
-            # Description entities are kept in metadata for domain/module inference but not in required_objects
+            # Store math expression for calculation engine
+            if math_expression:
+                enriched_kpi["math_expression"] = math_expression
+            
+            # Update required_objects - use formula entities (all nouns from formula)
             enriched_kpi["required_objects"] = formula_entities if formula_entities else []
             
             # NOTE: We do NOT embed module references in KPIs - relationships handle this
@@ -97,6 +102,7 @@ class DecompositionOrchestrator:
                 "module": module_code,
                 "extracted_entities": entities,
                 "formula_entities": formula_entities,
+                "math_expression": math_expression,
                 "original_formula": kpi_data.get("formula") if normalized_formula else None
             }
             
@@ -257,10 +263,14 @@ class DecompositionOrchestrator:
                         modules[module_code]["kpis"].append(kpi.get("code"))
                 
                 # Extract entities from decomposition metadata
-                decomp_entities = decomp.get("entities", [])
+                decomp_entities = decomp.get("extracted_entities", [])
                 if decomp_entities:
                     entities.update(decomp_entities)
-                # Also include required_objects if present
+                # Include formula_entities (nouns extracted from formula)
+                formula_entities = decomp.get("formula_entities", [])
+                if formula_entities:
+                    entities.update(formula_entities)
+                # Also include required_objects if present (same as formula_entities but at top level)
                 required_objs = kpi.get("required_objects", [])
                 if required_objs:
                     entities.update(required_objs)

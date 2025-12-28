@@ -118,18 +118,33 @@ class LLMClient:
         system_prompt = """
         You are an expert Business Analyst. Your goal is to extract structured Business Intents from the user's input.
         Identify what the user wants to measure, analyze, or achieve.
-        Return the result as a JSON object containing a list of intents with 'name', 'confidence' (0-1), 'parameters', and 'description'.
+        
+        For each intent, you MUST extract:
+        - name: A short name for the intent
+        - confidence: A score from 0-1 indicating how confident you are
+        - parameters: Key-value pairs of relevant parameters mentioned
+        - description: A brief description of the intent
+        - domain: The business domain (e.g., "supply_chain", "finance", "sales", "hr", "operations", "marketing")
+        - target_entities: A list of business entities mentioned (e.g., "Customer", "Order", "Product", "Invoice", "Employee", "Supplier", "Inventory")
+        - requested_metrics: A list of KPIs or metrics mentioned (e.g., "Revenue", "Order Fulfillment Rate", "Inventory Turnover", "Customer Satisfaction")
+        
+        Return the result as a JSON object containing a list of intents.
         Example JSON structure:
         {
             "intents": [
                 {
                     "name": "Analyze Revenue",
                     "confidence": 0.95,
-                    "parameters": {"metric": "revenue", "dimension": "region"},
-                    "description": "User wants to see revenue breakdown by region"
+                    "parameters": {"dimension": "region"},
+                    "description": "User wants to see revenue breakdown by region",
+                    "domain": "finance",
+                    "target_entities": ["Customer", "Order", "Region"],
+                    "requested_metrics": ["Revenue", "Sales Volume", "Average Order Value"]
                 }
             ]
         }
+        
+        IMPORTANT: Always populate target_entities and requested_metrics arrays based on what is mentioned or implied in the conversation.
         """
         
         messages = [

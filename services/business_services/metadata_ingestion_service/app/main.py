@@ -209,7 +209,8 @@ import uuid
 async def upload_excel(file: UploadFile = File(...)):
     """
     Upload and process an Excel/CSV file containing KPI definitions.
-    Fast parsing only - no LLM calls. Use /import/{id}/enrich for AI enrichment.
+    Automatically extracts entities and math expressions using spaCy NLP (no OpenAI).
+    Use /import/{id}/enrich for additional AI enrichment with LLM.
     """
     try:
         # 1. Parse File (fast - no LLM)
@@ -217,6 +218,13 @@ async def upload_excel(file: UploadFile = File(...)):
         
         # Generate Import ID
         import_id = str(uuid.uuid4())
+        
+        # Initialize KPI decomposer for spaCy-based extraction (no OpenAI)
+        from app.semantic_mapping import KPIDecomposer
+        kpi_decomposer = KPIDecomposer(entity_resolution_service_url="")
+        
+        # Collect all extracted entities for ontology
+        all_entities = set()
         
         results = {
             "importId": import_id,
@@ -238,15 +246,47 @@ async def upload_excel(file: UploadFile = File(...)):
         final_valid_kpis = []
         
         for kpi in valid_kpis_data:
-            # Basic processing only - no LLM calls
-            # Just generate code and basic metadata
+            # Generate code
             kpi_name = kpi.get("name", "")
             kpi["code"] = kpi.get("code") or kpi_name.upper().replace(" ", "_").replace("-", "_")
+            
+            # Extract entities and math expression from formula using spaCy (no OpenAI)
+            formula = kpi.get("formula")
+            math_expression = None
+            formula_entities = []
+            
+            if formula:
+                try:
+                    decomposed = await kpi_decomposer.decompose_formula(formula)
+                    math_expression = decomposed.get("math_expression")
+                    formula_entities = decomposed.get("identified_attributes", [])
+                    
+                    # Store in KPI data
+                    kpi["math_expression"] = math_expression
+                    kpi["required_objects"] = formula_entities
+                    
+                    # Add to metadata
+                    if "metadata" not in kpi:
+                        kpi["metadata"] = {}
+                    kpi["metadata"]["decomposition"] = {
+                        "math_expression": math_expression,
+                        "formula_entities": formula_entities,
+                        "extraction_method": decomposed.get("extraction_method", "spacy")
+                    }
+                    
+                    # Collect entities for ontology
+                    all_entities.update(formula_entities)
+                    
+                    logger.info(f"Formula decomposition for '{kpi_name}': entities={formula_entities}, math='{math_expression}'")
+                except Exception as e:
+                    logger.warning(f"Formula decomposition failed for '{kpi_name}': {e}")
             
             row_data = {
                 "Name": kpi.get("name"),
                 "Formula": kpi.get("formula"),
                 "Code": kpi.get("code"),
+                "MathExpression": math_expression,
+                "RequiredObjects": formula_entities,
                 "Metadata": kpi.get("metadata", {})
             }
             
@@ -254,6 +294,9 @@ async def upload_excel(file: UploadFile = File(...)):
             results["preview"].append(row_data)
 
         results["validRows"] = len(final_valid_kpis)
+        
+        # Add extracted entities to ontology_sync
+        results["ontology_sync"]["entities_created"] = sorted(list(all_entities))
         
         # Cache valid KPIs for enrichment and commit
         if final_valid_kpis:
@@ -265,7 +308,7 @@ async def upload_excel(file: UploadFile = File(...)):
         # Limit preview to top 20
         results["preview"] = results["preview"][:20]
         
-        logger.info(f"Upload complete: {len(final_valid_kpis)} KPIs parsed (no LLM). Import ID: {import_id}")
+        logger.info(f"Upload complete: {len(final_valid_kpis)} KPIs parsed with spaCy extraction. Import ID: {import_id}. Entities: {len(all_entities)}")
         
         return results
 
@@ -328,6 +371,8 @@ async def enrich_import(import_id: str):
                 "Name": kpi.get("name"),
                 "Formula": kpi.get("formula"),
                 "Code": kpi.get("code"),
+                "MathExpression": kpi.get("math_expression"),
+                "RequiredObjects": kpi.get("required_objects", []),
                 "Metadata": kpi.get("metadata", {})
             })
         

@@ -137,5 +137,8 @@ services/backend_services/
 services/business_services/
 services/support_services/
 
+# Exception: include metadata_ingestion_service requirements for spaCy model
+!services/business_services/metadata_ingestion_service/requirements.txt
+
 # Keep only the specific service being built
 # This will be overridden by context-specific .dockerignore files

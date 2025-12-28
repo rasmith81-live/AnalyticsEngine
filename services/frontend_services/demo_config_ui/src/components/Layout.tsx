@@ -9,9 +9,10 @@ import {
   ListItemButton, 
   ListItemIcon, 
   ListItemText,
-  Divider
+  Divider,
+  Collapse
 } from '@mui/material';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -23,31 +24,94 @@ import PolicyIcon from '@mui/icons-material/Policy';
 import ModelTrainingIcon from '@mui/icons-material/ModelTraining';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import ChatIcon from '@mui/icons-material/Chat';
+import CategoryIcon from '@mui/icons-material/Category';
+import SlideshowIcon from '@mui/icons-material/Slideshow';
+import TuneIcon from '@mui/icons-material/Tune';
+import InsightsIcon from '@mui/icons-material/Insights';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import TransformIcon from '@mui/icons-material/Transform';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
-const menuItems = [
-  { text: 'Demo', icon: <DashboardIcon />, path: '/demo' },
-  { text: 'KPI Configuration', icon: <SettingsIcon />, path: '/config' },
-  { text: 'Excel Import', icon: <UploadFileIcon />, path: '/excel-import' },
-  { text: 'Ontology Studio', icon: <AccountTreeIcon />, path: '/ontology-studio' },
-  { text: 'Simulation Controller', icon: <SettingsIcon />, path: '/simulation' },
-  { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
+interface MenuItem {
+  text: string;
+  icon: ReactNode;
+  path?: string;
+  children?: MenuItem[];
+}
+
+const menuItems: MenuItem[] = [
+  { text: 'Start', icon: <DashboardIcon />, path: '/demo' },
+  {
+    text: 'KPI Management',
+    icon: <BarChartIcon />,
+    children: [
+      { text: 'Excel Import', icon: <UploadFileIcon />, path: '/excel-import' },
+      { text: 'Ontology Studio', icon: <AccountTreeIcon />, path: '/ontology-studio' },
+      { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
+    ]
+  },
+  {
+    text: 'Client Configuration',
+    icon: <SettingsIcon />,
+    children: [
+      { text: 'Conversation Service', icon: <ChatIcon />, path: '/conversation-service' },
+      { text: 'KPI Configuration', icon: <SettingsIcon />, path: '/config' },
+      { text: 'Object Models', icon: <CategoryIcon />, path: '/object-models' },
+    ]
+  },
+  {
+    text: 'Client Demo',
+    icon: <SlideshowIcon />,
+    children: [
+      { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
+      { text: 'Simulation Controller', icon: <TuneIcon />, path: '/simulation' },
+      { text: 'Analytics Demo', icon: <InsightsIcon />, path: '/analytics-demo' },
+      { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },
+    ]
+  },
+  {
+    text: 'Deployment',
+    icon: <RocketLaunchIcon />,
+    children: [
+      { text: 'Source to Target Mapping', icon: <TransformIcon />, path: '/mapping' },
+      { text: 'Governance', icon: <PolicyIcon />, path: '/governance' },
+      { text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
+      { text: 'SQL', icon: <TerminalIcon />, path: '/sql' },
+    ]
+  },
   { text: 'System Monitor', icon: <MonitorHeartIcon />, path: '/system-monitor' },
-  { text: 'Object Models', icon: <AccountTreeIcon />, path: '/object-models' },
-  { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
-  { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },
-  { text: 'Governance', icon: <PolicyIcon />, path: '/governance' },
-  { text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({
+    'KPI Management': true,
+    'Client Configuration': false,
+    'Client Demo': false,
+    'Deployment': false,
+  });
+
+  const handleToggle = (text: string) => {
+    setOpenMenus(prev => ({
+      ...prev,
+      [text]: !prev[text]
+    }));
+  };
+
+  const handleNavigation = (path?: string) => {
+    if (path) navigate(path);
+  };
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', width: '100vw', maxWidth: '100%', overflow: 'hidden' }}>
@@ -77,17 +141,39 @@ export default function Layout({ children }: LayoutProps) {
         <Box sx={{ overflow: 'auto' }}>
           <List>
             {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding>
-                <ListItemButton
-                  selected={location.pathname === item.path}
-                  onClick={() => navigate(item.path)}
-                >
-                  <ListItemIcon>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={item.text} />
-                </ListItemButton>
-              </ListItem>
+              <Box key={item.text}>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    selected={!!item.path && location.pathname === item.path}
+                    onClick={() => item.children ? handleToggle(item.text) : handleNavigation(item.path)}
+                  >
+                    <ListItemIcon>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={item.text} />
+                    {item.children && (openMenus[item.text] ? <ExpandLess /> : <ExpandMore />)}
+                  </ListItemButton>
+                </ListItem>
+                {item.children && (
+                  <Collapse in={openMenus[item.text]} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {item.children.map((child) => (
+                        <ListItemButton
+                          key={child.text}
+                          sx={{ pl: 4 }}
+                          selected={!!child.path && location.pathname === child.path}
+                          onClick={() => handleNavigation(child.path)}
+                        >
+                          <ListItemIcon>
+                            {child.icon}
+                          </ListItemIcon>
+                          <ListItemText primary={child.text} />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  </Collapse>
+                )}
+              </Box>
             ))}
           </List>
           <Divider />

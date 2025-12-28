@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "")
     AZURE_OPENAI_ENDPOINT: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai or azure
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4-turbo-preview")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     
     # Messaging
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")

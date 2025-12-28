@@ -32,6 +32,10 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Copy application code
 COPY . .
 
+# Pre-install metadata_ingestion_service dependencies including large spaCy model
+# This avoids runtime installation of the ~560MB model
+RUN pip install --no-cache-dir -r services/business_services/metadata_ingestion_service/requirements.txt
+
 # Build argument for service directory
 ARG SERVICE_DIR
 ENV SERVICE_DIR=${SERVICE_DIR}
