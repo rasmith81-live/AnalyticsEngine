@@ -180,12 +180,15 @@ async def chat_endpoint(request: ChatRequest):
         logger.error(f"Error extracting intents: {e}")
         intents = []
 
-    # Generate Response
-    try:
-        response_text = await llm_client.generate_response(request.message, session_context, intents)
-    except Exception as e:
-        logger.error(f"Error generating response: {e}")
-        response_text = "I encountered an error processing your request."
+    # Generate Response (skip if requested for faster intent-only extraction)
+    if request.skip_response:
+        response_text = ""
+    else:
+        try:
+            response_text = await llm_client.generate_response(request.message, session_context, intents)
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            response_text = "I encountered an error processing your request."
 
     # Update context with this turn
     session_context.append({"role": "user", "content": request.message})

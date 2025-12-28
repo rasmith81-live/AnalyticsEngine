@@ -97,6 +97,7 @@ export default function ExcelImportPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [committing, setCommitting] = useState(false);
   const [commitSuccess, setCommitSuccess] = useState<number | null>(null);
+  const [lastImportedFileName, setLastImportedFileName] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [newValueChain, setNewValueChain] = useState('');
@@ -108,7 +109,7 @@ export default function ExcelImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to update relationships when ontology items change
-  const updateRelationshipsForRename = (oldName: string, newName: string, type: 'value_chain' | 'module' | 'entity') => {
+  const updateRelationshipsForRename = (oldName: string, newName: string) => {
     if (!importResult?.ontology_sync?.relationships_created) return;
     const updatedRelationships = importResult.ontology_sync.relationships_created.map(rel => {
       // Relationships are in format "KPI_NAME -> target"
@@ -278,6 +279,7 @@ export default function ExcelImportPage() {
       const result = await metadataIngestionApi.commitImport(importResult.importId, importResult.ontology_sync);
       if (result.success) {
         setCommitSuccess(result.count);
+        setLastImportedFileName(file?.name || 'Unknown File');
         setImportResult(null);
         setFile(null);
       }
@@ -319,6 +321,7 @@ export default function ExcelImportPage() {
     setFile(null);
     setImportResult(null);
     setCommitSuccess(null);
+    setLastImportedFileName(null);
     setUploadError(null);
     setEnrichError(null);
     if (fileInputRef.current) {
@@ -340,7 +343,7 @@ export default function ExcelImportPage() {
         <Box sx={{ mb: 3 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
             <AlertTitle>Import Successful</AlertTitle>
-            Successfully imported {commitSuccess} KPI definitions into the metadata repository.
+            Successfully imported {commitSuccess} KPI definitions from <strong>{lastImportedFileName}</strong> into the metadata repository.
           </Alert>
           <Button
             variant="contained"
@@ -494,9 +497,9 @@ export default function ExcelImportPage() {
               variant="outlined" 
               color="secondary" 
               onClick={handleEnrich}
-              disabled={enriching || committing || !importResult.ontology_sync === undefined}
+              disabled={enriching || committing || importResult.enriched}
             >
-              {enriching ? 'Enriching...' : '✨ Enrich with AI (Optional)'}
+              {importResult.enriched ? 'Analysis Complete' : (enriching ? 'Enriching...' : '✨ Enrich with AI (Optional)')}
             </Button>
             <Button 
               variant="contained" 
@@ -511,6 +514,13 @@ export default function ExcelImportPage() {
 
           {/* Tabs for KPIs and Ontology */}
           <Paper sx={{ mb: 3 }}>
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'grey.50' }}>
+               <FileIcon color="primary" />
+               <Typography variant="subtitle1" fontWeight="bold">
+                 {file?.name}
+               </Typography>
+               <Chip label="Ready for Import" size="small" color="success" variant="outlined" sx={{ ml: 'auto' }} />
+            </Box>
             <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tab icon={<KPIIcon />} label={`KPIs (${importResult.validRows})`} iconPosition="start" />
               <Tab 
@@ -529,14 +539,17 @@ export default function ExcelImportPage() {
             {activeTab === 0 && (
               <Box sx={{ p: 2 }}>
                 <Typography variant="h6" gutterBottom>KPI Preview (First 20)</Typography>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <strong>Formula Description</strong> shows the original text. <strong>Math Expression</strong> shows the parsed formula for the calculation engine.
+                </Alert>
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell>Name</TableCell>
-                        <TableCell>Formula</TableCell>
-                        <TableCell>Unit</TableCell>
-                        <TableCell>Owner</TableCell>
+                        <TableCell>Formula Description</TableCell>
+                        <TableCell>Math Expression</TableCell>
+                        <TableCell>Entities</TableCell>
                         <TableCell width={50}></TableCell>
                       </TableRow>
                     </TableHead>
@@ -544,9 +557,20 @@ export default function ExcelImportPage() {
                       {importResult.preview.map((row, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{row.Name}</TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{row.Formula}</TableCell>
-                          <TableCell><Chip label={row.Metadata?.unit || 'N/A'} size="small" /></TableCell>
-                          <TableCell>{row.Metadata?.owner || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.85rem', maxWidth: 250 }}>{row.Formula}</TableCell>
+                          <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'primary.main', bgcolor: 'grey.50' }}>
+                            {row.Metadata?.decomposition?.math_expression || row.MathExpression || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                              {(row.Metadata?.decomposition?.formula_entities || row.RequiredObjects || []).map((entity: string, i: number) => (
+                                <Chip key={i} label={entity} size="small" color="success" variant="outlined" sx={{ fontSize: '0.7rem' }} />
+                              ))}
+                              {!(row.Metadata?.decomposition?.formula_entities?.length || row.RequiredObjects?.length) && (
+                                <Typography variant="caption" color="text.secondary">-</Typography>
+                              )}
+                            </Stack>
+                          </TableCell>
                           <TableCell>
                             <ImportItemMenu
                               name={row.Name}
@@ -618,7 +642,7 @@ export default function ExcelImportPage() {
                                         ...importResult,
                                         ontology_sync: { ...importResult.ontology_sync!, value_chains_created: updated }
                                       });
-                                      updateRelationshipsForRename(oldName, newName, 'value_chain');
+                                      updateRelationshipsForRename(oldName, newName);
                                     }}
                                     onDelete={() => {
                                       const deletedName = importResult.ontology_sync!.value_chains_created[idx];
@@ -680,7 +704,7 @@ export default function ExcelImportPage() {
                                         ...importResult,
                                         ontology_sync: { ...importResult.ontology_sync!, modules_created: updated }
                                       });
-                                      updateRelationshipsForRename(oldName, newName, 'module');
+                                      updateRelationshipsForRename(oldName, newName);
                                     }}
                                     onDelete={() => {
                                       const deletedName = importResult.ontology_sync!.modules_created[idx];
@@ -742,7 +766,7 @@ export default function ExcelImportPage() {
                                         ...importResult,
                                         ontology_sync: { ...importResult.ontology_sync!, entities_created: updated }
                                       });
-                                      updateRelationshipsForRename(oldName, newName, 'entity');
+                                      updateRelationshipsForRename(oldName, newName);
                                     }}
                                     onDelete={() => {
                                       const deletedName = importResult.ontology_sync!.entities_created[idx];

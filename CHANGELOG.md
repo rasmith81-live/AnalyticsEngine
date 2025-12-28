@@ -5,6 +5,55 @@ All notable changes to the Analytics Engine project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2025-12-26] - Neo4j-Style Graph Visualization for Ontology Studio
+
+### Added
+- **OntologyGraph.tsx**: New React component for interactive graph visualization using `react-force-graph-2d`
+- **Graph View Tab**: New first tab on Ontology Studio page showing value chains, modules, KPIs, and object models as an interactive graph
+- **Neo4j-Inspired Styling**: Nodes rendered as colored circles with gradient 3D effect, labels below nodes, directional arrows on edges
+- **Node Types**: Value Chain (orange), Module (pink), KPI (blue), Object Model (green)
+- **Relationship Types**: CONTAINS, HAS_KPI, USES, RELATES_TO with distinct styling
+- **Interactive Features**: Pan, zoom, drag nodes, click for details, hover highlighting
+- **Legend Panel**: Shows node type colors and labels
+- **Zoom Controls**: Zoom in/out buttons and fit-to-view
+- **Selected Node Info Panel**: Displays details when a node is clicked
+
+### Changed
+- **OntologyManagerPage.tsx**: Added Graph View as first tab, fetches KPIs and Object Models in addition to Value Chains and Modules
+- **package.json**: Added `react-force-graph-2d` dependency
+
+### Technical Details
+- Force-directed layout using d3-force physics simulation
+- Custom canvas rendering for Neo4j-style node appearance
+- Graph data built from API responses with automatic relationship inference
+- Dark background (#1a1a2e) for better contrast with colored nodes
+
+## [2025-12-26] - Left Navigation Menu Restructure
+
+### Changed
+- **Layout.tsx**: Completely restructured left navigation menu with hierarchical groupings
+- **Menu Item 1**: Renamed 'Demo' to 'Start'
+- **Menu Item 2**: 'KPI Management' with sub-items: Excel Import, Ontology Studio, ML Model Registry
+- **Menu Item 3**: 'Client Configuration' with sub-items: Conversation Service, KPI Configuration, Object Models
+- **Menu Item 4**: 'Client Demo' with sub-items: Data Sources, Simulation Controller, Analytics Demo, Service Proposal
+- **Menu Item 5**: 'Deployment' with sub-items: Source to Target Mapping, Governance, Admin, SQL
+- **Menu Item 6**: 'System Monitor' (standalone)
+- **Drawer Width**: Increased from 240px to 280px to accommodate longer menu item names
+
+### Added
+- **ConversationServicePage.tsx**: New placeholder page for Conversation Service configuration
+- **AnalyticsDemoPage.tsx**: New placeholder page for Analytics Demo dashboard
+- **MappingPage.tsx**: New placeholder page for Source to Target Mapping
+- **SQLPage.tsx**: New placeholder page for SQL Interface
+- **Collapsible Menu Groups**: Parent menu items now expand/collapse to show child items
+- **New Icons**: Added BarChartIcon, ChatIcon, CategoryIcon, SlideshowIcon, TuneIcon, InsightsIcon, RocketLaunchIcon, TransformIcon, TerminalIcon
+
+### Technical Details
+- Added `MenuItem` interface with optional `children` property for nested menu structure
+- Added `openMenus` state to track expanded/collapsed state of parent menu items
+- Added `handleToggle` function for expanding/collapsing menu groups
+- Routes added in App.tsx: /conversation-service, /analytics-demo, /mapping, /sql
+
 ## [2025-12-21] - Docker Build Performance Optimization
 
 ### Changed

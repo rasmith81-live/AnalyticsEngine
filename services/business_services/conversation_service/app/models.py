@@ -62,6 +62,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     user_id: str
     message: str
+    skip_response: bool = False  # Skip LLM response generation for faster intent-only extraction
 
 class ChatResponse(BaseModel):
     session_id: str

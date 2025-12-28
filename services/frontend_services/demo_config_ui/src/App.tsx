@@ -18,6 +18,10 @@ import OntologyManagerPage from './pages/OntologyManagerPage';
 import SimulationPage from './pages/SimulationPage';
 import MLDashboardPage from './pages/MLDashboardPage';
 import SystemMonitorPage from './pages/SystemMonitorPage';
+import ConversationServicePage from './pages/ConversationServicePage';
+import AnalyticsDemoPage from './pages/AnalyticsDemoPage';
+import MappingPage from './pages/MappingPage';
+import SQLPage from './pages/SQLPage';
 import Layout from './components/Layout';
 import { CartProvider } from './contexts/CartContext';
 import { TreeActionsProvider } from './contexts/TreeActionsContext';
@@ -73,6 +77,10 @@ function App() {
                   <Route path="/simulation" element={<SimulationPage />} />
                   <Route path="/ml-registry" element={<MLDashboardPage />} />
                   <Route path="/system-monitor" element={<SystemMonitorPage />} />
+                  <Route path="/conversation-service" element={<ConversationServicePage />} />
+                  <Route path="/analytics-demo" element={<AnalyticsDemoPage />} />
+                  <Route path="/mapping" element={<MappingPage />} />
+                  <Route path="/sql" element={<SQLPage />} />
                 </Routes>
               </Layout>
             </BrowserRouter>
