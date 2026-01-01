@@ -8,12 +8,16 @@ to dynamic handlers based on metadata definitions.
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from pydantic import BaseModel
 import logging
 
 from .orchestrator import CalculationOrchestrator
 from .base_handler import CalculationParams, CalculationResult
 from .handlers.dynamic_handler import DynamicCalculationHandler
+from .handlers.set_based_handler import SetBasedCalculationHandler, SetBasedCalculationEngine
+from .engine.set_operations import SET_BASED_KPI_REGISTRY
 from .stream_processor import StreamProcessor
 from .clients import DatabaseClient, MessagingClientWrapper
 from .config import get_settings
@@ -25,12 +29,13 @@ orchestrator = None
 stream_processor = None
 db_client = None
 msg_client = None
+set_based_engine = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
-    global orchestrator, stream_processor, db_client, msg_client
+    global orchestrator, stream_processor, db_client, msg_client, set_based_engine
     
     settings = get_settings()
     
@@ -69,6 +74,27 @@ async def lifespan(app: FastAPI):
     orchestrator.register_handler("SALES", dynamic_handler)
     orchestrator.register_handler("CRM", dynamic_handler)
     
+    # Register Set-Based Calculation Handler for complex KPIs
+    set_based_handler = SetBasedCalculationHandler(
+        value_chain_code="SET_BASED",
+        database_service_url=settings.database_service_url,
+        messaging_service_url=settings.messaging_service_url,
+        metadata_service_url=settings.metadata_service_url,
+        cache_enabled=settings.cache_enabled,
+        cache_ttl=settings.cache_ttl
+    )
+    orchestrator.register_handler("SET_BASED", set_based_handler)
+    
+    # Register set-based KPIs in the KPI-to-handler map
+    for kpi_code in SET_BASED_KPI_REGISTRY.keys():
+        orchestrator.kpi_to_handler_map[kpi_code] = "SET_BASED"
+    
+    # Initialize standalone set-based engine for direct API access
+    set_based_engine = SetBasedCalculationEngine(
+        database_service_url=settings.database_service_url,
+        metadata_service_url=settings.metadata_service_url
+    )
+    
     # Load KPI mappings
     await orchestrator.load_kpi_mappings(settings.metadata_service_url)
     
@@ -91,6 +117,10 @@ async def lifespan(app: FastAPI):
     if stream_processor:
         await stream_processor.stop()
         logger.info("Stream processor stopped")
+    
+    if set_based_engine:
+        await set_based_engine.close()
+        logger.info("SetBasedCalculationEngine closed")
     
     if msg_client:
         await msg_client.disconnect()
@@ -222,6 +252,352 @@ async def get_kpis_for_value_chain(value_chain_code: str):
         "kpi_count": len(kpis),
         "kpis": kpis
     }
+
+
+# ============================================================================
+# SET-BASED CALCULATION ENDPOINTS
+# ============================================================================
+
+@app.get("/set-based/kpis")
+async def list_set_based_kpis():
+    """
+    List all available set-based KPIs.
+    
+    Returns:
+        List of set-based KPI definitions with code, name, description, unit
+    """
+    if not set_based_engine:
+        raise HTTPException(status_code=503, detail="Set-based engine not initialized")
+    
+    return {
+        "kpis": set_based_engine.list_available_kpis(),
+        "count": len(SET_BASED_KPI_REGISTRY)
+    }
+
+
+@app.post("/set-based/calculate/{kpi_code}")
+async def calculate_set_based_kpi(
+    kpi_code: str,
+    period_start: datetime,
+    period_end: datetime,
+    filters: Dict[str, Any] = None
+):
+    """
+    Calculate a set-based KPI.
+    
+    Set-based KPIs require multiple intermediate sets to produce a result.
+    Example: Churn Rate requires StartPeriodCustomers, EndPeriodCustomers,
+    and LostCustomers sets.
+    
+    Args:
+        kpi_code: The KPI code (e.g., "CHURN_RATE", "RETENTION_RATE")
+        period_start: Start of the calculation period
+        period_end: End of the calculation period
+        filters: Optional additional filters
+        
+    Returns:
+        Calculation result with value, metadata, and SQL breakdown
+    """
+    if not set_based_engine:
+        raise HTTPException(status_code=503, detail="Set-based engine not initialized")
+    
+    try:
+        result = await set_based_engine.calculate(
+            kpi_code=kpi_code,
+            period_start=period_start,
+            period_end=period_end,
+            filters=filters
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Set-based calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/set-based/explain/{kpi_code}")
+async def explain_set_based_kpi(
+    kpi_code: str,
+    period_start: datetime,
+    period_end: datetime
+):
+    """
+    Get explanation of how a set-based KPI would be calculated.
+    
+    Returns the SQL and step breakdown without executing the calculation.
+    Useful for understanding the calculation logic and debugging.
+    
+    Args:
+        kpi_code: The KPI code
+        period_start: Start of the calculation period
+        period_end: End of the calculation period
+        
+    Returns:
+        Explanation with SQL, parameters, and step breakdown
+    """
+    if not set_based_engine:
+        raise HTTPException(status_code=503, detail="Set-based engine not initialized")
+    
+    try:
+        explanation = await set_based_engine.explain(
+            kpi_code=kpi_code,
+            period_start=period_start,
+            period_end=period_end
+        )
+        return explanation
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Set-based explanation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/set-based/definition/{kpi_code}")
+async def get_set_based_kpi_definition(kpi_code: str):
+    """
+    Get the full definition of a set-based KPI.
+    
+    Returns the complete definition including all steps, set definitions,
+    aggregations, and the final formula.
+    
+    Args:
+        kpi_code: The KPI code
+        
+    Returns:
+        Full KPI definition
+    """
+    from .engine.set_operations import get_set_based_kpi_definition as get_def
+    
+    kpi_def = get_def(kpi_code)
+    if not kpi_def:
+        raise HTTPException(status_code=404, detail=f"Set-based KPI not found: {kpi_code}")
+    
+    return kpi_def.model_dump()
+
+
+@app.get("/set-based/metrics")
+async def get_set_based_metrics():
+    """
+    Get performance metrics for the set-based calculation engine.
+    
+    Returns metrics for monitoring SLA compliance:
+    - total_calculations: Total calculations performed
+    - cache_hits/misses: Cache performance
+    - avg_calculation_time_ms: Average response time
+    - max_calculation_time_ms: Maximum response time
+    - sla_violations: Calculations exceeding 1000ms
+    - sla_compliance_rate: Percentage meeting <1s SLA
+    
+    Target SLA: <1000ms per calculation
+    """
+    if not set_based_engine:
+        raise HTTPException(status_code=503, detail="Set-based engine not initialized")
+    
+    return {
+        "sla_target_ms": 1000,
+        "metrics": set_based_engine.get_metrics()
+    }
+
+
+@app.post("/set-based/cache/clear")
+async def clear_set_based_cache():
+    """Clear the set-based calculation result cache."""
+    if not set_based_engine:
+        raise HTTPException(status_code=503, detail="Set-based engine not initialized")
+    
+    set_based_engine.clear_cache()
+    return {"status": "cache_cleared"}
+
+
+class NLPConversionRequest(BaseModel):
+    """Request model for NLP to set-based definition conversion."""
+    nlp_definition: str
+    kpi_code: str
+    kpi_name: str
+    base_entity: str
+    unit: str = "Number"
+    metadata: Optional[Dict[str, Any]] = None
+    register: bool = False
+
+
+@app.post("/set-based/convert-nlp")
+async def convert_nlp_to_sets(request: NLPConversionRequest):
+    """
+    Convert a natural language KPI definition to a set-based calculation definition.
+    
+    This endpoint parses NLP definitions like:
+    "(Number of Customers Lost During Period / Number of Customers at Start of Period) * 100"
+    
+    And converts them into structured set-based definitions with:
+    - Set definitions (FILTER, EXCEPT, INTERSECT, UNION)
+    - Aggregations (COUNTROWS, SUMX, AVERAGEX)
+    - Final formula
+    
+    Supports common patterns:
+    - Churn Rate (lost/churned entities)
+    - Retention Rate (retained entities)
+    - Growth Rate (new entities)
+    - Generic ratio patterns
+    
+    Args:
+        request: NLPConversionRequest with:
+            - nlp_definition: Natural language definition
+            - kpi_code: Code for the KPI (e.g., "CHURN_RATE")
+            - kpi_name: Human-readable name
+            - base_entity: Primary entity table (e.g., "customers")
+            - unit: Unit of measurement (default: "Number")
+            - metadata: Optional additional metadata
+            - register: If True, persist to metadata service AND register in memory
+            
+    Returns:
+        SetBasedKPIDefinition as JSON
+        
+    Example:
+        POST /set-based/convert-nlp
+        {
+            "nlp_definition": "(Number of Customers Lost During Period / Number of Customers at Start of Period) * 100",
+            "kpi_code": "CUSTOMER_CHURN",
+            "kpi_name": "Customer Churn Rate",
+            "base_entity": "customers",
+            "unit": "Percentage",
+            "register": true
+        }
+    """
+    from .engine.nlp_to_sets_converter import convert_nlp_to_set_definition
+    import httpx
+    
+    settings = get_settings()
+    
+    try:
+        definition = await convert_nlp_to_set_definition(
+            nlp_definition=request.nlp_definition,
+            kpi_code=request.kpi_code,
+            kpi_name=request.kpi_name,
+            base_entity=request.base_entity,
+            unit=request.unit,
+            metadata=request.metadata,
+            llm_service_url=settings.conversation_service_url if hasattr(settings, 'conversation_service_url') else None,
+            register=request.register
+        )
+        
+        persisted = False
+        
+        # If registered, persist to metadata service for durability
+        if request.register:
+            # Add to orchestrator's KPI map (in-memory)
+            if orchestrator:
+                orchestrator.kpi_to_handler_map[request.kpi_code.upper()] = "SET_BASED"
+            
+            # Persist to metadata service
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    # Build the metric definition payload
+                    metric_payload = {
+                        "kind": "metric_definition",
+                        "code": request.kpi_code.upper(),
+                        "name": request.kpi_name,
+                        "description": request.nlp_definition,
+                        "formula": request.nlp_definition,
+                        "unit": request.unit,
+                        "calculation_type": "set_based",
+                        "set_based_definition": definition.model_dump(),
+                        "metadata_": request.metadata or {},
+                        "required_objects": [request.base_entity]
+                    }
+                    
+                    response = await client.post(
+                        f"{settings.metadata_service_url}/api/v1/metadata/definitions",
+                        json=metric_payload
+                    )
+                    
+                    if response.status_code in (200, 201):
+                        persisted = True
+                        logger.info(f"Persisted set-based KPI {request.kpi_code} to metadata service")
+                    else:
+                        logger.warning(f"Failed to persist to metadata service: {response.status_code}")
+                        
+            except Exception as e:
+                logger.warning(f"Failed to persist to metadata service: {e}")
+        
+        return {
+            "success": True,
+            "registered": request.register,
+            "persisted": persisted,
+            "definition": definition.model_dump()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"NLP conversion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/set-based/convert-nlp/preview")
+async def preview_nlp_conversion(request: NLPConversionRequest):
+    """
+    Preview the SQL that would be generated from an NLP definition.
+    
+    Converts the NLP definition and generates the SQL without executing.
+    Useful for validating the conversion before registering.
+    
+    Args:
+        request: Same as convert-nlp endpoint
+        
+    Returns:
+        Definition and generated SQL preview
+    """
+    from .engine.nlp_to_sets_converter import convert_nlp_to_set_definition
+    from .engine.set_operations import SetBasedSQLGenerator
+    
+    settings = get_settings()
+    
+    try:
+        definition = await convert_nlp_to_set_definition(
+            nlp_definition=request.nlp_definition,
+            kpi_code=request.kpi_code,
+            kpi_name=request.kpi_name,
+            base_entity=request.base_entity,
+            unit=request.unit,
+            metadata=request.metadata,
+            llm_service_url=settings.conversation_service_url if hasattr(settings, 'conversation_service_url') else None,
+            register=False  # Never register in preview
+        )
+        
+        # Generate SQL preview
+        sql_generator = SetBasedSQLGenerator()
+        sample_start = datetime(2024, 1, 1)
+        sample_end = datetime(2024, 1, 31)
+        
+        sql, params = sql_generator.generate_sql(
+            kpi_def=definition,
+            period_start=sample_start,
+            period_end=sample_end
+        )
+        
+        return {
+            "success": True,
+            "definition": definition.model_dump(),
+            "sql_preview": sql,
+            "sample_parameters": {
+                k: v.isoformat() if isinstance(v, datetime) else v
+                for k, v in params.items()
+            },
+            "steps_summary": [
+                {
+                    "step": step.step_number,
+                    "name": step.name,
+                    "type": "set_definition" if step.set_definition else 
+                            "aggregation" if step.aggregation else "formula"
+                }
+                for step in definition.steps
+            ]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"NLP preview failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

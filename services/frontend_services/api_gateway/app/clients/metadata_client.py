@@ -101,6 +101,27 @@ class MetadataServiceClient:
         response.raise_for_status()
         return {"status": "deleted", "code": code}
 
+    async def update_definition(
+        self, 
+        kind: str, 
+        code: str, 
+        definition: Dict[str, Any],
+        changed_by: str = "admin",
+        change_description: Optional[str] = None
+    ) -> None:
+        """Update a definition."""
+        params = {"changed_by": changed_by}
+        if change_description:
+            params["change_description"] = change_description
+        
+        response = await self.client.put(
+            f"{self.base_url}/api/v1/metadata/definitions/{kind}/{code}",
+            json=definition,
+            params=params
+        )
+        response.raise_for_status()
+        return {"status": "updated", "code": code}
+
     async def get_all_relationships(self, relationship_type: str = None) -> List[Dict[str, Any]]:
         """Get all relationships, optionally filtered by type."""
         # Query all entities and get their relationships

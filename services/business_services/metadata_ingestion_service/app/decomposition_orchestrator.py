@@ -62,17 +62,27 @@ class DecompositionOrchestrator:
             module_code = self.entity_extractor.infer_module(kpi_data)
             logger.info(f"Inferred module: {module_code}")
             
-            # 4. Decompose formula (if present)
+            # 4. Decompose formula (if present) into set_based_definition
             formula_entities = []
             normalized_formula = None
-            math_expression = None
+            set_based_definition = None
+            calculation_type = "simple"  # Default to simple
+            
             if kpi_data.get("formula"):
                 try:
                     decomposed = await self.kpi_decomposer.decompose_formula(kpi_data["formula"])
                     formula_entities = decomposed.get("identified_attributes", [])
                     normalized_formula = decomposed.get("normalized_formula")
-                    math_expression = decomposed.get("math_expression")
-                    logger.info(f"Formula decomposition found: entities={formula_entities}, math='{math_expression}'")
+                    
+                    # Check if this is a set-based calculation
+                    set_based_definition = decomposed.get("set_based_definition")
+                    if set_based_definition:
+                        calculation_type = "set_based"
+                        logger.info(f"Formula decomposed to set_based_definition with {len(set_based_definition.get('steps', []))} steps")
+                    else:
+                        # Legacy: simple formula
+                        logger.info(f"Formula decomposition found: entities={formula_entities}")
+                    
                     if normalized_formula != kpi_data["formula"]:
                         logger.info(f"Formula normalized: '{kpi_data['formula']}' -> '{normalized_formula}'")
                 except Exception as e:
@@ -85,15 +95,16 @@ class DecompositionOrchestrator:
             if normalized_formula:
                 enriched_kpi["formula"] = normalized_formula
             
-            # Store math expression for calculation engine
-            if math_expression:
-                enriched_kpi["math_expression"] = math_expression
+            # Store calculation type and set_based_definition
+            enriched_kpi["calculation_type"] = calculation_type
+            if set_based_definition:
+                enriched_kpi["set_based_definition"] = set_based_definition
             
             # Update required_objects - use formula entities (all nouns from formula)
             enriched_kpi["required_objects"] = formula_entities if formula_entities else []
             
             # NOTE: We do NOT embed module references in KPIs - relationships handle this
-            # Add decomposition metadata
+            # Add decomposition metadata (import-time info only, not math_expression)
             if "metadata" not in enriched_kpi:
                 enriched_kpi["metadata"] = {}
             
@@ -102,7 +113,7 @@ class DecompositionOrchestrator:
                 "module": module_code,
                 "extracted_entities": entities,
                 "formula_entities": formula_entities,
-                "math_expression": math_expression,
+                "extraction_method": "spacy",
                 "original_formula": kpi_data.get("formula") if normalized_formula else None
             }
             
@@ -274,6 +285,7 @@ class DecompositionOrchestrator:
                 required_objs = kpi.get("required_objects", [])
                 if required_objs:
                     entities.update(required_objs)
+                    logger.debug(f"KPI '{kpi.get('code')}' has required_objects: {required_objs}")
             
             # Create value chain definitions
             for vc_code in value_chains:
@@ -306,34 +318,27 @@ class DecompositionOrchestrator:
                     logger.warning(f"Failed to create module '{module_code}': {e}")
                     summary["errors"].append(f"Module {module_code}: {str(e)}")
             
-            # Create entity definitions (placeholder - would need more sophisticated logic)
+            # Create entity definitions
+            logger.info(f"Collected {len(entities)} unique entities to create: {list(entities)[:10]}...")
             for entity_code in entities:
                 try:
                     await self._create_entity(entity_code)
                     summary["entities_created"].append(entity_code)
+                    logger.info(f"Created entity: {entity_code}")
                 except Exception as e:
                     logger.warning(f"Failed to create entity '{entity_code}': {e}")
                     summary["errors"].append(f"Entity {entity_code}: {str(e)}")
             
             # Create relationships between KPIs and ontology objects
+            # Hierarchy: ValueChain <- Module <- KPI -> Entity
+            # - Module belongs_to_value_chain ValueChain (already created above)
+            # - KPI belongs_to_module Module
+            # - KPI uses Entity
+            # NOTE: KPIs do NOT directly relate to ValueChains - they relate via Modules
             logger.info(f"Creating relationships for {len(enriched_kpis)} KPIs...")
             for kpi in enriched_kpis:
                 kpi_code = kpi.get("code")
                 decomp = kpi.get("metadata", {}).get("decomposition", {})
-                
-                # KPI -> Value Chain relationship (use category as fallback)
-                vc = decomp.get("value_chain") or kpi.get("category")
-                if vc:
-                    vc_code = str(vc).lower().replace(" ", "_").replace("-", "_")
-                    try:
-                        await self._create_relationship(
-                            from_code=kpi_code,
-                            to_code=vc_code,
-                            relationship_type="belongs_to_value_chain"
-                        )
-                        summary["relationships_created"].append(f"{kpi_code} -> {vc_code}")
-                    except Exception as e:
-                        logger.warning(f"Failed to create KPI->ValueChain relationship: {e}")
                 
                 # KPI -> Module relationships (use modules array as fallback)
                 kpi_modules = decomp.get("module")
@@ -353,9 +358,40 @@ class DecompositionOrchestrator:
                                 to_code=module_code,
                                 relationship_type="belongs_to_module"
                             )
-                            summary["relationships_created"].append(f"{kpi_code} -> {module_code}")
+                            summary["relationships_created"].append(f"{kpi_code} -[belongs_to_module]-> {module_code}")
                         except Exception as e:
                             logger.warning(f"Failed to create KPI->Module relationship: {e}")
+                
+                # KPI -> Entity relationships (uses)
+                # Get entities from required_objects (formula entities) and decomposition
+                kpi_entities = set()
+                
+                # From required_objects (top-level, extracted from formula)
+                required_objs = kpi.get("required_objects", [])
+                if required_objs:
+                    kpi_entities.update(required_objs)
+                
+                # From decomposition metadata
+                formula_entities = decomp.get("formula_entities", [])
+                if formula_entities:
+                    kpi_entities.update(formula_entities)
+                
+                extracted_entities = decomp.get("extracted_entities", [])
+                if extracted_entities:
+                    kpi_entities.update(extracted_entities)
+                
+                for entity_name in kpi_entities:
+                    if entity_name:
+                        entity_code = str(entity_name).lower().replace(" ", "_").replace("-", "_")
+                        try:
+                            await self._create_relationship(
+                                from_code=kpi_code,
+                                to_code=entity_code,
+                                relationship_type="uses"
+                            )
+                            summary["relationships_created"].append(f"{kpi_code} -[uses]-> {entity_code}")
+                        except Exception as e:
+                            logger.warning(f"Failed to create KPI->Entity relationship: {e}")
             
             logger.info(f"Ontology sync complete. Value chains: {list(value_chains)}, Modules: {list(modules.keys())}, Relationships: {len(summary['relationships_created'])}")
             
@@ -553,14 +589,56 @@ class DecompositionOrchestrator:
                     logger.warning(f"Failed to create entity '{entity_code}': {e}")
                     summary["errors"].append(f"Entity {entity_code}: {str(e)}")
             
-            # Process relationships (format: "KPI_NAME -> target")
+            # Process relationships (format: "FROM_CODE -> TO_CODE")
+            # Hierarchy: ValueChain <- Module <- KPI -> Entity
+            # - Module -> VC = belongs_to_value_chain
+            # - Module -> KPI = contains (module contains KPIs)
+            # - KPI -> Entity = uses
+            # Normalize for comparison: lowercase for VC/Module/Entity names (which have spaces)
+            # But preserve original case for codes that are already formatted (like KPI codes which are UPPERCASE)
+            vc_codes_lower = set(str(vc).lower().replace(" ", "_").replace("-", "_") for vc in edited_ontology.get("value_chains", []))
+            mod_codes_lower = set(str(mod).lower().replace(" ", "_").replace("-", "_") for mod in edited_ontology.get("modules", []))
+            entity_codes_lower = set(str(e).lower().replace(" ", "_").replace("-", "_") for e in edited_ontology.get("entities", []))
+            
             for rel in edited_ontology.get("relationships", []):
                 try:
                     parts = rel.split(" -> ")
                     if len(parts) == 2:
                         from_code = parts[0].strip()
                         to_code = parts[1].strip()
-                        summary["relationships_processed"].append(rel)
+                        
+                        # Normalize to lowercase with underscores for both comparison and storage
+                        # This matches how all entities are stored in the database
+                        from_code_normalized = from_code.lower().replace(" ", "_").replace("-", "_")
+                        to_code_normalized = to_code.lower().replace(" ", "_").replace("-", "_")
+                        
+                        # Determine relationship type based on source and target
+                        if from_code_normalized in mod_codes_lower and to_code_normalized in vc_codes_lower:
+                            # Module -> ValueChain
+                            rel_type = "belongs_to_value_chain"
+                        elif from_code_normalized in mod_codes_lower:
+                            # Module -> KPI (module contains KPIs)
+                            rel_type = "contains"
+                        elif to_code_normalized in entity_codes_lower or (to_code_normalized not in vc_codes_lower and to_code_normalized not in mod_codes_lower):
+                            # KPI -> Entity
+                            rel_type = "uses"
+                        else:
+                            rel_type = "uses"  # Default
+                        
+                        try:
+                            await self._create_relationship(
+                                from_code=from_code_normalized,
+                                to_code=to_code_normalized,
+                                relationship_type=rel_type
+                            )
+                            summary["relationships_processed"].append(f"{from_code_normalized} -[{rel_type}]-> {to_code_normalized}")
+                            logger.info(f"Created relationship: {from_code_normalized} -[{rel_type}]-> {to_code_normalized}")
+                        except httpx.HTTPStatusError as e:
+                            if e.response.status_code == 409:  # Already exists
+                                logger.info(f"Relationship '{from_code} -> {to_code}' already exists, skipping")
+                            else:
+                                logger.warning(f"Failed to create relationship '{rel}': {e}")
+                                summary["errors"].append(f"Relationship {rel}: {str(e)}")
                 except Exception as e:
                     logger.warning(f"Failed to parse relationship '{rel}': {e}")
             

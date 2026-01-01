@@ -15,7 +15,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.dialects.postgresql import insert
 
 import sys
@@ -63,7 +63,10 @@ class MetadataWriteRepository:
         created_by: str,
         metadata_hash: Optional[str] = None
     ) -> UUID:
-        """Create a new metadata definition.
+        """Create a new metadata definition or return existing one.
+        
+        If a definition with the same kind and code already exists,
+        returns the existing definition's ID instead of failing.
         
         Args:
             kind: Type of definition (e.g., "entity_definition")
@@ -74,8 +77,22 @@ class MetadataWriteRepository:
             metadata_hash: Optional hash for change detection
             
         Returns:
-            UUID of created definition
+            UUID of created or existing definition
         """
+        # Check if definition already exists (case-insensitive code match)
+        existing_stmt = select(MetadataDefinition).where(
+            MetadataDefinition.kind == kind,
+            func.lower(MetadataDefinition.code) == code.lower(),
+            MetadataDefinition.is_active == True
+        )
+        result = await self.session.execute(existing_stmt)
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            # Definition already exists, return its ID
+            logger.debug(f"Definition already exists: {kind}/{code}, returning existing ID")
+            return existing.id
+        
         if not metadata_hash:
             metadata_hash = self._compute_hash(data)
         
@@ -287,7 +304,33 @@ class MetadataWriteRepository:
                 existing.metadata_ = metadata  # Note: model uses metadata_ not metadata
             return existing.id
 
+        # Look up UUID IDs for the entity codes (case-insensitive)
+        from_entity_id = None
+        to_entity_id = None
+        
+        # Look up from_entity_id
+        from_stmt = select(MetadataDefinition.id).where(
+            func.lower(MetadataDefinition.code) == from_entity_code.lower(),
+            MetadataDefinition.is_active == True
+        ).limit(1)
+        from_result = await self.session.execute(from_stmt)
+        from_row = from_result.scalar_one_or_none()
+        if from_row:
+            from_entity_id = from_row
+        
+        # Look up to_entity_id
+        to_stmt = select(MetadataDefinition.id).where(
+            func.lower(MetadataDefinition.code) == to_entity_code.lower(),
+            MetadataDefinition.is_active == True
+        ).limit(1)
+        to_result = await self.session.execute(to_stmt)
+        to_row = to_result.scalar_one_or_none()
+        if to_row:
+            to_entity_id = to_row
+
         relationship = MetadataRelationship(
+            from_entity_id=from_entity_id,
+            to_entity_id=to_entity_id,
             from_entity_code=from_entity_code,
             to_entity_code=to_entity_code,
             relationship_type=relationship_type,

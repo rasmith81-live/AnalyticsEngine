@@ -8,8 +8,8 @@ from ..repositories import MetadataWriteRepository, MetadataQueryRepository
 from .metadata_instantiation_service import MetadataInstantiationService
 
 from ..ontology_models import (
-    ThingDefinition,
-    RelationshipDefinition,
+    NodeDefinition,
+    EdgeDefinition,
     CompanyValueChainModelDefinition,
     MetricDefinition,
     BusinessProcessDefinition
@@ -102,7 +102,7 @@ class MetadataService:
     
     async def create_definition(
         self,
-        definition: ThingDefinition,
+        definition: NodeDefinition,
         created_by: str
     ) -> UUID:
         """Create a new metadata definition.
@@ -153,7 +153,7 @@ class MetadataService:
         include_relationships: bool = True,
         version: Optional[int] = None,
         use_cache: bool = True
-    ) -> Optional[ThingDefinition]:
+    ) -> Optional[NodeDefinition]:
         """Get definition by code.
         
         Args:
@@ -187,7 +187,7 @@ class MetadataService:
         self,
         code: str,
         kind: str,
-        definition: ThingDefinition,
+        definition: NodeDefinition,
         changed_by: str,
         change_description: Optional[str] = None
     ) -> None:
@@ -270,7 +270,7 @@ class MetadataService:
         filters: Optional[Dict[str, Any]] = None,
         limit: int = 100,
         offset: int = 0
-    ) -> List[ThingDefinition]:
+    ) -> List[NodeDefinition]:
         """Search definitions with filters.
         
         Args:
@@ -310,17 +310,23 @@ class MetadataService:
             offset: Pagination offset
             
         Returns:
-            List of raw definition dicts
+            List of raw definition dicts with id field included
         """
         results = await self.query_repo.get_all_by_kind(kind, limit=limit, offset=offset)
-        return [r['data'] for r in results]
+        # Include the UUID id field in the returned data
+        output = []
+        for r in results:
+            data = r['data'].copy() if r['data'] else {}
+            data['id'] = r.get('id')  # Add UUID id from the database record
+            output.append(data)
+        return output
     
     async def get_all_by_kind(
         self,
         kind: str,
         limit: Optional[int] = None,
         offset: int = 0
-    ) -> List[ThingDefinition]:
+    ) -> List[NodeDefinition]:
         """Get all definitions of a specific kind.
         
         Args:
@@ -395,7 +401,7 @@ class MetadataService:
     
     async def bulk_create_definitions(
         self,
-        definitions: List[ThingDefinition],
+        definitions: List[NodeDefinition],
         created_by: str
     ) -> List[UUID]:
         """Bulk create definitions (for seeding).
@@ -443,7 +449,7 @@ class MetadataService:
         Decomposes the nested model into:
         - BusinessProcessDefinition (for Process/Activity nodes)
         - MetricDefinition (for Metric nodes)
-        - RelationshipDefinition (for links)
+        - EdgeDefinition (for links)
         - CompanyValueChainModelDefinition (container)
         """
         # 1. Create container model
@@ -529,20 +535,20 @@ class MetadataService:
         )
         
         # Need to implement instantiate for CompanyValueChainModelDefinition if not present
-        # Or just use generic create_definition since it's a ThingDefinition
+        # Or just use generic create_definition since it's a NodeDefinition
         
         # We need a code for the model definition itself
-        model_def.id = model_id # ThingDefinition requires ID
-        # Since ThingDefinition doesn't explicitly require 'code' field but create_definition does...
-        # Wait, CompanyValueChainModelDefinition inherits ThingDefinition.
+        model_def.id = model_id # NodeDefinition requires ID
+        # Since NodeDefinition doesn't explicitly require 'code' field but create_definition does...
+        # Wait, CompanyValueChainModelDefinition inherits NodeDefinition.
         # create_definition extracts code using instantiation service.
-        # ThingDefinition has 'id' and 'name'. It doesn't enforce 'code' field on base, 
+        # NodeDefinition has 'id' and 'name'. It doesn't enforce 'code' field on base, 
         # but subclasses like EntityDefinition have it.
         # CompanyValueChainModelDefinition does NOT have a 'code' field in ontology_models.py.
         # This might be an issue for create_definition which expects a code.
         
         # Let's check CompanyValueChainModelDefinition in ontology_models.py
-        # class CompanyValueChainModelDefinition(ThingDefinition):
+        # class CompanyValueChainModelDefinition(NodeDefinition):
         #     kind: str = "company_value_chain_model_definition"
         #     company_id: str
         #     ...
@@ -562,11 +568,11 @@ class MetadataService:
         pass # Placeholder for thought process.
 
         # Let's create the definition using a dict approach to bypass pydantic validation if needed,
-        # but create_definition takes a ThingDefinition.
+        # but create_definition takes a NodeDefinition.
         
         # Actually, I'll update CompanyValueChainModelDefinition to include 'code' in ontology_models.py 
         # OR I will just pass it as extra data if allowed (ConfigDict(extra="allow")).
-        # ThingDefinition allows extra.
+        # NodeDefinition allows extra.
         
         # Assign a code
         model_code = f"VCM_{uuid.uuid4().hex[:8]}"
@@ -580,9 +586,9 @@ class MetadataService:
     # Helper methods
     # -------------------------------------------------------------------------
     
-    def _dict_to_relationship(self, rel_dict: Dict[str, Any]) -> RelationshipDefinition:
+    def _dict_to_relationship(self, rel_dict: Dict[str, Any]) -> EdgeDefinition:
         """Convert relationship dict to Pydantic model."""
-        return RelationshipDefinition(
+        return EdgeDefinition(
             kind="relationship_definition",
             id=rel_dict['id'],
             name=f"{rel_dict['from_entity_code']} {rel_dict['relationship_type']} {rel_dict['to_entity_code']}",

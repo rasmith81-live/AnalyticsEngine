@@ -134,6 +134,18 @@ async def get_entity_relationships(
     """Get relationships for a specific entity."""
     return await client.get_entity_relationships(entity_code, direction, relationship_type)
 
+@router.put("/definitions/{kind}/{code}")
+async def update_definition(
+    kind: str,
+    code: str,
+    definition: Dict[str, Any],
+    changed_by: str = "admin",
+    change_description: str = None,
+    client: MetadataServiceClient = Depends(get_metadata_client)
+):
+    """Proxy PUT to business_metadata definitions endpoint."""
+    return await client.update_definition(kind, code, definition, changed_by, change_description)
+
 @router.delete("/definitions/{kind}/{code}")
 async def delete_definition(
     kind: str,

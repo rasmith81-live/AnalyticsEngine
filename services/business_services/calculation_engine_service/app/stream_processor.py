@@ -160,18 +160,28 @@ class StreamProcessor:
             return self._active_subscriptions[stream_key]
         
         try:
-            # Subscribe to stream via database service
-            response = await self._http_client.post(
-                f"{self.database_service_url}/stream/subscribe",
-                params={
+            # Subscribe to stream via pub/sub messaging
+            # The channel follows the pattern: stream.{kpi_code}.{entity_id}.{period}
+            channel = f"stream.{kpi_code}.{entity_id}.{period}"
+            
+            # Publish subscription request via messaging
+            await self.messaging_client.publish_event(
+                event_type="stream.subscribe",
+                payload={
                     "kpi_code": kpi_code,
                     "entity_id": entity_id,
                     "period": period,
-                    "subscriber_id": self.subscriber_id
+                    "subscriber_id": self.subscriber_id,
+                    "channel": channel
                 }
             )
-            response.raise_for_status()
-            subscription_info = response.json()
+            
+            subscription_info = {
+                "channel": channel,
+                "kpi_code": kpi_code,
+                "entity_id": entity_id,
+                "period": period
+            }
             
             # Store subscription info
             self._active_subscriptions[stream_key] = {
@@ -181,7 +191,6 @@ class StreamProcessor:
             }
             
             # Start message consumer for this stream
-            channel = subscription_info["channel"]
             await self._start_message_consumer(channel, kpi_code, entity_id, period, calculation_params)
             
             # Register for write-behind sync
@@ -223,20 +232,20 @@ class StreamProcessor:
                     pass
                 del self._message_consumers[channel]
             
-            # Unsubscribe via database service
+            # Unsubscribe via pub/sub messaging
             parts = stream_key.split(":")
             if len(parts) == 3:
                 kpi_code, entity_id, period = parts
-                response = await self._http_client.post(
-                    f"{self.database_service_url}/stream/unsubscribe",
-                    params={
+                await self.messaging_client.publish_event(
+                    event_type="stream.unsubscribe",
+                    payload={
                         "subscriber_id": self.subscriber_id,
                         "kpi_code": kpi_code,
                         "entity_id": entity_id,
-                        "period": period
+                        "period": period,
+                        "channel": channel
                     }
                 )
-                response.raise_for_status()
             
             # Remove from active subscriptions
             del self._active_subscriptions[stream_key]
@@ -405,7 +414,11 @@ class StreamProcessor:
         period: str
     ):
         """
-        Publish calculation result to messaging service
+        Publish calculation result to messaging service.
+        
+        Publishes to:
+        - kpi.calculated (general channel for database service to persist/archive)
+        - kpi.calculated.{kpi_code} (specific channel for subscribers)
         
         Args:
             result: Calculation result
@@ -414,10 +427,8 @@ class StreamProcessor:
             period: Time period
         """
         try:
-            # Publish to messaging service
-            channel = f"kpi.calculated.{kpi_code}.{entity_id}.{period}"
-            
             message = {
+                "source": "calculation_engine",
                 "kpi_code": kpi_code,
                 "entity_id": entity_id,
                 "period": period,
@@ -428,23 +439,26 @@ class StreamProcessor:
                 "metadata": result.metadata
             }
             
-            response = await self._http_client.post(
-                f"{self.messaging_service_url}/publish",
-                json={
-                    "channel": channel,
-                    "message": message,
-                    "message_type": "kpi_calculation_result"
-                }
+            # Publish via messaging client to standard channel
+            # Database service subscribes to this for persistence and archival
+            await self.messaging_client.publish_event(
+                event_type="kpi.calculated",
+                payload=message
             )
-            response.raise_for_status()
             
-            logger.debug(f"Published calculation result to {channel}")
+            # Also publish to KPI-specific channel for targeted subscribers
+            await self.messaging_client.publish_event(
+                event_type=f"kpi.calculated.{kpi_code}",
+                payload=message
+            )
+            
+            logger.debug(f"Published KPI result: {kpi_code}={result.value}")
         
         except Exception as e:
             logger.error(f"Failed to publish calculation result: {e}")
     
     async def _heartbeat_loop(self):
-        """Send periodic heartbeats to keep subscriptions alive"""
+        """Send periodic heartbeats via pub/sub to keep subscriptions alive"""
         logger.info("Heartbeat loop started")
         
         try:
@@ -452,11 +466,15 @@ class StreamProcessor:
                 await asyncio.sleep(60)  # Send heartbeat every minute
                 
                 try:
-                    response = await self._http_client.post(
-                        f"{self.database_service_url}/stream/heartbeat",
-                        params={"subscriber_id": self.subscriber_id}
+                    # Publish heartbeat via messaging service
+                    await self.messaging_client.publish_event(
+                        event_type="stream.heartbeat",
+                        payload={
+                            "subscriber_id": self.subscriber_id,
+                            "active_subscriptions": list(self._active_subscriptions.keys()),
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
                     )
-                    response.raise_for_status()
                     logger.debug(f"Heartbeat sent for subscriber: {self.subscriber_id}")
                 
                 except Exception as e:
@@ -490,3 +508,116 @@ class StreamProcessor:
                 for stream_key, sub in self._active_subscriptions.items()
             }
         }
+    
+    async def subscribe_to_simulation_events(
+        self,
+        kpi_codes: Optional[Set[str]] = None
+    ):
+        """
+        Subscribe to simulation entity events for real-time KPI calculation.
+        
+        The Data Simulator Service publishes entity events to Redis pub/sub.
+        This method subscribes to those events and triggers KPI calculations.
+        
+        Args:
+            kpi_codes: Optional set of KPI codes to calculate. If None, calculates all.
+        """
+        channel = "simulation.entity.created"
+        
+        if channel in self._message_consumers:
+            logger.warning(f"Already subscribed to simulation events")
+            return
+        
+        # Create consumer task for simulation events
+        task = asyncio.create_task(
+            self._consume_simulation_events(channel, kpi_codes)
+        )
+        self._message_consumers[channel] = task
+        
+        logger.info(f"Subscribed to simulation entity events")
+    
+    async def _consume_simulation_events(
+        self,
+        channel: str,
+        kpi_codes: Optional[Set[str]]
+    ):
+        """Consume simulation entity events and calculate KPIs."""
+        logger.info(f"Simulation event consumer started for channel: {channel}")
+        
+        redis_client = None
+        pubsub = None
+        
+        try:
+            redis_client = redis.from_url(self.redis_url, decode_responses=True)
+            pubsub = redis_client.pubsub()
+            await pubsub.subscribe(channel)
+            
+            while self._running:
+                try:
+                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                    
+                    if message:
+                        try:
+                            data = json.loads(message["data"])
+                            await self._process_simulation_entity_event(data, kpi_codes)
+                        except json.JSONDecodeError:
+                            logger.warning(f"Invalid JSON in simulation event")
+                        except Exception as e:
+                            logger.error(f"Error processing simulation event: {e}")
+                    
+                    if not message:
+                        await asyncio.sleep(0.01)
+                
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error consuming simulation events: {e}")
+                    await asyncio.sleep(5)
+        
+        except asyncio.CancelledError:
+            logger.info("Simulation event consumer stopped")
+            raise
+        finally:
+            if pubsub:
+                await pubsub.unsubscribe(channel)
+                await pubsub.close()
+            if redis_client:
+                await redis_client.close()
+    
+    async def _process_simulation_entity_event(
+        self,
+        event: Dict,
+        kpi_codes: Optional[Set[str]]
+    ):
+        """
+        Process a simulation entity event and trigger KPI calculations.
+        
+        Args:
+            event: Entity event from simulation
+            kpi_codes: Optional filter for which KPIs to calculate
+        """
+        try:
+            entity_name = event.get("entity_name")
+            entity_id = event.get("entity_id")
+            attributes = event.get("attributes", {})
+            timestamp = event.get("timestamp")
+            simulation_id = event.get("simulation_id")
+            
+            logger.debug(f"Processing simulation event: {entity_name}/{entity_id}")
+            
+            # Ingest into Stream Aggregator for real-time windowing
+            # Extract numeric values from attributes for aggregation
+            for attr_name, attr_value in attributes.items():
+                if isinstance(attr_value, (int, float)):
+                    metric_name = f"{entity_name}.{attr_name}"
+                    await self.aggregator.add_sample(
+                        metric_name=metric_name,
+                        value=float(attr_value),
+                        dimensions={"entity_id": entity_id, "simulation_id": simulation_id}
+                    )
+            
+            # TODO: Trigger KPI calculations based on entity type
+            # This would look up which KPIs use this entity and calculate them
+            
+        except Exception as e:
+            logger.error(f"Failed to process simulation entity event: {e}")

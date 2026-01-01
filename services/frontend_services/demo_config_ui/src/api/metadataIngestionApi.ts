@@ -54,7 +54,7 @@ export const metadataIngestionApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 60000, // 1 minute - fast parsing only
+      timeout: 180000, // 3 minutes - includes spaCy model loading on first use
     });
     return response.data;
   },

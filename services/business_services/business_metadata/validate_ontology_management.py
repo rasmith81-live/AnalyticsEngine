@@ -13,7 +13,7 @@ if service_dir not in sys.path:
 from ontology_models import (
     EntityDefinition,
     MetricDefinition,
-    RelationshipDefinition,
+    EdgeDefinition,
     ValueChainPatternDefinition,
     ActorDefinition,
     TableSchemaDefinition,
@@ -72,8 +72,8 @@ class TestOntologyManagement(unittest.TestCase):
         print("✅ Valid MetricDefinition created successfully")
 
     def test_relationship_definition_valid(self):
-        """Test creating a valid RelationshipDefinition."""
-        print("\nTesting Valid RelationshipDefinition...")
+        """Test creating a valid EdgeDefinition."""
+        print("\nTesting Valid EdgeDefinition...")
         rel_data = {
             "kind": "relationship_definition",
             "id": "rel_cust_order",
@@ -82,9 +82,9 @@ class TestOntologyManagement(unittest.TestCase):
             "to_entity": "ORDER",
             "relationship_type": "one_to_many"
         }
-        rel = RelationshipDefinition(**rel_data)
+        rel = EdgeDefinition(**rel_data)
         self.assertEqual(rel.from_entity, "CUSTOMER")
-        print("✅ Valid RelationshipDefinition created successfully")
+        print("✅ Valid EdgeDefinition created successfully")
 
     def test_value_chain_pattern_valid(self):
         """Test creating a valid ValueChainPatternDefinition."""

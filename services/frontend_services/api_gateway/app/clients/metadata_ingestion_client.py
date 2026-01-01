@@ -49,8 +49,12 @@ class MetadataIngestionServiceClient:
         response.raise_for_status()
         return response.json()
 
-    async def commit_import(self, import_id: str) -> Dict[str, Any]:
-        response = await self.client.post(f"{self.base_url}/import/{import_id}/commit")
+    async def commit_import(self, import_id: str, body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        logger.info(f"commit_import called with body: {body is not None}, keys: {list(body.keys()) if body else 'None'}")
+        response = await self.client.post(
+            f"{self.base_url}/import/{import_id}/commit",
+            json=body
+        )
         response.raise_for_status()
         return response.json()
 

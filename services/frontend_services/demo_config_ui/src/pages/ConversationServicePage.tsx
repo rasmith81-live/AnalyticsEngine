@@ -3,7 +3,9 @@ import {
   Box, Typography, Paper, Button, Chip, Stack,
   Card, CardContent, List, ListItem,
   CircularProgress, Alert, Tabs, Tab, Tooltip, Badge,
-  LinearProgress, IconButton, Divider, TextField
+  LinearProgress, IconButton, Divider, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow
 } from '@mui/material';
 import {
   Mic as MicIcon,
@@ -17,8 +19,16 @@ import {
   Stop as StopIcon,
   FiberManualRecord as RecordIcon,
   Delete as ClearIcon,
-  Send as SendIcon
+  Send as SendIcon,
+  Save as SaveIcon,
+  FolderOpen as LoadIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
+import { 
+  conversationApi, 
+  SaveFullConfigurationRequest,
+  ClientConfigurationResponse
+} from '../api/conversationApi';
 
 // Types
 interface BusinessIntent {
@@ -98,8 +108,19 @@ export default function ConversationServicePage() {
   const [generatedModel, setGeneratedModel] = useState<ValueChainModel | null>(null);
   const [isGeneratingModel, setIsGeneratingModel] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  
+  // Load Configuration Dialog State
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [searchClientName, setSearchClientName] = useState('');
+  const [searchDateFrom, setSearchDateFrom] = useState('');
+  const [searchDateTo, setSearchDateTo] = useState('');
+  const [searchResults, setSearchResults] = useState<ClientConfigurationResponse[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Refs
   const recognitionRef = useRef<any>(null);
@@ -385,6 +406,172 @@ export default function ConversationServicePage() {
     }
   };
 
+  // Save Configuration to Client Configuration Table
+  const saveConfiguration = async () => {
+    if (!sessionId || (transcript.length === 0 && allIntents.length === 0)) {
+      setError('Nothing to save. Start a conversation first.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    setSaveSuccess(null);
+
+    try {
+      // Build the full transcript text
+      const fullTranscript = transcript.map(seg => seg.text).join('\n');
+      
+      // Extract unique entities from intents
+      const uniqueEntities = [...new Set(allIntents.flatMap(i => i.target_entities || []))];
+      const uniqueMetrics = [...new Set(allIntents.flatMap(i => i.requested_metrics || []))];
+
+      const request: SaveFullConfigurationRequest = {
+        configuration: {
+          client_id: userId,
+          client_name: 'Demo Client',
+          name: `Conversation ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+          description: `Configuration extracted from conversation session ${sessionId}`,
+          source_session_id: sessionId,
+        },
+        recordings: [{
+          session_id: sessionId,
+          transcript: fullTranscript,
+          recorded_at: new Date().toISOString(),
+          segments: transcript.map(seg => ({
+            id: seg.id,
+            text: seg.text,
+            timestamp: seg.timestamp.toISOString(),
+            isFinal: seg.isFinal,
+          })),
+        }],
+        intents: allIntents.map(intent => ({
+          name: intent.name,
+          description: intent.description,
+          confidence: intent.confidence,
+          domain: intent.domain || 'general',
+          target_entities: intent.target_entities,
+          requested_metrics: intent.requested_metrics,
+          parameters: intent.parameters,
+        })),
+        entities: [
+          ...uniqueEntities.map(name => ({
+            name,
+            entity_type: 'Entity',
+            description: `Entity extracted from conversation`,
+          })),
+          ...uniqueMetrics.map(name => ({
+            name,
+            entity_type: 'Metric',
+            description: `Metric extracted from conversation`,
+          })),
+        ],
+        value_chain_model: generatedModel ? {
+          name: generatedModel.name,
+          nodes: generatedModel.nodes.map(n => ({
+            id: n.id,
+            name: n.name,
+            type: n.type,
+            description: n.description,
+            properties: n.properties,
+          })),
+          links: generatedModel.links.map(l => ({
+            source_id: l.source_id,
+            target_id: l.target_id,
+            type: l.type,
+          })),
+          generated_from_session: sessionId,
+          generation_method: 'llm',
+        } : undefined,
+      };
+
+      const result = await conversationApi.saveFullConfiguration(request);
+      setSaveSuccess(`Configuration saved successfully! ID: ${result.configuration.uuid}`);
+    } catch (err) {
+      console.error('Error saving configuration:', err);
+      setError('Failed to save configuration. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Search for saved configurations
+  const searchConfigurations = async () => {
+    setIsSearching(true);
+    setError(null);
+    
+    try {
+      const result = await conversationApi.searchConfigurations(
+        searchClientName || undefined,
+        searchDateFrom || undefined,
+        searchDateTo || undefined
+      );
+      setSearchResults(result.items);
+    } catch (err) {
+      console.error('Error searching configurations:', err);
+      setError('Failed to search configurations.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Load a saved configuration
+  const loadConfiguration = async (configId: number) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const config = await conversationApi.getConfiguration(configId);
+      
+      // Populate the UI with loaded data
+      if (config.recordings.length > 0) {
+        const recording = config.recordings[0];
+        if (recording.segments) {
+          const loadedTranscript: TranscriptSegment[] = recording.segments.map((seg: any) => ({
+            id: seg.id,
+            text: seg.text,
+            timestamp: new Date(seg.timestamp),
+            isFinal: seg.isFinal,
+          }));
+          setTranscript(loadedTranscript);
+        }
+      }
+      
+      // Load intents
+      if (config.intents.length > 0) {
+        const loadedIntents: BusinessIntent[] = config.intents.map((intent: any) => ({
+          name: intent.name,
+          confidence: intent.confidence,
+          parameters: intent.parameters || {},
+          description: intent.description,
+          domain: intent.domain,
+          target_entities: intent.target_entities,
+          requested_metrics: intent.requested_metrics,
+        }));
+        setAllIntents(loadedIntents);
+      }
+      
+      // Load value chain model
+      if (config.value_chain_models.length > 0) {
+        const model = config.value_chain_models[0];
+        setGeneratedModel({
+          id: model.uuid,
+          name: model.name,
+          nodes: model.nodes,
+          links: model.links,
+          created_at: model.created_at,
+        });
+      }
+      
+      setLoadDialogOpen(false);
+      setSaveSuccess(`Configuration "${config.configuration.name}" loaded successfully!`);
+    } catch (err) {
+      console.error('Error loading configuration:', err);
+      setError('Failed to load configuration.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Get intent color based on confidence
   const getIntentColor = (confidence: number): 'success' | 'warning' | 'error' => {
     if (confidence >= 0.8) return 'success';
@@ -438,8 +625,33 @@ export default function ConversationServicePage() {
           >
             {isGeneratingModel ? 'Generating...' : 'Generate Model'}
           </Button>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+            onClick={saveConfiguration}
+            disabled={isSaving || (transcript.length === 0 && allIntents.length === 0)}
+            size="small"
+          >
+            {isSaving ? 'Saving...' : 'Save Configuration'}
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<LoadIcon />}
+            onClick={() => setLoadDialogOpen(true)}
+            size="small"
+          >
+            Load Configuration
+          </Button>
         </Stack>
       </Box>
+
+      {saveSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSaveSuccess(null)}>
+          {saveSuccess}
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -828,6 +1040,110 @@ export default function ConversationServicePage() {
           </Box>
         </Paper>
       </Box>
+
+      {/* Load Configuration Dialog */}
+      <Dialog 
+        open={loadDialogOpen} 
+        onClose={() => setLoadDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Load Saved Configuration</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Search for saved configurations by client name and/or date range.
+            </Typography>
+            
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Client Name"
+                value={searchClientName}
+                onChange={(e) => setSearchClientName(e.target.value)}
+                size="small"
+                fullWidth
+                placeholder="Enter client name..."
+              />
+              <TextField
+                label="Date From"
+                type="date"
+                value={searchDateFrom}
+                onChange={(e) => setSearchDateFrom(e.target.value)}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Date To"
+                type="date"
+                value={searchDateTo}
+                onChange={(e) => setSearchDateTo(e.target.value)}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+              <Button
+                variant="contained"
+                startIcon={isSearching ? <CircularProgress size={16} /> : <SearchIcon />}
+                onClick={searchConfigurations}
+                disabled={isSearching}
+              >
+                Search
+              </Button>
+            </Stack>
+
+            {searchResults.length > 0 && (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Client Name</TableCell>
+                      <TableCell>Configuration Name</TableCell>
+                      <TableCell>Created</TableCell>
+                      <TableCell>Intents</TableCell>
+                      <TableCell>Entities</TableCell>
+                      <TableCell>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {searchResults.map((config) => (
+                      <TableRow key={config.id} hover>
+                        <TableCell>{config.client_name}</TableCell>
+                        <TableCell>{config.name}</TableCell>
+                        <TableCell>
+                          {new Date(config.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{config.intent_count}</TableCell>
+                        <TableCell>{config.entity_count}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => loadConfiguration(config.id)}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? 'Loading...' : 'Load'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {searchResults.length === 0 && !isSearching && (
+              <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                <LoadIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                <Typography variant="body2">
+                  No configurations found. Try searching with different criteria.
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoadDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
