@@ -246,9 +246,12 @@ async def upload_excel(file: UploadFile = File(...)):
         final_valid_kpis = []
         
         for kpi in valid_kpis_data:
-            # Generate code
+            # Set kind for metric definitions
+            kpi["kind"] = "metric_definition"
+            
+            # Generate code (lowercase with underscores for consistency)
             kpi_name = kpi.get("name", "")
-            kpi["code"] = kpi.get("code") or kpi_name.upper().replace(" ", "_").replace("-", "_")
+            kpi["code"] = kpi.get("code") or kpi_name.lower().replace(" ", "_").replace("-", "_")
             
             # Extract entities and math expression from formula using spaCy (no OpenAI)
             formula = kpi.get("formula")
@@ -261,15 +264,14 @@ async def upload_excel(file: UploadFile = File(...)):
                     math_expression = decomposed.get("math_expression")
                     formula_entities = decomposed.get("identified_attributes", [])
                     
-                    # Store in KPI data
+                    # Store math_expression at top level (core calculation property)
                     kpi["math_expression"] = math_expression
                     kpi["required_objects"] = formula_entities
                     
-                    # Add to metadata
+                    # Add import metadata to metadata.decomposition (import-time info only)
                     if "metadata" not in kpi:
                         kpi["metadata"] = {}
                     kpi["metadata"]["decomposition"] = {
-                        "math_expression": math_expression,
                         "formula_entities": formula_entities,
                         "extraction_method": decomposed.get("extraction_method", "spacy")
                     }
@@ -298,6 +300,20 @@ async def upload_excel(file: UploadFile = File(...)):
         # Add extracted entities to ontology_sync
         results["ontology_sync"]["entities_created"] = sorted(list(all_entities))
         
+        # Generate relationships preview (KPI -> Entity "uses" relationships)
+        relationships_preview = []
+        for kpi in final_valid_kpis:
+            kpi_code = kpi.get("code", "")
+            required_objs = kpi.get("required_objects", [])
+            for entity_name in required_objs:
+                if entity_name:
+                    entity_code = str(entity_name).lower().replace(" ", "_").replace("-", "_")
+                    rel_str = f"{kpi_code} -> {entity_code}"
+                    if rel_str not in relationships_preview:
+                        relationships_preview.append(rel_str)
+        
+        results["ontology_sync"]["relationships_created"] = relationships_preview
+        
         # Cache valid KPIs for enrichment and commit
         if final_valid_kpis:
             import_cache[import_id] = final_valid_kpis
@@ -308,7 +324,7 @@ async def upload_excel(file: UploadFile = File(...)):
         # Limit preview to top 20
         results["preview"] = results["preview"][:20]
         
-        logger.info(f"Upload complete: {len(final_valid_kpis)} KPIs parsed with spaCy extraction. Import ID: {import_id}. Entities: {len(all_entities)}")
+        logger.info(f"Upload complete: {len(final_valid_kpis)} KPIs parsed with spaCy extraction. Import ID: {import_id}. Entities: {len(all_entities)}. Relationships: {len(relationships_preview)}")
         
         return results
 
@@ -408,12 +424,14 @@ class CommitRequest(BaseModel):
 async def commit_import(
     import_id: str,
     user: str = Query("system", description="User performing the commit"),
-    body: Optional[CommitRequest] = Body(None)
+    body: Optional[Dict[str, Any]] = Body(None)
 ):
     """
     Commit a previously uploaded import session to the metadata repository.
     Accepts optional edited ontology in request body to create value chains, modules, entities.
     """
+    logger.info(f"Commit called with body type: {type(body)}, body: {body is not None}")
+    
     if import_id not in import_cache:
         raise HTTPException(status_code=404, detail="Import session not found or expired")
     
@@ -422,17 +440,26 @@ async def commit_import(
     if not kpis_to_commit:
         raise HTTPException(status_code=400, detail="No valid KPIs to commit")
     
+    # Parse ontology from body dict
+    ontology = None
+    if body and "ontology" in body:
+        ontology = body["ontology"]
+        logger.info(f"Ontology keys: {list(ontology.keys()) if ontology else 'None'}")
+    
     # If ontology edits provided, sync them first
     ontology_sync_result = {}
-    if body and body.ontology:
-        logger.info(f"Processing edited ontology: {body.ontology}")
+    if ontology:
+        logger.info(f"Processing edited ontology with keys: {list(ontology.keys())}")
+        logger.info(f"Value chains: {ontology.get('value_chains_created', [])}")
+        logger.info(f"Modules: {ontology.get('modules_created', [])}")
+        logger.info(f"Relationships: {len(ontology.get('relationships_created', []))}")
         try:
             # Use the edited ontology for sync
             edited_ontology = {
-                "value_chains": body.ontology.value_chains_created or [],
-                "modules": body.ontology.modules_created or [],
-                "entities": body.ontology.entities_created or [],
-                "relationships": body.ontology.relationships_created or []
+                "value_chains": ontology.get("value_chains_created") or [],
+                "modules": ontology.get("modules_created") or [],
+                "entities": ontology.get("entities_created") or [],
+                "relationships": ontology.get("relationships_created") or []
             }
             ontology_sync_result = await decomposition_orchestrator.sync_edited_ontology(edited_ontology, user)
             logger.info(f"Edited ontology sync complete: {ontology_sync_result}")

@@ -634,6 +634,8 @@ class MetadataQueryRepository:
         """Convert relationship model to dict."""
         return {
             "id": str(relationship.id),
+            "from_entity_id": str(relationship.from_entity_id) if relationship.from_entity_id else None,
+            "to_entity_id": str(relationship.to_entity_id) if relationship.to_entity_id else None,
             "from_entity_code": relationship.from_entity_code,
             "to_entity_code": relationship.to_entity_code,
             "relationship_type": relationship.relationship_type,

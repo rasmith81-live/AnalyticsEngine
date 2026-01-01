@@ -1,6 +1,6 @@
 
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, UploadFile, File
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Body
 from ...clients.metadata_ingestion_client import MetadataIngestionServiceClient
 from ...api.dependencies import get_metadata_ingestion_client
 
@@ -52,6 +52,7 @@ async def enrich_import(
 @router.post("/import/{import_id}/commit")
 async def commit_import(
     import_id: str,
+    body: Optional[Dict[str, Any]] = Body(None),
     client: MetadataIngestionServiceClient = Depends(get_metadata_ingestion_client)
 ):
-    return await client.commit_import(import_id)
+    return await client.commit_import(import_id, body)

@@ -1,6 +1,6 @@
-import { Typography, Box, Alert, Snackbar, Paper, AppBar, Toolbar } from '@mui/material';
+import { Typography, Box, Alert, Snackbar, AppBar, Toolbar } from '@mui/material';
 import { useState } from 'react';
-import MetricTreeTabs from '../components/MetricTreeTabs';
+import KPITreeView from '../components/KPITreeView';
 import KPIDetailPreview from '../components/KPIDetailPreview';
 import KPISampleVisualization from '../components/KPISampleVisualization';
 import DeriveCustomKPIModal from '../components/DeriveCustomKPIModal';
@@ -100,20 +100,18 @@ export default function ConfigPage() {
       {/* Resizable Split Panel */}
       <Box sx={{ flex: 1, minHeight: 0, mt: 2, px: 2, overflow: 'hidden' }}>
         <ResizableSplitPanel
-          defaultLeftWidth={50}
-          minLeftWidth={30}
-          minRightWidth={30}
+          defaultLeftWidth={55}
+          minLeftWidth={35}
+          minRightWidth={25}
           leftPanel={
-            <Paper elevation={2} sx={{ height: '100%', p: 2, overflow: 'hidden' }}>
-              <Box sx={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
-                <MetricTreeTabs
-                  onKPIToggleCart={handleKPIToggleCart}
-                  onKPIViewDetails={handleKPIViewDetails}
-                  selectedKPIs={selectedKPIs}
-                  currentViewKPI={currentViewKPI}
-                />
-              </Box>
-            </Paper>
+            <Box sx={{ height: '100%', overflow: 'hidden' }}>
+              <KPITreeView
+                onKPIToggleCart={handleKPIToggleCart}
+                onKPIViewDetails={handleKPIViewDetails}
+                selectedKPIs={selectedKPIs}
+                currentViewKPI={currentViewKPI}
+              />
+            </Box>
           }
           rightPanel={
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2, pl: 2, overflow: 'hidden', minWidth: 0 }}>

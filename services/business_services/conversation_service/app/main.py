@@ -29,6 +29,8 @@ from .models import (
 from .llm_client import llm_client
 from .engine.pattern_matcher import PatternMatcher, DesignSuggester
 from .engine.strategic_recommender import StrategicRecommender, StrategyScore
+from .database import init_db, close_db
+from .client_config_api import router as client_config_router
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +46,14 @@ strategic_recommender = StrategicRecommender()
 async def lifespan(app: FastAPI):
     """Manage application lifespan."""
     global messaging_client
+    
+    # Initialize database
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        # Continue without database - in-memory mode still works
     
     # Initialize messaging client
     try:
@@ -63,6 +73,9 @@ async def lifespan(app: FastAPI):
     if messaging_client:
         await messaging_client.disconnect()
         logger.info("MessagingClient disconnected")
+    
+    await close_db()
+    logger.info("Database connections closed")
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -78,6 +91,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include client configuration API router
+app.include_router(client_config_router, prefix=settings.API_V1_STR)
 
 # In-memory session stores
 active_sessions: Dict[str, List[Dict[str, str]]] = {} # Stores chat history for LLM context

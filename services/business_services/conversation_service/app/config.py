@@ -5,10 +5,17 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     APP_NAME: str = "Conversation Service"
     API_V1_STR: str = "/api/v1"
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8004
+    
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@timescaledb:5432/analytics_engine"
+    )
     
     # LLM Provider
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")

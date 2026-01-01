@@ -31,6 +31,9 @@ from .telemetry_consumers import TelemetryEventConsumer
 from .command_consumers import CommandConsumer
 from .news_consumer import NewsConsumer
 from .market_data_consumer import MarketDataConsumer
+from .simulation_data_consumer import SimulationDataConsumer
+from .kpi_result_consumer import KPIResultConsumer
+from .query_request_handler import QueryRequestHandler
 from .subscriber_manager import SubscriberManager
 from .stream_publisher import StreamPublisher
 from .query_builder import QueryBuilder
@@ -62,6 +65,9 @@ telemetry_consumer = None
 command_consumer = None
 news_consumer = None
 market_data_consumer = None
+simulation_data_consumer = None
+kpi_result_consumer = None
+query_request_handler = None
 subscriber_manager = None
 stream_publisher = None
 secure_storage_manager = None
@@ -163,6 +169,30 @@ async def lifespan(app: FastAPI):
             messaging_client=messaging_client
         )
         await market_data_consumer.start()
+        
+        # Initialize and start simulation data consumer
+        simulation_data_consumer = SimulationDataConsumer(
+            database_manager=database_manager,
+            messaging_client=messaging_client
+        )
+        await simulation_data_consumer.start()
+        logger.info("Simulation data consumer started")
+        
+        # Initialize and start KPI result consumer
+        kpi_result_consumer = KPIResultConsumer(
+            database_manager=database_manager,
+            messaging_client=messaging_client
+        )
+        await kpi_result_consumer.start()
+        logger.info("KPI result consumer started")
+        
+        # Initialize and start query request handler (for pub/sub database access)
+        query_request_handler = QueryRequestHandler(
+            database_manager=database_manager,
+            redis_url=settings.redis_url
+        )
+        await query_request_handler.start()
+        logger.info("Query request handler started (pub/sub database access)")
         
         # Initialize subscriber manager for stream publishing
         subscriber_manager = SubscriberManager(timeout_seconds=300)

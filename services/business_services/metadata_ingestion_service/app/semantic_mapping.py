@@ -342,12 +342,17 @@ class KPIDecomposer:
     
     async def decompose_formula(self, formula: str) -> Dict[str, Any]:
         """
-        Parses a formula string (e.g., "(Revenue - Cost) / Revenue") into
-        required entities/attributes for calculation.
+        Parses a formula string into a set_based_definition for the calculation engine.
         
-        Extracts ALL nouns as entities using spaCy NLP (no OpenAI).
-        Also normalizes time modifiers to generic 'period' for time-agnostic definitions.
-        Also generates a mathematical formula expression for the calculation engine.
+        This method:
+        1. Normalizes time modifiers to generic 'period' for time-agnostic definitions
+        2. Extracts entities using spaCy NLP
+        3. Attempts to generate a set_based_definition for complex KPIs
+        4. Falls back to simple formula for basic arithmetic expressions
+        
+        Returns:
+            Dict with set_based_definition (for set-based KPIs) or 
+            identified_attributes (for simple formulas)
         """
         # First, normalize time modifiers
         normalized_formula = self.normalize_time_modifiers(formula)
@@ -368,21 +373,866 @@ class KPIDecomposer:
             if attr not in entities:
                 entities.append(attr)
         
-        # Parse the formula into a mathematical expression using pyparsing-based parser
-        math_expression = parse_formula_to_math(normalized_formula, entities)
-        
         # Sort for consistent output
         entities = sorted(set(entities))
         
-        logger.info(f"Formula decomposition ({extraction_method}): '{formula}' -> entities={entities}, math='{math_expression}'")
+        # Try to generate set_based_definition for complex KPIs
+        set_based_definition = None
+        try:
+            set_based_definition = self._try_generate_set_based_definition(
+                formula=normalized_formula,
+                entities=entities
+            )
+        except Exception as e:
+            logger.debug(f"Set-based definition generation failed: {e}")
+        
+        if set_based_definition:
+            logger.info(f"Formula decomposed to set_based_definition: '{formula}' -> {len(set_based_definition.get('steps', []))} steps")
+            return {
+                "original_formula": formula,
+                "normalized_formula": normalized_formula,
+                "set_based_definition": set_based_definition,
+                "identified_attributes": entities,
+                "extraction_method": extraction_method,
+                "status": "set_based"
+            }
+        
+        # Fall back to simple formula parsing
+        math_expression = parse_formula_to_math(normalized_formula, entities)
+        
+        logger.info(f"Formula decomposition ({extraction_method}): '{formula}' -> entities={entities}")
         
         return {
             "original_formula": formula,
             "normalized_formula": normalized_formula,
-            "math_expression": math_expression,
             "identified_attributes": entities,
             "extraction_method": extraction_method,
             "status": "resolved" if entities else "no_entities_found"
+        }
+    
+    def _try_generate_set_based_definition(
+        self,
+        formula: str,
+        entities: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Try to generate a set_based_definition for complex KPI formulas.
+        
+        Detects patterns like:
+        - Churn Rate: (Lost / Start) * 100
+        - Retention Rate: (Retained / Start) * 100
+        - Growth Rate: (New / Start) * 100
+        - Period-over-Period: (Current - Previous) / Previous * 100
+        - Conversion Rate: (Converted / Total) * 100
+        - Net Change: End - Start
+        - Active Count: Count of active entities at a point in time
+        
+        Returns None if the formula doesn't match a known set-based pattern.
+        """
+        formula_lower = formula.lower()
+        
+        # Common entity candidates for all patterns
+        entity_candidates = ["customer", "policy", "subscription", "user", "member", "account", "client"]
+        transaction_candidates = ["order", "sale", "transaction", "deal", "lead", "opportunity"]
+        
+        # 1. Detect churn rate pattern
+        churn_indicators = ["churn", "lost", "cancelled", "terminated", "left", "departed", "attrition"]
+        if any(ind in formula_lower for ind in churn_indicators):
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_churn_definition(base_entity, entities)
+        
+        # 2. Detect retention rate pattern
+        retention_indicators = ["retain", "kept", "stayed", "remained", "continuing", "loyalty"]
+        if any(ind in formula_lower for ind in retention_indicators):
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_retention_definition(base_entity, entities)
+        
+        # 3. Detect growth rate pattern
+        growth_indicators = ["growth", "new", "acquired", "gained", "added"]
+        if any(ind in formula_lower for ind in growth_indicators) and "rate" in formula_lower:
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_growth_definition(base_entity, entities)
+        
+        # 4. Detect Period-over-Period (PoP) pattern - YoY, MoM, WoW, QoQ
+        pop_indicators = ["period over period", "year over year", "month over month", 
+                         "week over week", "quarter over quarter", "yoy", "mom", "wow", "qoq",
+                         "compared to previous", "vs previous", "versus last"]
+        if any(ind in formula_lower for ind in pop_indicators):
+            # Try entity-based PoP first
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_pop_count_definition(base_entity, entities)
+            # Try transaction-based PoP (for revenue, sales)
+            base_entity = self._infer_base_entity(entities, transaction_candidates)
+            if base_entity:
+                return self._build_pop_sum_definition(base_entity, entities)
+        
+        # 5. Detect Conversion Rate pattern
+        conversion_indicators = ["conversion", "converted", "convert", "funnel", "win rate", 
+                                "close rate", "success rate", "completion rate"]
+        if any(ind in formula_lower for ind in conversion_indicators):
+            # Conversion typically involves leads/opportunities -> deals/customers
+            source_entity = self._infer_base_entity(entities, ["lead", "opportunity", "prospect", "visitor"])
+            target_entity = self._infer_base_entity(entities, ["customer", "deal", "sale", "conversion", "won"])
+            if source_entity:
+                return self._build_conversion_definition(source_entity, target_entity, entities)
+        
+        # 6. Detect Net Change pattern
+        net_change_indicators = ["net change", "net growth", "net increase", "net decrease", 
+                                "difference", "delta", "change in"]
+        if any(ind in formula_lower for ind in net_change_indicators):
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_net_change_definition(base_entity, entities)
+        
+        # 7. Detect Active/Current Count pattern
+        active_indicators = ["active", "current", "existing", "total", "count of", "number of"]
+        if any(ind in formula_lower for ind in active_indicators) and not any(x in formula_lower for x in ["rate", "ratio", "percent"]):
+            base_entity = self._infer_base_entity(entities, entity_candidates)
+            if base_entity:
+                return self._build_active_count_definition(base_entity, entities)
+        
+        # 8. Detect Ratio/Percentage pattern (generic A/B * 100)
+        ratio_indicators = ["ratio", "percentage", "percent of", "proportion", "share"]
+        if any(ind in formula_lower for ind in ratio_indicators):
+            base_entity = self._infer_base_entity(entities, entity_candidates + transaction_candidates)
+            if base_entity:
+                return self._build_ratio_definition(base_entity, entities, formula_lower)
+        
+        return None
+    
+    def _infer_base_entity(self, entities: List[str], candidates: List[str]) -> Optional[str]:
+        """Infer the base entity from extracted entities."""
+        for entity in entities:
+            entity_lower = entity.lower()
+            for candidate in candidates:
+                if candidate in entity_lower:
+                    return entity_lower + "s"  # Pluralize for table name
+        return None
+    
+    def _build_churn_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """Build set_based_definition for churn rate."""
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "StartPeriodSet",
+                    "description": f"All {base_entity} active at the start of the period",
+                    "set_definition": {
+                        "name": "StartPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodStart"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "EndPeriodSet",
+                    "description": f"All {base_entity} active at the end of the period",
+                    "set_definition": {
+                        "name": "EndPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "LostDuringPeriodSet",
+                    "description": f"{base_entity} who were active at start but not at end",
+                    "set_definition": {
+                        "name": "LostDuringPeriodSet",
+                        "operation": "EXCEPT",
+                        "source_sets": ["StartPeriodSet", "EndPeriodSet"],
+                        "key_column": key_col
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "StartCount",
+                    "description": "Count of starting set",
+                    "aggregation": {
+                        "name": "StartCount",
+                        "set_name": "StartPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 5,
+                    "name": "LostCount",
+                    "description": "Count of lost set",
+                    "aggregation": {
+                        "name": "LostCount",
+                        "set_name": "LostDuringPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN StartCount > 0 THEN (LostCount::float / StartCount::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_retention_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """Build set_based_definition for retention rate."""
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "StartPeriodSet",
+                    "description": f"All {base_entity} active at the start of the period",
+                    "set_definition": {
+                        "name": "StartPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodStart"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "EndPeriodSet",
+                    "description": f"All {base_entity} active at the end of the period",
+                    "set_definition": {
+                        "name": "EndPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "RetainedSet",
+                    "description": f"{base_entity} who were active at both start and end",
+                    "set_definition": {
+                        "name": "RetainedSet",
+                        "operation": "INTERSECT",
+                        "source_sets": ["StartPeriodSet", "EndPeriodSet"],
+                        "key_column": key_col
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "StartCount",
+                    "description": "Count of starting set",
+                    "aggregation": {
+                        "name": "StartCount",
+                        "set_name": "StartPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 5,
+                    "name": "RetainedCount",
+                    "description": "Count of retained set",
+                    "aggregation": {
+                        "name": "RetainedCount",
+                        "set_name": "RetainedSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN StartCount > 0 THEN (RetainedCount::float / StartCount::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_growth_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """Build set_based_definition for growth rate."""
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "StartPeriodSet",
+                    "description": f"All {base_entity} active at the start of the period",
+                    "set_definition": {
+                        "name": "StartPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodStart"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "NewDuringPeriodSet",
+                    "description": f"New {base_entity} acquired during the period",
+                    "set_definition": {
+                        "name": "NewDuringPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "GT", "value": "@PeriodStart"},
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"}
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "StartCount",
+                    "description": "Count of starting set",
+                    "aggregation": {
+                        "name": "StartCount",
+                        "set_name": "StartPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "NewCount",
+                    "description": "Count of new set",
+                    "aggregation": {
+                        "name": "NewCount",
+                        "set_name": "NewDuringPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN StartCount > 0 THEN (NewCount::float / StartCount::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_pop_count_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """
+        Build set_based_definition for Period-over-Period count comparison.
+        
+        Calculates: ((CurrentPeriodCount - PreviousPeriodCount) / PreviousPeriodCount) * 100
+        
+        Uses @PeriodStart, @PeriodEnd for current period
+        Uses @PreviousPeriodStart, @PreviousPeriodEnd for previous period
+        """
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd", "PreviousPeriodStart", "PreviousPeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "CurrentPeriodSet",
+                    "description": f"All {base_entity} active during the current period",
+                    "set_definition": {
+                        "name": "CurrentPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "PreviousPeriodSet",
+                    "description": f"All {base_entity} active during the previous period",
+                    "set_definition": {
+                        "name": "PreviousPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PreviousPeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PreviousPeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "CurrentCount",
+                    "description": "Count of current period set",
+                    "aggregation": {
+                        "name": "CurrentCount",
+                        "set_name": "CurrentPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "PreviousCount",
+                    "description": "Count of previous period set",
+                    "aggregation": {
+                        "name": "PreviousCount",
+                        "set_name": "PreviousPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN PreviousCount > 0 THEN ((CurrentCount::float - PreviousCount::float) / PreviousCount::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_pop_sum_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """
+        Build set_based_definition for Period-over-Period sum comparison (e.g., Revenue YoY).
+        
+        Calculates: ((CurrentPeriodSum - PreviousPeriodSum) / PreviousPeriodSum) * 100
+        """
+        key_col = f"{base_entity.rstrip('s')}_id"
+        amount_col = "amount"  # Default amount column
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd", "PreviousPeriodStart", "PreviousPeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "CurrentPeriodSet",
+                    "description": f"All {base_entity} in the current period",
+                    "set_definition": {
+                        "name": "CurrentPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "created_at", "operator": "GE", "value": "@PeriodStart"},
+                                {"column": "created_at", "operator": "LE", "value": "@PeriodEnd"}
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "PreviousPeriodSet",
+                    "description": f"All {base_entity} in the previous period",
+                    "set_definition": {
+                        "name": "PreviousPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "created_at", "operator": "GE", "value": "@PreviousPeriodStart"},
+                                {"column": "created_at", "operator": "LE", "value": "@PreviousPeriodEnd"}
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "CurrentSum",
+                    "description": "Sum of current period",
+                    "aggregation": {
+                        "name": "CurrentSum",
+                        "set_name": "CurrentPeriodSet",
+                        "aggregation_type": "SUMX",
+                        "column": amount_col
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "PreviousSum",
+                    "description": "Sum of previous period",
+                    "aggregation": {
+                        "name": "PreviousSum",
+                        "set_name": "PreviousPeriodSet",
+                        "aggregation_type": "SUMX",
+                        "column": amount_col
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN PreviousSum > 0 THEN ((CurrentSum::float - PreviousSum::float) / PreviousSum::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_conversion_definition(
+        self, 
+        source_entity: str, 
+        target_entity: Optional[str],
+        entities: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Build set_based_definition for Conversion Rate.
+        
+        Calculates: (Converted / Total) * 100
+        
+        Example: Lead Conversion Rate = (Leads that became Customers / Total Leads) * 100
+        """
+        key_col = f"{source_entity.rstrip('s')}_id"
+        return {
+            "base_entity": source_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "TotalSet",
+                    "description": f"All {source_entity} created during the period",
+                    "set_definition": {
+                        "name": "TotalSet",
+                        "base_entity": source_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "created_at", "operator": "GE", "value": "@PeriodStart"},
+                                {"column": "created_at", "operator": "LE", "value": "@PeriodEnd"}
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "ConvertedSet",
+                    "description": f"{source_entity} that converted during the period",
+                    "set_definition": {
+                        "name": "ConvertedSet",
+                        "base_entity": source_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "created_at", "operator": "GE", "value": "@PeriodStart"},
+                                {"column": "created_at", "operator": "LE", "value": "@PeriodEnd"},
+                                {"column": "converted_at", "operator": "IS_NOT_NULL"},
+                                {"column": "converted_at", "operator": "LE", "value": "@PeriodEnd"}
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "TotalCount",
+                    "description": "Count of total set",
+                    "aggregation": {
+                        "name": "TotalCount",
+                        "set_name": "TotalSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "ConvertedCount",
+                    "description": "Count of converted set",
+                    "aggregation": {
+                        "name": "ConvertedCount",
+                        "set_name": "ConvertedSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN TotalCount > 0 THEN (ConvertedCount::float / TotalCount::float) * 100 ELSE 0 END"
+        }
+    
+    def _build_net_change_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """
+        Build set_based_definition for Net Change.
+        
+        Calculates: EndCount - StartCount
+        
+        Can also be expressed as: NewCount - LostCount
+        """
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodStart", "PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "StartPeriodSet",
+                    "description": f"All {base_entity} active at the start of the period",
+                    "set_definition": {
+                        "name": "StartPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodStart"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodStart"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "EndPeriodSet",
+                    "description": f"All {base_entity} active at the end of the period",
+                    "set_definition": {
+                        "name": "EndPeriodSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GE", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "StartCount",
+                    "description": "Count at start of period",
+                    "aggregation": {
+                        "name": "StartCount",
+                        "set_name": "StartPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "EndCount",
+                    "description": "Count at end of period",
+                    "aggregation": {
+                        "name": "EndCount",
+                        "set_name": "EndPeriodSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "EndCount - StartCount"
+        }
+    
+    def _build_active_count_definition(self, base_entity: str, entities: List[str]) -> Dict[str, Any]:
+        """
+        Build set_based_definition for Active/Current Count.
+        
+        Calculates: Count of entities active at @PeriodEnd
+        """
+        key_col = f"{base_entity.rstrip('s')}_id"
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "ActiveSet",
+                    "description": f"All {base_entity} active at the point in time",
+                    "set_definition": {
+                        "name": "ActiveSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GT", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "ActiveCount",
+                    "description": "Count of active set",
+                    "aggregation": {
+                        "name": "ActiveCount",
+                        "set_name": "ActiveSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "ActiveCount"
+        }
+    
+    def _build_ratio_definition(
+        self, 
+        base_entity: str, 
+        entities: List[str],
+        formula_lower: str
+    ) -> Dict[str, Any]:
+        """
+        Build set_based_definition for generic Ratio/Percentage.
+        
+        Calculates: (SubsetCount / TotalCount) * 100
+        
+        Tries to infer the subset condition from the formula.
+        """
+        key_col = f"{base_entity.rstrip('s')}_id"
+        
+        # Try to infer subset condition from formula
+        subset_condition = "status = 'active'"  # Default
+        if "premium" in formula_lower:
+            subset_condition = "tier = 'premium'"
+        elif "paid" in formula_lower:
+            subset_condition = "payment_status = 'paid'"
+        elif "verified" in formula_lower:
+            subset_condition = "verified = true"
+        elif "complete" in formula_lower:
+            subset_condition = "status = 'complete'"
+        
+        return {
+            "base_entity": base_entity,
+            "key_column": key_col,
+            "period_parameters": ["PeriodEnd"],
+            "steps": [
+                {
+                    "step_number": 1,
+                    "name": "TotalSet",
+                    "description": f"All {base_entity} at the point in time",
+                    "set_definition": {
+                        "name": "TotalSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GT", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND"
+                        }
+                    }
+                },
+                {
+                    "step_number": 2,
+                    "name": "SubsetSet",
+                    "description": f"{base_entity} matching subset criteria",
+                    "set_definition": {
+                        "name": "SubsetSet",
+                        "base_entity": base_entity,
+                        "key_column": key_col,
+                        "filter_conditions": {
+                            "conditions": [
+                                {"column": "active_date", "operator": "LE", "value": "@PeriodEnd"},
+                                {
+                                    "conditions": [
+                                        {"column": "inactive_date", "operator": "IS_NULL"},
+                                        {"column": "inactive_date", "operator": "GT", "value": "@PeriodEnd"}
+                                    ],
+                                    "logical_operator": "OR"
+                                }
+                            ],
+                            "logical_operator": "AND",
+                            "raw_sql_condition": subset_condition
+                        }
+                    }
+                },
+                {
+                    "step_number": 3,
+                    "name": "TotalCount",
+                    "description": "Count of total set",
+                    "aggregation": {
+                        "name": "TotalCount",
+                        "set_name": "TotalSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                },
+                {
+                    "step_number": 4,
+                    "name": "SubsetCount",
+                    "description": "Count of subset",
+                    "aggregation": {
+                        "name": "SubsetCount",
+                        "set_name": "SubsetSet",
+                        "aggregation_type": "COUNTROWS"
+                    }
+                }
+            ],
+            "final_formula": "CASE WHEN TotalCount > 0 THEN (SubsetCount::float / TotalCount::float) * 100 ELSE 0 END"
         }
 
     async def resolve_components(self, attributes: List[str]) -> Dict[str, str]:

@@ -429,6 +429,14 @@ async def startup_event():
         service_name="archival_service"
     )
     
+    # Subscribe to KPI result archival events
+    await messaging_client.subscribe(
+        topic="archive.kpi_results",
+        callback=handle_kpi_result_archival,
+        service_name="archival_service"
+    )
+    logger.info("Subscribed to KPI result archival channel")
+    
     # Initialize monitoring
     from app.api.monitoring_endpoints import get_monitor
     monitor = get_monitor()
@@ -611,6 +619,76 @@ async def process_archival(event_id: str):
         )
         
         logger.error(f"Error processing archival event {event_id}: {e}", exc_info=True)
+
+@track_redis_operation(operation_name="handle_kpi_result")
+@trace_method(name="handle_kpi_result_archival", kind="CONSUMER")
+async def handle_kpi_result_archival(message: Dict[str, Any]):
+    """Handle KPI result archival events from the Database Service.
+    
+    Receives calculated KPI results and archives them to the lakehouse
+    for long-term storage and historical analysis.
+    
+    Args:
+        message: The KPI result archival message
+    """
+    try:
+        data = message.get("data", {})
+        kpi_code = data.get("kpi_code")
+        entity_id = data.get("entity_id")
+        value = data.get("value")
+        timestamp = data.get("timestamp")
+        calculated_at = data.get("calculated_at")
+        
+        # Add span attributes for event context
+        add_span_attributes({
+            "kpi_code": kpi_code,
+            "entity_id": entity_id,
+            "value": str(value),
+            "archival_type": "kpi_result"
+        })
+        
+        logger.info(f"Received KPI result for archival: {kpi_code}={value}")
+        
+        # Define the lakehouse path for KPI results
+        current_date = datetime.utcnow().strftime("%Y/%m/%d")
+        lakehouse_path = f"kpi_results/{kpi_code}/{current_date}"
+        
+        # Prepare data for archival
+        kpi_record = {
+            "kpi_code": kpi_code,
+            "entity_id": entity_id,
+            "value": value,
+            "unit": data.get("unit"),
+            "period": data.get("period"),
+            "timestamp": timestamp,
+            "calculated_at": calculated_at,
+            "metadata": data.get("metadata", {}),
+            "archived_at": datetime.utcnow().isoformat(),
+        }
+        
+        # Write to lakehouse
+        from app.clients import lakehouse_client
+        await lakehouse_client.write_data(
+            path=f"{lakehouse_path}/{entity_id}_{calculated_at}.parquet",
+            data=[kpi_record],
+            format="parquet"
+        )
+        
+        # Track metrics
+        metrics.archival_events_processed.labels(
+            table_name="kpi_results",
+            status="success"
+        ).inc()
+        
+        logger.info(f"Archived KPI result: {kpi_code} to {lakehouse_path}")
+        
+    except Exception as e:
+        logger.error(f"Error archiving KPI result: {str(e)}", exc_info=True)
+        metrics.archival_events_processed.labels(
+            table_name="kpi_results",
+            status="failed"
+        ).inc()
+
 
 @track_archival_operation(operation_name="extract_chunk_data")
 @trace_method(name="extract_chunk_data", kind="CLIENT")

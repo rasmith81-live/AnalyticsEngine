@@ -16,6 +16,7 @@ from .v1.ingestion import router as ingestion_router
 from .v1.entity_resolution import router as entity_resolution_router
 from .v1.conversation import router as conversation_router
 from .v1.metadata_ingestion import router as metadata_ingestion_router
+from .v1.simulator import router as simulator_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -36,3 +37,4 @@ api_router.include_router(ingestion_router, prefix="/ingestion", tags=["ingestio
 api_router.include_router(entity_resolution_router, prefix="/entity-resolution", tags=["entity-resolution"])
 api_router.include_router(conversation_router, prefix="/conversation", tags=["conversation"])
 api_router.include_router(metadata_ingestion_router, prefix="/metadata-ingestion", tags=["metadata-ingestion"])
+api_router.include_router(simulator_router, prefix="/simulator", tags=["simulator"])

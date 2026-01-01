@@ -23,10 +23,10 @@ from pydantic import BaseModel, ConfigDict
 # ---------------------------------------------------------------------------
 
 
-class ThingDefinition(BaseModel):
-    """Base ontology class for all definitions.
+class NodeDefinition(BaseModel):
+    """Base ontology class for all node definitions in the knowledge graph.
     
-    Note: relationships are NOT embedded here to avoid circular references.
+    Note: edges (relationships) are NOT embedded here to avoid circular references.
     They are stored separately in the relationships table and fetched via
     the relationships API endpoints.
     """
@@ -38,6 +38,10 @@ class ThingDefinition(BaseModel):
     name: str
     description: Optional[str] = None
     metadata_: Dict[str, Any] = {}
+
+
+# Backward compatibility alias
+ThingDefinition = NodeDefinition
 
 
 class ColumnDefinition(BaseModel):
@@ -66,8 +70,11 @@ class TableSchemaDefinition(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class EntityDefinition(ThingDefinition):
-    """Ontology representation of a business entity/object model."""
+class EntityDefinition(NodeDefinition):
+    """Ontology representation of a business entity/object model (data/noun).
+    
+    Represents static data structures like Customer, Order, Product.
+    """
 
     kind: str = "entity_definition"
     code: str
@@ -75,16 +82,43 @@ class EntityDefinition(ThingDefinition):
     schema_definition: Optional[str] = None  # UML / graph snippet
 
 
-class RelationshipDefinition(BaseModel):
-    """Ontology representation of a relationship between entities.
+# ---------------------------------------------------------------------------
+# Process layer
+# ---------------------------------------------------------------------------
+
+
+class ProcessDefinition(NodeDefinition):
+    """Base ontology class for all process/workflow definitions (action/verb).
     
-    Note: Inherits from BaseModel (not ThingDefinition) to avoid circular reference
-    since ThingDefinition has relationships: List[RelationshipDefinition].
+    Represents dynamic processes, workflows, and value flows.
+    Child classes include ValueChainPatternDefinition and BusinessProcessDefinition.
+    """
+
+    kind: str = "process_definition"
+    code: str
+    process_type: Optional[str] = None  # "value_chain", "business_process", "workflow"
+    
+    # Graph pattern for process flow
+    graph_pattern: Optional["GraphPatternDefinition"] = None
+    
+    # Associated metrics for this process
+    associated_metrics: List[str] = []
+    
+    # Business ontology fields
+    business_purpose: Optional[str] = None  # Purpose statement
+    intended_value: Optional[str] = None  # Value to be produced
+
+
+class EdgeDefinition(BaseModel):
+    """Ontology representation of an edge (relationship) between nodes in the knowledge graph.
+    
+    Note: Inherits from BaseModel (not NodeDefinition) to avoid circular reference
+    since NodeDefinition could have edges: List[EdgeDefinition].
     """
     model_config = ConfigDict(extra="allow")
 
     id: Optional[str] = None
-    kind: str = "relationship_definition"
+    kind: str = "edge_definition"
     name: str = ""
     description: Optional[str] = None
     from_entity: str
@@ -95,18 +129,22 @@ class RelationshipDefinition(BaseModel):
     metadata_: Dict[str, Any] = {}
 
 
+# Backward compatibility alias
+RelationshipDefinition = EdgeDefinition
+
+
 # ---------------------------------------------------------------------------
 # Terminology layer
 # ---------------------------------------------------------------------------
 
 
-class ValueSetDefinition(ThingDefinition):
+class ValueSetDefinition(NodeDefinition):
     kind: str = "value_set_definition"
 
     codes: List[str]
 
 
-class CodeSystemDefinition(ThingDefinition):
+class CodeSystemDefinition(NodeDefinition):
     kind: str = "code_system_definition"
 
     # map code -> human-readable label/description
@@ -118,7 +156,7 @@ class CodeSystemDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class MetricDefinition(ThingDefinition):
+class MetricDefinition(NodeDefinition):
     """Metric/KPI definition without time or arithmetic modifiers in name.
     
     Time and arithmetic modifiers are applied at QUERY TIME via:
@@ -129,6 +167,10 @@ class MetricDefinition(ThingDefinition):
     Example: "Recurring Revenue" (NOT "Monthly Recurring Revenue")
     
     Benchmarks are stored as separate BenchmarkDefinition entities linked via relationships.
+    
+    Calculation Types:
+    - "simple": Direct formula calculation (math_expression)
+    - "set_based": Multi-step set operations (set_based_definition)
     """
     kind: str = "metric_definition"
 
@@ -136,9 +178,24 @@ class MetricDefinition(ThingDefinition):
     category: Optional[str] = None
     modules: List[str] = []
     required_objects: List[str] = []
-    formula: Optional[str] = None  # Uses Entity.attribute syntax
+    formula: Optional[str] = None  # Natural language formula description
+    math_expression: Optional[str] = None  # Parsed mathematical expression for calculation engine
     unit: Optional[str] = None
     data_type: str = "decimal"
+    
+    # Calculation type - determines which engine processes this metric
+    calculation_type: str = "simple"  # "simple", "set_based"
+    
+    # Set-based calculation definition (for calculation_type="set_based")
+    # Stores the complete SetBasedKPIDefinition as JSON
+    # Structure: {
+    #   "base_entity": "customers",
+    #   "key_column": "customer_id",
+    #   "period_parameters": ["PeriodStart", "PeriodEnd"],
+    #   "steps": [...],  # List of CalculationStep definitions
+    #   "final_formula": "CASE WHEN X > 0 THEN (Y/X)*100 ELSE 0 END"
+    # }
+    set_based_definition: Optional[Dict[str, Any]] = None
     
     # Time modifiers - applied at query time
     aggregation_methods: List[str] = []  # ["sum", "avg", "min", "max", "count", "median"]
@@ -203,8 +260,10 @@ class DimensionBinding(BaseModel):
     node: str
 
 
-class ValueChainPatternDefinition(ThingDefinition):
+class ValueChainPatternDefinition(ProcessDefinition):
     """Value chain pattern at any granularity level.
+    
+    Inherits from ProcessDefinition.
     
     The 'domain' field indicates granularity:
     - "company": Top-level (entire company as a value chain)
@@ -215,19 +274,15 @@ class ValueChainPatternDefinition(ThingDefinition):
     All are value chain patterns, just at different scales.
     """
     kind: str = "value_chain_pattern_definition"
+    process_type: str = "value_chain"  # Override from ProcessDefinition
 
     domain: Optional[str] = None  # Granularity: "company", "industry", "module", "process"
     applicability: Dict[str, Any] = {}
-    graph_pattern: GraphPatternDefinition = GraphPatternDefinition()
-    associated_metrics: List[str] = []
+    graph_pattern: GraphPatternDefinition = GraphPatternDefinition()  # Override with concrete type
     dimension_bindings: List[DimensionBinding] = []
-    
-    # Business ontology fields
-    business_purpose: Optional[str] = None  # Purpose statement
-    intended_value: Optional[str] = None  # Value to be produced
 
 
-class CompanyValueChainModelDefinition(ThingDefinition):
+class CompanyValueChainModelDefinition(NodeDefinition):
     """Company-specific value chain instance (derived from patterns)."""
     kind: str = "company_value_chain_model_definition"
 
@@ -244,7 +299,7 @@ class CompanyValueChainModelDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class ActorDefinition(ThingDefinition):
+class ActorDefinition(NodeDefinition):
     """Actors that perform actions and participate in processes.
     
     Actors can be people, roles, organizations, or systems.
@@ -277,7 +332,7 @@ class BeneficiaryDefinition(ActorDefinition):
 # ---------------------------------------------------------------------------
 
 
-class ClientDefinition(ThingDefinition):
+class ClientDefinition(NodeDefinition):
     """Multi-tenant client/organization with access control.
     
     Represents a tenant organization with access to specific modules
@@ -321,7 +376,7 @@ class RoleDefinition(ActorDefinition):
     is_admin: bool = False
 
 
-class PermissionDefinition(ThingDefinition):
+class PermissionDefinition(NodeDefinition):
     """Base class for all permission types.
     
     Defines access control rules for various resource types.
@@ -388,7 +443,7 @@ class AttributePermissionDefinition(PermissionDefinition):
     mask_pattern: Optional[str] = None  # Custom mask pattern
 
 
-class RowLevelSecurityDefinition(ThingDefinition):
+class RowLevelSecurityDefinition(NodeDefinition):
     """Row-level security filter for data access control.
     
     Defines attribute-based filters that restrict which rows
@@ -412,7 +467,7 @@ class RowLevelSecurityDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class CountryDefinition(ThingDefinition):
+class CountryDefinition(NodeDefinition):
     """Country with ISO codes and basic information.
     
     Represents a country for geographic classification and client segmentation.
@@ -430,7 +485,7 @@ class CountryDefinition(ThingDefinition):
     phone_code: Optional[str] = None  # e.g., "+1"
 
 
-class RegionDefinition(ThingDefinition):
+class RegionDefinition(NodeDefinition):
     """State, province, or administrative region within a country.
     
     Represents sub-national geographic divisions (states, provinces, territories).
@@ -444,7 +499,7 @@ class RegionDefinition(ThingDefinition):
     abbreviation: Optional[str] = None
 
 
-class MetropolitanAreaDefinition(ThingDefinition):
+class MetropolitanAreaDefinition(NodeDefinition):
     """Metropolitan Statistical Area (MSA) or equivalent.
     
     Represents metropolitan areas as defined by census/statistical agencies.
@@ -462,7 +517,7 @@ class MetropolitanAreaDefinition(ThingDefinition):
     counties: List[str] = []  # List of counties in the MSA
 
 
-class NAICSIndustryDefinition(ThingDefinition):
+class NAICSIndustryDefinition(NodeDefinition):
     """NAICS (North American Industry Classification System) industry code.
     
     Represents standardized industry classifications for business establishments.
@@ -514,13 +569,13 @@ class CompanyDefinition(ValueChainPatternDefinition):
 class BusinessProcessDefinition(ValueChainPatternDefinition):
     """A business process is a low-level value chain pattern.
     
-    Inherits all value chain characteristics and adds process-specific fields.
+    Inherits from ValueChainPatternDefinition (which inherits from ProcessDefinition).
+    Adds process-specific execution details.
     """
     kind: str = "business_process_definition"
+    process_type: str = "business_process"  # Override from ProcessDefinition
     
-    # Process-specific fields:
-    code: str
-    process_type: str  # "core", "support", "management"
+    # Process-specific execution fields:
     performed_by_actors: List[str] = []  # ActorDefinition codes
     uses_entities: List[str] = []  # EntityDefinition codes
     produces_event_types: List[str] = []  # Event entity codes
@@ -529,7 +584,7 @@ class BusinessProcessDefinition(ValueChainPatternDefinition):
     domain: str = "process"  # Low-level granularity
 
 
-class StrategicObjectiveDefinition(ThingDefinition):
+class StrategicObjectiveDefinition(NodeDefinition):
     """Strategic objectives that achieve business purpose and produce value."""
     kind: str = "strategic_objective_definition"
     
@@ -544,7 +599,7 @@ class StrategicObjectiveDefinition(ThingDefinition):
     responsible_actors: List[str] = []  # Links to ActorDefinition
 
 
-class BenchmarkDefinition(ThingDefinition):
+class BenchmarkDefinition(NodeDefinition):
     """Industry benchmark data point for metrics with full citation and context.
     
     Each benchmark represents a specific data point from research studies, industry
@@ -632,7 +687,7 @@ class BenchmarkDefinition(ThingDefinition):
     tags: List[str] = []
 
 
-class ExternalEventDefinition(ThingDefinition):
+class ExternalEventDefinition(NodeDefinition):
     """External event or news that may impact business metrics.
     
     Captures external context like news, economic events, regulatory changes,
@@ -673,7 +728,7 @@ class ExternalEventDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class AnalyticsStrategyDefinition(ThingDefinition):
+class AnalyticsStrategyDefinition(NodeDefinition):
     """Company's overall analytics strategy and maturity.
     
     Defines the strategic approach to analytics, maturity level,
@@ -703,7 +758,7 @@ class AnalyticsStrategyDefinition(ThingDefinition):
     data_governance_maturity: Optional[str] = None
 
 
-class DataSourceDefinition(ThingDefinition):
+class DataSourceDefinition(NodeDefinition):
     """External or internal data source for analytics.
     
     Represents data sources that feed the analytics platform.
@@ -730,7 +785,7 @@ class DataSourceDefinition(ThingDefinition):
     sensitivity_level: Optional[str] = None  # "public", "internal", "confidential", "restricted"
 
 
-class DataProductDefinition(ThingDefinition):
+class DataProductDefinition(NodeDefinition):
     """Packaged data asset with defined consumers and SLAs.
     
     Represents curated data products for specific use cases.
@@ -754,7 +809,7 @@ class DataProductDefinition(ThingDefinition):
     latency_sla: Optional[str] = None
 
 
-class AnalyticsUseCaseDefinition(ThingDefinition):
+class AnalyticsUseCaseDefinition(NodeDefinition):
     """Specific analytics use case or application.
     
     Represents a business problem being solved with analytics.
@@ -784,7 +839,7 @@ class AnalyticsUseCaseDefinition(ThingDefinition):
     implementation_priority: Optional[str] = None  # "critical", "high", "medium", "low"
 
 
-class DimensionDefinition(ThingDefinition):
+class DimensionDefinition(NodeDefinition):
     """Analytical dimension for slicing and dicing metrics.
     
     Represents dimensions like time, geography, product, customer segment.
@@ -807,7 +862,7 @@ class DimensionDefinition(ThingDefinition):
     estimated_cardinality: Optional[int] = None  # Number of distinct values
 
 
-class MetricCategoryDefinition(ThingDefinition):
+class MetricCategoryDefinition(NodeDefinition):
     """Hierarchical categorization of metrics.
     
     Organizes metrics into logical categories for navigation and discovery.
@@ -824,7 +879,7 @@ class MetricCategoryDefinition(ThingDefinition):
     color: Optional[str] = None
 
 
-class DataQualityRuleDefinition(ThingDefinition):
+class DataQualityRuleDefinition(NodeDefinition):
     """Data quality rule for validation and monitoring.
     
     Defines rules to ensure data quality across entities and attributes.
@@ -853,7 +908,7 @@ class DataQualityRuleDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class ConstraintDefinition(ThingDefinition):
+class ConstraintDefinition(NodeDefinition):
     kind: str = "constraint_definition"
 
     target_kind: str  # e.g., entity_definition, value_chain_pattern_definition
@@ -867,7 +922,7 @@ class DesignPolicyRuleDefinition(BaseModel):
     and_: Optional[Dict[str, Any]] = None
 
 
-class DesignPolicyDefinition(ThingDefinition):
+class DesignPolicyDefinition(NodeDefinition):
     kind: str = "design_policy_definition"
 
     scope: str = "global"
@@ -880,7 +935,7 @@ class DesignPolicyDefinition(ThingDefinition):
 # ---------------------------------------------------------------------------
 
 
-class InterviewSessionDefinition(ThingDefinition):
+class InterviewSessionDefinition(NodeDefinition):
     kind: str = "interview_session_definition"
 
     company_id: Optional[str] = None
@@ -890,7 +945,7 @@ class InterviewSessionDefinition(ThingDefinition):
     ended_at: Optional[str] = None
 
 
-class UtteranceDefinition(ThingDefinition):
+class UtteranceDefinition(NodeDefinition):
     kind: str = "utterance_definition"
 
     session_id: str
@@ -900,7 +955,7 @@ class UtteranceDefinition(ThingDefinition):
     nlp_annotations: Dict[str, Any] = {}
 
 
-class BusinessIntentDefinition(ThingDefinition):
+class BusinessIntentDefinition(NodeDefinition):
     kind: str = "business_intent_definition"
 
     session_id: str
@@ -911,7 +966,7 @@ class BusinessIntentDefinition(ThingDefinition):
     source_utterances: List[str] = []
 
 
-class PatternMatchDefinition(ThingDefinition):
+class PatternMatchDefinition(NodeDefinition):
     kind: str = "pattern_match_definition"
 
     session_id: str
@@ -921,7 +976,7 @@ class PatternMatchDefinition(ThingDefinition):
     supporting_intents: List[str] = []
 
 
-class DesignSuggestionDefinition(ThingDefinition):
+class DesignSuggestionDefinition(NodeDefinition):
     kind: str = "design_suggestion_definition"
 
     session_id: str
@@ -931,11 +986,14 @@ class DesignSuggestionDefinition(ThingDefinition):
 
 
 __all__ = [
-    "ThingDefinition",
+    "NodeDefinition",
+    "EdgeDefinition",
+    "ProcessDefinition",
+    "ThingDefinition",  # Backward compatibility alias
+    "RelationshipDefinition",  # Backward compatibility alias
     "ColumnDefinition",
     "TableSchemaDefinition",
     "EntityDefinition",
-    "RelationshipDefinition",
     "ValueSetDefinition",
     "CodeSystemDefinition",
     "MetricDefinition",

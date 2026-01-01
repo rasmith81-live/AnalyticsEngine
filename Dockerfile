@@ -56,10 +56,10 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Run the application
 # Dynamic entrypoint detection:
-# 1. Install service-specific requirements if present
+# 1. Install service-specific requirements if present (skip for metadata_ingestion_service - pre-installed at build time)
 # 2. Check for __init__.py (module pattern) vs app/ subdirectory (app pattern)
 CMD ["sh", "-c", "cd ${SERVICE_DIR} && \
-    if [ -f requirements.txt ]; then echo 'Installing service dependencies...'; pip install --no-cache-dir --user -r requirements.txt; fi && \
+    if [ -f requirements.txt ] && [ \"$(basename ${SERVICE_DIR})\" != 'metadata_ingestion_service' ]; then echo 'Installing service dependencies...'; pip install --no-cache-dir --user -r requirements.txt; fi && \
     export PATH=\"/home/appuser/.local/bin:$PATH\" && \
     if [ -f __init__.py ] && [ -f main.py ]; then \
         echo 'Starting service as Python module...'; \

@@ -5,32 +5,27 @@ import {
   Paper,
   Tabs,
   Tab,
-  Grid,
-  Card,
-  CardContent,
   Button,
   TextField,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
   CircularProgress,
   Alert,
   Snackbar
 } from '@mui/material';
 import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Business as ValueChainIcon,
-  Category as ModuleIcon,
   Refresh as RefreshIcon,
-  AccountTree as GraphIcon
+  AccountTree as GraphIcon,
+  List as ListIcon,
+  Schema as SchemaIcon
 } from '@mui/icons-material';
 
 // Lazy load the graph component to avoid SSR issues
 const OntologyGraph = lazy(() => import('../components/OntologyGraph'));
+import OntologyTreeView from '../components/OntologyTreeView';
+import OntologyModelsView from '../components/OntologyModelsView';
 
 // Graph types (matching OntologyGraph component)
 interface GraphNode {
@@ -114,7 +109,7 @@ function TabPanel(props: TabPanelProps) {
 export default function OntologyManagerPage() {
   const [tabValue, setTabValue] = useState(0);
   const [valueChains, setValueChains] = useState<ValueChain[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
+  const [, setModules] = useState<Module[]>([]);
   const [, setKpis] = useState<KPI[]>([]);
   const [, setObjectModels] = useState<ObjectModelDef[]>([]);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
@@ -140,7 +135,7 @@ export default function OntologyManagerPage() {
       const [vcRes, modRes, kpiRes, objRes, relRes] = await Promise.all([
         axios.get(`${BASE_URL}/definitions/value_chain_pattern_definition`, { params: { limit: 100 } }),
         axios.get(`${BASE_URL}/definitions/business_process_definition`, { params: { limit: 100 } }),
-        axios.get(`${BASE_URL}/definitions/kpi_definition`, { params: { limit: 100 } }).catch(() => ({ data: [] })),
+        axios.get(`${BASE_URL}/definitions/metric_definition`, { params: { limit: 100 } }).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL}/definitions/entity_definition`, { params: { limit: 100 } }).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL}/relationships`).catch(() => ({ data: [] }))
       ]);
@@ -175,12 +170,17 @@ export default function OntologyManagerPage() {
   ): GraphData => {
     const nodes: GraphNode[] = [];
     const links: GraphLink[] = [];
-    const nodeCodeToId = new Map<string, string>();
+    // Separate maps for each entity type to avoid code collisions
+    // (e.g., entity "supply_chain" vs value chain "supply_chain")
+    const vcCodeToId = new Map<string, string>();
+    const modCodeToId = new Map<string, string>();
+    const kpiCodeToId = new Map<string, string>();
+    const objCodeToId = new Map<string, string>();
     
     // Add Value Chain nodes
     vcs.forEach(vc => {
       const nodeId = `vc-${vc.code}`;
-      nodeCodeToId.set(vc.code, nodeId);
+      vcCodeToId.set(vc.code.toLowerCase(), nodeId);
       nodes.push({
         id: nodeId,
         name: vc.name,
@@ -193,7 +193,7 @@ export default function OntologyManagerPage() {
     // Add Module nodes
     mods.forEach(mod => {
       const nodeId = `mod-${mod.code}`;
-      nodeCodeToId.set(mod.code, nodeId);
+      modCodeToId.set(mod.code.toLowerCase(), nodeId);
       nodes.push({
         id: nodeId,
         name: mod.name,
@@ -206,7 +206,7 @@ export default function OntologyManagerPage() {
     // Add KPI nodes
     kpiList.forEach(kpi => {
       const nodeId = `kpi-${kpi.code}`;
-      nodeCodeToId.set(kpi.code, nodeId);
+      kpiCodeToId.set(kpi.code.toLowerCase(), nodeId);
       nodes.push({
         id: nodeId,
         name: kpi.name,
@@ -216,10 +216,10 @@ export default function OntologyManagerPage() {
       });
     });
     
-    // Add Object Model nodes
+    // Add Object Model nodes (entities)
     objs.forEach(obj => {
       const nodeId = `obj-${obj.code}`;
-      nodeCodeToId.set(obj.code, nodeId);
+      objCodeToId.set(obj.code.toLowerCase(), nodeId);
       nodes.push({
         id: nodeId,
         name: obj.name,
@@ -230,22 +230,22 @@ export default function OntologyManagerPage() {
     });
     
     // Build hierarchy links from relationships table ONLY:
-    // - ValueChain → Module (from belongs_to_value_chain where from=module)
-    // - Module → KPI (from belongs_to_module where from=kpi)
+    // - ValueChain → Module (from belongs_to where from=module, to=value_chain)
+    // - Module → KPI (from contains where from=module, to=kpi)
     // - KPI → ObjectModel (from uses/uses_object)
     
-    const moduleCodeSet = new Set(mods.map(m => m.code));
-    
     relationships.forEach(rel => {
-      // Module belongs_to_value_chain → create VC → Module link
-      if (rel.relationship_type === 'belongs_to_value_chain') {
-        const fromCode = rel.from_entity_code;
-        const vcCode = rel.to_entity_code;
-        
-        // Only process if from_entity is a module
-        if (moduleCodeSet.has(fromCode)) {
-          const sourceId = nodeCodeToId.get(vcCode);     // ValueChain is source
-          const targetId = nodeCodeToId.get(fromCode);   // Module is target
+      const fromCodeLower = rel.from_entity_code.toLowerCase();
+      const toCodeLower = rel.to_entity_code.toLowerCase();
+      
+      // Module belongs_to ValueChain → create VC → Module link
+      // Relationship is stored as: module --[belongs_to_value_chain]--> value_chain
+      // We display as: value_chain --[CONTAINS]--> module
+      if (rel.relationship_type === 'belongs_to' || rel.relationship_type === 'belongs_to_value_chain') {
+        // Check if this is a module -> value_chain relationship
+        if (modCodeToId.has(fromCodeLower) && vcCodeToId.has(toCodeLower)) {
+          const sourceId = vcCodeToId.get(toCodeLower);     // ValueChain is source (display)
+          const targetId = modCodeToId.get(fromCodeLower);   // Module is target (display)
           
           if (sourceId && targetId) {
             links.push({
@@ -257,26 +257,11 @@ export default function OntologyManagerPage() {
         }
       }
       
-      // KPI belongs_to_module → create Module → KPI link
-      if (rel.relationship_type === 'belongs_to_module') {
-        const kpiCode = rel.from_entity_code;
-        const moduleCode = rel.to_entity_code;
-        
-        // Create KPI node if it doesn't exist
-        if (!nodeCodeToId.has(kpiCode)) {
-          const nodeId = `kpi-${kpiCode}`;
-          nodeCodeToId.set(kpiCode, nodeId);
-          nodes.push({
-            id: nodeId,
-            name: kpiCode.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-            type: 'KPI',
-            code: kpiCode,
-            description: 'Discovered from relationship'
-          });
-        }
-        
-        const sourceId = nodeCodeToId.get(moduleCode); // Module is source
-        const targetId = nodeCodeToId.get(kpiCode);    // KPI is target
+      // Module contains KPI → create Module → KPI link
+      // 'contains' relationship: module --[contains]--> kpi (module is source, kpi is target)
+      if (rel.relationship_type === 'contains') {
+        const sourceId = modCodeToId.get(fromCodeLower); // Module is source
+        const targetId = kpiCodeToId.get(toCodeLower);    // KPI is target
         
         if (sourceId && targetId) {
           links.push({
@@ -287,10 +272,37 @@ export default function OntologyManagerPage() {
         }
       }
       
-      // KPI uses ObjectModel
+      // 'belongs_to_module' relationship: kpi --[belongs_to_module]--> module (kpi is source, module is target)
+      if (rel.relationship_type === 'belongs_to_module') {
+        // Create KPI node if it doesn't exist
+        if (!kpiCodeToId.has(fromCodeLower)) {
+          const nodeId = `kpi-${rel.from_entity_code}`;
+          kpiCodeToId.set(fromCodeLower, nodeId);
+          nodes.push({
+            id: nodeId,
+            name: rel.from_entity_code.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            type: 'KPI',
+            code: rel.from_entity_code,
+            description: 'Discovered from relationship'
+          });
+        }
+        
+        const sourceId = modCodeToId.get(toCodeLower); // Module is source
+        const targetId = kpiCodeToId.get(fromCodeLower);    // KPI is target
+        
+        if (sourceId && targetId) {
+          links.push({
+            source: sourceId,
+            target: targetId,
+            type: 'HAS_KPI'
+          });
+        }
+      }
+      
+      // KPI uses ObjectModel (Entity)
       if (rel.relationship_type === 'uses' || rel.relationship_type === 'uses_object') {
-        const sourceId = nodeCodeToId.get(rel.from_entity_code);
-        const targetId = nodeCodeToId.get(rel.to_entity_code);
+        const sourceId = kpiCodeToId.get(fromCodeLower);
+        const targetId = objCodeToId.get(toCodeLower);
         
         if (sourceId && targetId) {
           links.push({
@@ -429,16 +441,18 @@ export default function OntologyManagerPage() {
       // Map UI link types to API relationship types
       const relationshipTypeMap: Record<string, string> = {
         'CONTAINS': 'contains',
-        'BELONGS_TO': 'belongs_to_value_chain',
+        'BELONGS_TO': 'belongs_to',
         'HAS_KPI': 'has_kpi',
         'USES': 'uses',
         'RELATES_TO': 'relates_to'
       };
       
+      const relType = relationshipTypeMap[linkType] || linkType.toLowerCase();
+      
       await axios.post(`${BASE_URL}/relationships`, {
         from_entity_code: source.code,
         to_entity_code: target.code,
-        relationship_type: relationshipTypeMap[linkType] || linkType.toLowerCase()
+        relationship_type: relType
       }, {
         params: { created_by: 'admin' }
       });
@@ -450,17 +464,28 @@ export default function OntologyManagerPage() {
       });
       fetchData(); // Refresh to show new relationship
     } catch (err: any) {
-      setSnackbar({ open: true, message: `Failed to create relationship: ${err.message}`, severity: 'error' });
+      // Extract error message from response
+      let errorMsg = 'Failed to create relationship';
+      if (err.response?.data?.detail) {
+        const detail = err.response.data.detail;
+        if (typeof detail === 'string') {
+          if (detail.includes('duplicate') || detail.includes('already exists')) {
+            errorMsg = `Relationship already exists: ${source.name} → ${target.name}`;
+          } else {
+            errorMsg = detail;
+          }
+        } else {
+          errorMsg = JSON.stringify(detail);
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      setSnackbar({ open: true, message: errorMsg, severity: 'error' });
     }
   };
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-  };
-
-  const handleEdit = (type: 'valueChain' | 'module', item: any) => {
-    setEditForm({ code: item.code || '', name: item.name || '', description: item.description || '', valueChain: item.metadata_?.value_chain || '' });
-    setEditDialog({ open: true, type, item, isNew: false });
   };
 
   const handleSaveEdit = async () => {
@@ -506,23 +531,6 @@ export default function OntologyManagerPage() {
     }
   };
 
-  const handleDelete = async (type: 'valueChain' | 'module', code: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
-    
-    const kind = type === 'valueChain' ? 'value_chain_pattern_definition' : 'business_process_definition';
-    
-    try {
-      await axios.delete(`${BASE_URL}/definitions/${kind}/${code}`, {
-        params: { deleted_by: 'admin' }
-      });
-      
-      setSnackbar({ open: true, message: `${type === 'valueChain' ? 'Value Chain' : 'Module'} deleted successfully`, severity: 'success' });
-      fetchData(); // Refresh data
-    } catch (err: any) {
-      setSnackbar({ open: true, message: `Failed to delete: ${err.message}`, severity: 'error' });
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -549,8 +557,8 @@ export default function OntologyManagerPage() {
       <Paper sx={{ width: '100%', mb: 2 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="ontology tabs">
           <Tab icon={<GraphIcon />} label="Graph View" />
-          <Tab icon={<ValueChainIcon />} label="Value Chains" />
-          <Tab icon={<ModuleIcon />} label="Modules" />
+          <Tab icon={<ListIcon />} label="Ontology" />
+          <Tab icon={<SchemaIcon />} label="Models" />
         </Tabs>
       </Paper>
 
@@ -583,98 +591,25 @@ export default function OntologyManagerPage() {
         </Paper>
       </TabPanel>
 
-      {/* Value Chains Tab */}
+      {/* Ontology Tree View Tab */}
       <TabPanel value={tabValue} index={1}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Manage value chains - click edit to rename or delete to remove.
+          Hierarchical tree view of the ontology structure. Click on nodes to view details, use buttons to add, edit, or delete components.
         </Typography>
-        <Grid container spacing={3}>
-          {valueChains.length === 0 ? (
-            <Grid item xs={12}>
-              <Alert severity="info">No value chains found.</Alert>
-            </Grid>
-          ) : (
-            valueChains.map((vc) => (
-              <Grid item xs={12} md={6} lg={4} key={vc.code}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Box>
-                        <Typography variant="h6">{vc.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Code: {vc.code}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <IconButton size="small" onClick={() => handleEdit('valueChain', vc)} title="Edit">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => handleDelete('valueChain', vc.code, vc.name)} color="error" title="Delete">
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                    {vc.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {vc.description}
-                      </Typography>
-                    )}
-                    {vc.domain && (
-                      <Chip label={vc.domain} size="small" sx={{ mt: 1 }} />
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))
-          )}
-        </Grid>
+        <OntologyTreeView 
+          onRefresh={fetchData}
+          onSnackbar={(message, severity) => setSnackbar({ open: true, message, severity })}
+        />
       </TabPanel>
 
-      {/* Modules Tab */}
+      {/* Models Tab - Ontology Component Types */}
       <TabPanel value={tabValue} index={2}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Manage modules (business processes) - click edit to rename or delete to remove.
+          View the ontology model schema - the types and fields that define ontology components.
         </Typography>
-        <Grid container spacing={3}>
-          {modules.length === 0 ? (
-            <Grid item xs={12}>
-              <Alert severity="info">No modules found.</Alert>
-            </Grid>
-          ) : (
-            modules.map((mod) => (
-              <Grid item xs={12} md={6} lg={4} key={mod.code}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Box>
-                        <Typography variant="h6">{mod.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Code: {mod.code}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <IconButton size="small" onClick={() => handleEdit('module', mod)} title="Edit">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => handleDelete('module', mod.code, mod.name)} color="error" title="Delete">
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                    {mod.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {mod.description}
-                      </Typography>
-                    )}
-                    {mod.metadata_?.value_chain && (
-                      <Chip label={`Value Chain: ${mod.metadata_.value_chain}`} size="small" sx={{ mt: 1 }} variant="outlined" />
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))
-          )}
-        </Grid>
+        <OntologyModelsView 
+          onSnackbar={(message, severity) => setSnackbar({ open: true, message, severity })}
+        />
       </TabPanel>
 
       {/* Edit Dialog */}

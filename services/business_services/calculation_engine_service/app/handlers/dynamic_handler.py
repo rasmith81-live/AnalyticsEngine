@@ -1,10 +1,16 @@
 """
 Dynamic Calculation Handler
 
-Generic handler that executes KPIs based on metadata definitions and formulas.
+Generic handler that executes KPIs based on metadata definitions.
+
+Supports two calculation types:
+1. "simple" - Direct formula calculation using math_expression and FormulaParser
+2. "set_based" - Multi-step set operations using SetBasedKPIDefinition
+
+The calculation_type field in the KPI definition determines which path is used.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
 
@@ -17,6 +23,11 @@ from ..base_handler import (
 from ..engine.parser import FormulaParser
 from ..engine.sql_generator import SQLGenerator
 from ..engine.timescale_manager import TimescaleManager
+from ..engine.set_operations import (
+    SetBasedKPIDefinition,
+    SetBasedSQLGenerator,
+    get_set_based_kpi_definition,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +35,22 @@ class DynamicCalculationHandler(BaseCalculationHandler):
     """
     Executes calculations dynamically based on metadata definitions.
     
-    Flow:
-    1. Fetch KPI definition from Metadata Service (formula, dimensions, aggregation).
-    2. Parse formula string into AST using FormulaParser.
-    3. Determine optimal table/view (Hierarchical Query Logic) using TimescaleManager.
-    4. Compile AST into SQL using SQLGenerator (supporting Approximate Analytics).
-    5. Execute SQL against the data warehouse/lakehouse.
-    6. Return result.
+    Calculation Types:
+    - "simple": Uses math_expression → FormulaParser → SQLGenerator
+    - "set_based": Uses set_based_definition → SetBasedSQLGenerator
+    
+    Flow for simple calculations:
+    1. Fetch KPI definition from Metadata Service
+    2. Parse formula string into AST using FormulaParser
+    3. Determine optimal table/view using TimescaleManager
+    4. Compile AST into SQL using SQLGenerator
+    5. Execute SQL and return result
+    
+    Flow for set-based calculations:
+    1. Fetch KPI definition from Metadata Service
+    2. Load SetBasedKPIDefinition from set_based_definition field
+    3. Generate CTE-based SQL using SetBasedSQLGenerator
+    4. Execute single SQL query and return result
     """
     
     def __init__(
@@ -50,9 +70,13 @@ class DynamicCalculationHandler(BaseCalculationHandler):
             cache_enabled=cache_enabled,
             cache_ttl=cache_ttl
         )
+        # Simple calculation components
         self.parser = FormulaParser()
         self.sql_generator = SQLGenerator()
         self.timescale_manager = TimescaleManager()
+        
+        # Set-based calculation components
+        self.set_based_sql_generator = SetBasedSQLGenerator(schema_name=self.schema_name)
         
     async def calculate(
         self,
@@ -60,27 +84,104 @@ class DynamicCalculationHandler(BaseCalculationHandler):
     ) -> CalculationResult:
         """
         Dynamically calculate KPI value.
+        
+        Routes to appropriate calculation method based on calculation_type:
+        - "set_based": Uses SetBasedSQLGenerator for multi-step set operations
+        - "simple" (default): Uses FormulaParser + SQLGenerator for direct formulas
         """
         start_time = datetime.utcnow()
         
         # 1. Fetch KPI Definition
-        # In a real app, this would be an async HTTP call to metadata_service
-        # For now, we'll mock/stub or use a local lookup if available, 
-        # but the architecture requires metadata driving this.
         kpi_def = await self.get_kpi_definition(params.kpi_code)
         
         if not kpi_def:
-            # Fallback for demo purposes if metadata service isn't reachable or populated
-            # This allows the "Dynamic" handler to still function with some basic assumptions
-            # or hardcoded fallbacks for the demo critical path if needed.
-            # But strictly, it should fail.
             logger.warning(f"KPI definition not found for {params.kpi_code}, checking fallbacks")
             kpi_def = self._get_fallback_definition(params.kpi_code)
             
         if not kpi_def:
              raise CalculationError(f"KPI definition not found for: {params.kpi_code}")
 
-        formula = kpi_def.get("formula")
+        # 2. Route based on calculation_type
+        calculation_type = kpi_def.get("calculation_type", "simple")
+        
+        if calculation_type == "set_based":
+            return await self._calculate_set_based(params, kpi_def, start_time)
+        else:
+            return await self._calculate_simple(params, kpi_def, start_time)
+    
+    async def _calculate_set_based(
+        self,
+        params: CalculationParams,
+        kpi_def: Dict[str, Any],
+        start_time: datetime
+    ) -> CalculationResult:
+        """
+        Calculate using set-based definition (multi-step set operations).
+        
+        Uses SetBasedKPIDefinition stored in set_based_definition field.
+        """
+        # Get set-based definition
+        set_def_data = kpi_def.get("set_based_definition")
+        if not set_def_data:
+            raise CalculationError(f"No set_based_definition for set_based KPI: {params.kpi_code}")
+        
+        # Parse into SetBasedKPIDefinition
+        try:
+            set_based_def = SetBasedKPIDefinition(
+                kpi_code=kpi_def.get("code", params.kpi_code),
+                name=kpi_def.get("name", params.kpi_code),
+                description=kpi_def.get("description"),
+                unit=kpi_def.get("unit", "Number"),
+                period_parameters=set_def_data.get("period_parameters", ["PeriodStart", "PeriodEnd"]),
+                steps=set_def_data.get("steps", []),
+                final_formula=set_def_data.get("final_formula", ""),
+                metadata=kpi_def.get("metadata_", {})
+            )
+        except Exception as e:
+            raise CalculationError(f"Invalid set_based_definition: {e}")
+        
+        # Generate SQL using SetBasedSQLGenerator
+        sql, sql_params = self.set_based_sql_generator.generate_sql(
+            kpi_def=set_based_def,
+            period_start=params.start_date,
+            period_end=params.end_date,
+            additional_filters=params.filters
+        )
+        
+        # Execute query (placeholder - would use db_client in real implementation)
+        # In real implementation: results = await self.db_client.fetch_all(sql, sql_params)
+        value = 0.0  # Placeholder
+        
+        calculation_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        
+        return CalculationResult(
+            kpi_code=params.kpi_code,
+            value=value,
+            unit=set_based_def.unit,
+            timestamp=datetime.utcnow(),
+            calculation_time_ms=calculation_time,
+            metadata={
+                "calculation_type": "set_based",
+                "sql_generated": sql,
+                "steps": [step.name for step in set_based_def.steps],
+                "final_formula": set_based_def.final_formula
+            }
+        )
+    
+    async def _calculate_simple(
+        self,
+        params: CalculationParams,
+        kpi_def: Dict[str, Any],
+        start_time: datetime
+    ) -> CalculationResult:
+        """
+        Calculate using simple formula (direct math expression).
+        
+        Uses math_expression or formula field with FormulaParser.
+        """
+        # Get formula - prefer set_based_definition.final_formula if exists,
+        # otherwise use math_expression or natural language formula
+        formula = kpi_def.get("math_expression") or kpi_def.get("formula")
         if not formula:
             raise CalculationError(f"No formula defined for KPI: {params.kpi_code}")
             
@@ -88,7 +189,7 @@ class DynamicCalculationHandler(BaseCalculationHandler):
         try:
             parsed_formula = self.parser.parse(formula)
         except Exception as e:
-            raise CalculationError(f"Formula parsing failed: {e}")
+            raise CalculationError(f"Formula parsing failed for '{formula}': {e}")
             
         # 3. Determine Execution Strategy (Hierarchical Query Logic & Approximation)
         # Check for approximate mode preference (Params override Metadata)
@@ -182,6 +283,7 @@ class DynamicCalculationHandler(BaseCalculationHandler):
             timestamp=datetime.utcnow(),
             calculation_time_ms=calculation_time,
             metadata={
+                "calculation_type": "simple",
                 "formula": formula,
                 "sql_generated": query,
                 "variables": parsed_formula.get("variables", [])

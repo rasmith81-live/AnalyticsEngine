@@ -57,5 +57,12 @@ if [ -f "$KEY_FILE" ] && [ -f "$CERT_FILE" ]; then
     fi
 fi
 
+# Ensure pip --user directory exists with correct permissions (for volume mounts)
+if [ "$(id -u)" = "0" ]; then
+    mkdir -p /home/appuser/.local/lib/python3.11/site-packages
+    mkdir -p /home/appuser/.local/bin
+    chown -R appuser:appuser /home/appuser/.local
+fi
+
 # Execute the command passed to this script as the non-root user
 exec gosu appuser "$@"

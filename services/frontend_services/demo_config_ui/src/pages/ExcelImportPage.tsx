@@ -137,44 +137,47 @@ export default function ExcelImportPage() {
     });
   };
 
-  // Add new ontology items - replaces old value chain/module relationships for ALL KPIs
+  // Add value chain - only creates Module->VC relationships (KPIs do NOT directly relate to VCs)
   const handleAddValueChain = () => {
     if (!newValueChain.trim() || !importResult?.ontology_sync) return;
     const vcName = newValueChain.trim();
     const updatedVCs = [...(importResult.ontology_sync.value_chains_created || []), vcName];
     
-    // Use allKpiCodes for full list, fallback to preview
-    const allKpis = importResult.allKpiCodes || importResult.preview.map(kpi => kpi.Code || kpi.Name);
-    const kpiCodes = new Set(allKpis);
+    // Get existing value chains and modules
+    const existingVCs = new Set(importResult.ontology_sync.value_chains_created || []);
+    const existingMods = importResult.ontology_sync.modules_created || [];
     
-    // Remove old value chain relationships for KPIs, keep module relationships
+    // Remove old module->VC relationships (keep all other relationships)
     const existingRelationships = importResult.ontology_sync.relationships_created || [];
+    const modSet = new Set(existingMods);
     
-    // Filter out KPI -> old_value_chain relationships (keep KPI -> module relationships)
+    // Filter out module -> old_value_chain relationships
     const filteredRelationships = existingRelationships.filter(rel => {
       const parts = rel.split(' -> ');
       const fromCode = parts[0];
       const toCode = parts[1];
-      // Keep if it's not a KPI, or if the target is a module (in modules_created)
-      const isKpiRelationship = kpiCodes.has(fromCode);
-      const isModuleTarget = (importResult.ontology_sync?.modules_created || []).includes(toCode);
-      return !isKpiRelationship || isModuleTarget;
+      // Remove if it's a module->VC relationship
+      const isModuleSource = modSet.has(fromCode);
+      const isValueChainTarget = existingVCs.has(toCode);
+      return !(isModuleSource && isValueChainTarget);
     });
     
-    // Create new relationships from ALL KPIs to this value chain
-    const newRelationships = allKpis.map(code => `${code} -> ${vcName}`);
+    // Create new relationships from ALL modules to this value chain
+    const newModuleRelationships = existingMods.map(mod => `${mod} -> ${vcName}`);
     
     setImportResult({
       ...importResult,
       ontology_sync: { 
         ...importResult.ontology_sync, 
         value_chains_created: updatedVCs,
-        relationships_created: [...filteredRelationships, ...newRelationships]
+        relationships_created: [...filteredRelationships, ...newModuleRelationships]
       }
     });
     setNewValueChain('');
   };
 
+  // Add module - creates Module->VC and Module->KPI relationships
+  // Hierarchy: ValueChain <- Module <- KPI -> Entity
   const handleAddModule = () => {
     if (!newModule.trim() || !importResult?.ontology_sync) return;
     const modName = newModule.trim();
@@ -182,31 +185,34 @@ export default function ExcelImportPage() {
     
     // Use allKpiCodes for full list, fallback to preview
     const allKpis = importResult.allKpiCodes || importResult.preview.map(kpi => kpi.Code || kpi.Name);
-    const kpiCodes = new Set(allKpis);
     
-    // Remove old module relationships for KPIs, keep value chain relationships
+    // Get existing modules and value chains
+    const existingMods = new Set(importResult.ontology_sync.modules_created || []);
+    const existingVCs = importResult.ontology_sync.value_chains_created || [];
+    
+    // Remove old module->KPI relationships (keep KPI->entity and module->VC relationships)
     const existingRelationships = importResult.ontology_sync.relationships_created || [];
     
-    // Filter out KPI -> old_module relationships (keep KPI -> value_chain relationships)
+    // Filter out old_module -> KPI relationships
     const filteredRelationships = existingRelationships.filter(rel => {
       const parts = rel.split(' -> ');
       const fromCode = parts[0];
-      const toCode = parts[1];
-      // Keep if it's not a KPI, or if the target is a value chain (in value_chains_created)
-      const isKpiRelationship = kpiCodes.has(fromCode);
-      const isValueChainTarget = (importResult.ontology_sync?.value_chains_created || []).includes(toCode);
-      return !isKpiRelationship || isValueChainTarget;
+      // Remove if source is an existing module (we'll recreate with new module)
+      return !existingMods.has(fromCode);
     });
     
-    // Create new relationships from ALL KPIs to this module
-    const newRelationships = allKpis.map(code => `${code} -> ${modName}`);
+    // Create new relationships: Module -> KPI (module contains KPIs)
+    const newModuleToKpiRelationships = allKpis.map(code => `${modName} -> ${code}`);
+    
+    // Create new relationships: Module -> VC (module belongs to value chain)
+    const newModuleToVCRelationships = existingVCs.map(vc => `${modName} -> ${vc}`);
     
     setImportResult({
       ...importResult,
       ontology_sync: { 
         ...importResult.ontology_sync, 
         modules_created: updatedMods,
-        relationships_created: [...filteredRelationships, ...newRelationships]
+        relationships_created: [...filteredRelationships, ...newModuleToKpiRelationships, ...newModuleToVCRelationships]
       }
     });
     setNewModule('');
@@ -276,6 +282,7 @@ export default function ExcelImportPage() {
     setCommitting(true);
     try {
       // Pass edited ontology data to commit
+      console.log('Committing with ontology_sync:', JSON.stringify(importResult.ontology_sync, null, 2));
       const result = await metadataIngestionApi.commitImport(importResult.importId, importResult.ontology_sync);
       if (result.success) {
         setCommitSuccess(result.count);

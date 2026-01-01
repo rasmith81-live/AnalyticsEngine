@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Import ontology models from the business_metadata package
 from ..ontology_models import (
-    ThingDefinition,
+    NodeDefinition,
     EntityDefinition,
     MetricDefinition,
     ValueChainPatternDefinition,

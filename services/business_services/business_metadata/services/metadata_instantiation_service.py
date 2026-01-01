@@ -5,11 +5,12 @@ from pydantic import BaseModel
 
 # Import ontology models from local module
 from ..ontology_models import (
-    ThingDefinition,
+    NodeDefinition,
+    EdgeDefinition,
+    ProcessDefinition,
     EntityDefinition,
     MetricDefinition,
     ValueChainPatternDefinition,
-    RelationshipDefinition,
     ValueSetDefinition,
     CodeSystemDefinition,
     ConstraintDefinition,
@@ -48,7 +49,7 @@ from ..ontology_models import (
     ExternalEventDefinition,
 )
 
-T = TypeVar('T', bound=ThingDefinition)
+T = TypeVar('T', bound=NodeDefinition)
 
 
 class MetadataInstantiationService:
@@ -60,11 +61,13 @@ class MetadataInstantiationService:
     """
     
     # Map kind → Pydantic class
-    KIND_TO_CLASS: Dict[str, Type[ThingDefinition]] = {
+    KIND_TO_CLASS: Dict[str, Type[NodeDefinition]] = {
         "entity_definition": EntityDefinition,
+        "process_definition": ProcessDefinition,
         "metric_definition": MetricDefinition,
         "value_chain_pattern_definition": ValueChainPatternDefinition,
-        "relationship_definition": RelationshipDefinition,
+        "edge_definition": EdgeDefinition,
+        "relationship_definition": EdgeDefinition,  # Backward compatibility
         "value_set_definition": ValueSetDefinition,
         "code_system_definition": CodeSystemDefinition,
         "constraint_definition": ConstraintDefinition,
@@ -111,7 +114,7 @@ class MetadataInstantiationService:
         self,
         kind: str,
         data: Dict[str, Any]
-    ) -> ThingDefinition:
+    ) -> NodeDefinition:
         """Instantiate Pydantic model from JSONB data.
         
         Args:
@@ -134,7 +137,7 @@ class MetadataInstantiationService:
     
     def serialize(
         self,
-        definition: ThingDefinition
+        definition: NodeDefinition
     ) -> Dict[str, Any]:
         """Serialize Pydantic model to JSONB-ready dict.
         
@@ -146,7 +149,7 @@ class MetadataInstantiationService:
         """
         return definition.model_dump(mode='json', exclude_none=False)
     
-    def get_kind_from_model(self, definition: ThingDefinition) -> str:
+    def get_kind_from_model(self, definition: NodeDefinition) -> str:
         """Extract kind from Pydantic model.
         
         Args:
@@ -157,7 +160,7 @@ class MetadataInstantiationService:
         """
         return definition.kind
     
-    def get_code_from_model(self, definition: ThingDefinition) -> Optional[str]:
+    def get_code_from_model(self, definition: NodeDefinition) -> Optional[str]:
         """Extract code from Pydantic model if it has one.
         
         Args:
@@ -168,7 +171,7 @@ class MetadataInstantiationService:
         """
         return getattr(definition, 'code', None)
     
-    def get_name_from_model(self, definition: ThingDefinition) -> str:
+    def get_name_from_model(self, definition: NodeDefinition) -> str:
         """Extract name from Pydantic model.
         
         Args:

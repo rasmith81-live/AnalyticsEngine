@@ -412,6 +412,7 @@ services:
     volumes:
       - .:/app
       - ./certs:/certs
+      - spacy_models:/home/appuser/.cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
