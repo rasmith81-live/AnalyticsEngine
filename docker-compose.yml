@@ -307,6 +307,44 @@ services:
       retries: 3
       start_period: 40s
 
+  # Data Simulator Service
+  data_simulator_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/business_services/data_simulator_service
+    ports:
+      - "8007:8000"
+    environment:
+      - SERVICE_NAME=data_simulator_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - METADATA_SERVICE_URL=http://metadata_ingestion_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - PYTHONPATH=/app/services/business_services:/app/services/backend_services:/app
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      metadata_ingestion_service:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Connector Service
   connector_service:
     build:
@@ -679,6 +717,7 @@ services:
       - INGESTION_SERVICE_URL=http://ingestion_service:8000
       - METADATA_INGESTION_SERVICE_URL=http://metadata_ingestion_service:8000
       - CONVERSATION_SERVICE_URL=http://conversation_service:8000
+      - SIMULATOR_SERVICE_URL=http://data_simulator_service:8000
     depends_on:
       redis:
         condition: service_healthy
@@ -711,6 +750,8 @@ services:
       metadata_ingestion_service:
         condition: service_healthy
       conversation_service:
+        condition: service_healthy
+      data_simulator_service:
         condition: service_healthy
     volumes:
       - .:/app

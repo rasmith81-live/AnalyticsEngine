@@ -18,6 +18,118 @@ logger = logging.getLogger(__name__)
 class KPIAnalyzer:
     """Analyzes KPI definitions to extract entity requirements for simulation."""
     
+    # Sample KPI definitions for fallback when metadata service is unavailable
+    SAMPLE_KPIS: Dict[str, Dict[str, Any]] = {
+        "REVENUE": {
+            "code": "REVENUE",
+            "name": "Total Revenue",
+            "calculation_type": "simple",
+            "required_objects": ["orders", "order_items"],
+        },
+        "AVG_ORDER_VALUE": {
+            "code": "AVG_ORDER_VALUE",
+            "name": "Average Order Value",
+            "calculation_type": "simple",
+            "required_objects": ["orders"],
+        },
+        "CONVERSION_RATE": {
+            "code": "CONVERSION_RATE",
+            "name": "Conversion Rate",
+            "calculation_type": "set_based",
+            "required_objects": ["leads", "opportunities", "deals"],
+        },
+        "WIN_RATE": {
+            "code": "WIN_RATE",
+            "name": "Win Rate",
+            "calculation_type": "set_based",
+            "required_objects": ["opportunities", "deals"],
+        },
+        "SALES_CYCLE_LENGTH": {
+            "code": "SALES_CYCLE_LENGTH",
+            "name": "Sales Cycle Length",
+            "calculation_type": "simple",
+            "required_objects": ["opportunities", "deals"],
+        },
+        "CHURN_RATE": {
+            "code": "CHURN_RATE",
+            "name": "Churn Rate",
+            "calculation_type": "set_based",
+            "required_objects": ["customers"],
+        },
+        "RETENTION_RATE": {
+            "code": "RETENTION_RATE",
+            "name": "Retention Rate",
+            "calculation_type": "set_based",
+            "required_objects": ["customers"],
+        },
+        "NPS": {
+            "code": "NPS",
+            "name": "Net Promoter Score",
+            "calculation_type": "simple",
+            "required_objects": ["customer_surveys"],
+        },
+        "CSAT": {
+            "code": "CSAT",
+            "name": "Customer Satisfaction Score",
+            "calculation_type": "simple",
+            "required_objects": ["customer_surveys"],
+        },
+        "CLV": {
+            "code": "CLV",
+            "name": "Customer Lifetime Value",
+            "calculation_type": "set_based",
+            "required_objects": ["customers", "orders"],
+        },
+        "CAC": {
+            "code": "CAC",
+            "name": "Customer Acquisition Cost",
+            "calculation_type": "simple",
+            "required_objects": ["marketing_spend", "customers"],
+        },
+        "MQL_COUNT": {
+            "code": "MQL_COUNT",
+            "name": "Marketing Qualified Leads",
+            "calculation_type": "simple",
+            "required_objects": ["leads"],
+        },
+        "CAMPAIGN_ROI": {
+            "code": "CAMPAIGN_ROI",
+            "name": "Campaign ROI",
+            "calculation_type": "set_based",
+            "required_objects": ["campaigns", "marketing_spend", "conversions"],
+        },
+        "ORDER_FULFILLMENT_TIME": {
+            "code": "ORDER_FULFILLMENT_TIME",
+            "name": "Order Fulfillment Time",
+            "calculation_type": "simple",
+            "required_objects": ["orders", "shipments"],
+        },
+        "INVENTORY_TURNOVER": {
+            "code": "INVENTORY_TURNOVER",
+            "name": "Inventory Turnover",
+            "calculation_type": "simple",
+            "required_objects": ["inventory", "sales"],
+        },
+        "GROSS_MARGIN": {
+            "code": "GROSS_MARGIN",
+            "name": "Gross Margin",
+            "calculation_type": "simple",
+            "required_objects": ["revenue", "costs"],
+        },
+        "MRR": {
+            "code": "MRR",
+            "name": "Monthly Recurring Revenue",
+            "calculation_type": "set_based",
+            "required_objects": ["subscriptions", "customers"],
+        },
+        "ARR": {
+            "code": "ARR",
+            "name": "Annual Recurring Revenue",
+            "calculation_type": "set_based",
+            "required_objects": ["subscriptions", "customers"],
+        },
+    }
+    
     def __init__(self, redis_url: Optional[str] = None):
         self.redis_url = redis_url
         self._metadata_client: Optional[MetadataClientPubSub] = None
@@ -87,10 +199,11 @@ class KPIAnalyzer:
         return list(entities_needed.values()), kpi_definitions
     
     async def _get_kpi_definition(self, kpi_code: str) -> Optional[Dict[str, Any]]:
-        """Fetch KPI definition from metadata service via pub/sub or cache."""
+        """Fetch KPI definition from metadata service via pub/sub, cache, or fallback to samples."""
         if kpi_code in self._kpi_cache:
             return self._kpi_cache[kpi_code]
         
+        # Try metadata service first
         metadata_client = await self._get_metadata_client()
         if metadata_client:
             try:
@@ -99,7 +212,14 @@ class KPIAnalyzer:
                     self._kpi_cache[kpi_code] = kpi_def
                     return kpi_def
             except Exception as e:
-                logger.warning(f"Failed to fetch KPI {kpi_code}: {e}")
+                logger.warning(f"Failed to fetch KPI {kpi_code} from metadata service: {e}")
+        
+        # Fallback to sample KPIs
+        if kpi_code in self.SAMPLE_KPIS:
+            logger.info(f"Using sample KPI definition for {kpi_code}")
+            sample_def = self.SAMPLE_KPIS[kpi_code]
+            self._kpi_cache[kpi_code] = sample_def
+            return sample_def
         
         return None
     

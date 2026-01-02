@@ -74,12 +74,10 @@ async def lifespan(app: FastAPI):
     orchestrator.register_handler("SALES", dynamic_handler)
     orchestrator.register_handler("CRM", dynamic_handler)
     
-    # Register Set-Based Calculation Handler for complex KPIs
+    # Register Set-Based Calculation Handler for complex KPIs (uses pub/sub)
     set_based_handler = SetBasedCalculationHandler(
         value_chain_code="SET_BASED",
-        database_service_url=settings.database_service_url,
-        messaging_service_url=settings.messaging_service_url,
-        metadata_service_url=settings.metadata_service_url,
+        redis_url=settings.redis_url,
         cache_enabled=settings.cache_enabled,
         cache_ttl=settings.cache_ttl
     )
@@ -89,10 +87,9 @@ async def lifespan(app: FastAPI):
     for kpi_code in SET_BASED_KPI_REGISTRY.keys():
         orchestrator.kpi_to_handler_map[kpi_code] = "SET_BASED"
     
-    # Initialize standalone set-based engine for direct API access
+    # Initialize standalone set-based engine for direct API access (uses pub/sub)
     set_based_engine = SetBasedCalculationEngine(
-        database_service_url=settings.database_service_url,
-        metadata_service_url=settings.metadata_service_url
+        redis_url=settings.redis_url
     )
     
     # Load KPI mappings
