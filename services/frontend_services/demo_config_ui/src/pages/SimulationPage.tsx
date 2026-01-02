@@ -19,7 +19,6 @@ import {
   Chip,
   Stack,
   Alert,
-  Autocomplete,
   Slider,
   Divider,
   IconButton,
@@ -27,13 +26,13 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableRow,
   CircularProgress,
   Collapse,
   Switch,
   FormControlLabel,
 } from '@mui/material';
+import KPITreeSelector, { KPIInfo } from '../components/KPITreeSelector';
 import {
   PlayArrow as RunIcon,
   Stop as StopIcon,
@@ -63,14 +62,7 @@ const SCENARIOS = [
   { id: 'volatile', name: 'Volatile', description: 'High variance, unpredictable patterns' },
 ];
 
-interface KPIInfo {
-  code: string;
-  name: string;
-  calculation_type: string;
-  required_objects: string[];
-  formula?: string;
-  category?: string;
-}
+// KPIInfo is now imported from KPITreeSelector
 
 interface Simulation {
   simulation_id: string;
@@ -88,12 +80,21 @@ interface Simulation {
   started_at: string | null;
 }
 
+interface EntityEvent {
+  event_type: string;
+  entity_name: string;
+  entity_id: string;
+  timestamp: string;
+  attributes: Record<string, any>;
+}
+
 interface SimulationTick {
   tick_number: number;
   simulated_time: string;
   real_time: string;
   entity_counts: Record<string, number>;
-  events: any[];
+  events: EntityEvent[];
+  metrics: Record<string, number>;
 }
 
 export default function SimulationPage() {
@@ -123,10 +124,25 @@ export default function SimulationPage() {
     fetchAvailableKPIs();
     fetchSimulations();
     
-    // Poll for simulation updates every 5 seconds
-    const interval = setInterval(fetchSimulations, 5000);
+    // Poll for simulation updates every 3 seconds
+    const interval = setInterval(fetchSimulations, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-refresh ticks when a simulation is expanded
+  useEffect(() => {
+    if (!expandedSimulation) return;
+    
+    // Fetch immediately
+    fetchSimulationTicks(expandedSimulation);
+    
+    // Then poll every 2 seconds for real-time updates
+    const tickInterval = setInterval(() => {
+      fetchSimulationTicks(expandedSimulation);
+    }, 2000);
+    
+    return () => clearInterval(tickInterval);
+  }, [expandedSimulation]);
 
   const fetchAvailableKPIs = async () => {
     setLoadingKPIs(true);
@@ -321,50 +337,19 @@ export default function SimulationPage() {
               </Typography>
               
               <Stack spacing={3} sx={{ mt: 2 }}>
-                {/* KPI Selection */}
-                <Autocomplete
-                  multiple
-                  options={availableKPIs}
-                  getOptionLabel={(option) => `${option.name} (${option.code})`}
-                  value={selectedKPIs}
-                  onChange={(_, newValue) => setSelectedKPIs(newValue)}
+                {/* KPI Selection - Hierarchical Tree View */}
+                <KPITreeSelector
+                  kpis={availableKPIs}
+                  selectedKPIs={selectedKPIs}
+                  onSelectionChange={setSelectedKPIs}
                   loading={loadingKPIs}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Select KPIs"
-                      placeholder="Search KPIs..."
-                      helperText="Select KPIs to generate data for"
-                    />
-                  )}
-                  renderOption={(props, option) => (
-                    <li {...props}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography variant="body2">{option.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.code} • {option.calculation_type} • {option.required_objects.length} entities
-                        </Typography>
-                      </Box>
-                    </li>
-                  )}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip
-                        {...getTagProps({ index })}
-                        key={option.code}
-                        label={option.code}
-                        size="small"
-                        color={option.calculation_type === 'set_based' ? 'primary' : 'default'}
-                      />
-                    ))
-                  }
                 />
 
                 {/* Selected Entities Display */}
                 {selectedEntities.length > 0 && (
                   <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
                     <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <EntityIcon fontSize="small" /> Required Entities
+                      <EntityIcon fontSize="small" /> Required Entities ({selectedEntities.length})
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {selectedEntities.map(entity => (
@@ -581,39 +566,162 @@ export default function SimulationPage() {
                       
                       <Collapse in={expandedSimulation === sim.simulation_id}>
                         <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
-                          <Typography variant="subtitle2" gutterBottom>Recent Ticks</Typography>
+                          {/* Live Tick Stream Header */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <RunningIcon sx={{ 
+                                animation: sim.status === 'running' ? 'spin 1s linear infinite' : 'none',
+                                '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
+                              }} />
+                              Live Tick Stream
+                            </Typography>
+                            <Chip 
+                              size="small" 
+                              label={`${simulationTicks[sim.simulation_id]?.length || 0} ticks buffered`}
+                              variant="outlined"
+                            />
+                          </Box>
+
                           {simulationTicks[sim.simulation_id]?.length > 0 ? (
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell>Tick</TableCell>
-                                  <TableCell>Simulated Time</TableCell>
-                                  <TableCell>Events</TableCell>
-                                  <TableCell>Entity Counts</TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {simulationTicks[sim.simulation_id].slice(-5).map((tick) => (
-                                  <TableRow key={tick.tick_number}>
-                                    <TableCell>{tick.tick_number}</TableCell>
-                                    <TableCell>
-                                      {new Date(tick.simulated_time).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell>{tick.events?.length || 0}</TableCell>
-                                    <TableCell>
+                            <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
+                              {/* Reverse to show newest first */}
+                              {[...simulationTicks[sim.simulation_id]].reverse().slice(0, 20).map((tick) => (
+                                <Paper 
+                                  key={tick.tick_number} 
+                                  variant="outlined" 
+                                  sx={{ 
+                                    p: 1.5, 
+                                    mb: 1, 
+                                    bgcolor: 'background.paper',
+                                    borderLeft: '3px solid',
+                                    borderLeftColor: tick.tick_number === simulationTicks[sim.simulation_id].length 
+                                      ? 'success.main' 
+                                      : 'grey.300'
+                                  }}
+                                >
+                                  {/* Tick Header */}
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                      Tick #{tick.tick_number}
+                                    </Typography>
+                                    <Stack direction="row" spacing={1}>
+                                      <Chip 
+                                        size="small" 
+                                        label={new Date(tick.simulated_time).toLocaleString()} 
+                                        variant="outlined"
+                                        sx={{ fontSize: '0.7rem' }}
+                                      />
+                                      <Chip 
+                                        size="small" 
+                                        label={`${tick.events?.length || 0} events`}
+                                        color={tick.events?.length > 0 ? 'primary' : 'default'}
+                                        sx={{ fontSize: '0.7rem' }}
+                                      />
+                                    </Stack>
+                                  </Box>
+
+                                  {/* Entity Counts */}
+                                  <Box sx={{ mb: 1 }}>
+                                    <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                                      Entity Counts:
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                       {Object.entries(tick.entity_counts)
                                         .filter(([k]) => !k.includes('_'))
-                                        .map(([k, v]) => `${k}: ${v}`)
-                                        .join(', ')}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                                        .map(([entity, count]) => (
+                                          <Chip 
+                                            key={entity} 
+                                            size="small" 
+                                            label={`${entity}: ${count}`}
+                                            variant="outlined"
+                                            sx={{ fontSize: '0.7rem', height: 20 }}
+                                          />
+                                        ))}
+                                    </Box>
+                                  </Box>
+
+                                  {/* KPI Metrics */}
+                                  {tick.metrics && Object.keys(tick.metrics).length > 0 && (
+                                    <Box sx={{ mb: 1 }}>
+                                      <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                                        KPI Calculations:
+                                      </Typography>
+                                      <Table size="small" sx={{ mt: 0.5 }}>
+                                        <TableBody>
+                                          {Object.entries(tick.metrics).map(([kpi, value]) => (
+                                            <TableRow key={kpi} sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                                              <TableCell sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 500 }}>
+                                                {kpi}
+                                              </TableCell>
+                                              <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                                                {typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </Box>
+                                  )}
+
+                                  {/* Events Detail */}
+                                  {tick.events && tick.events.length > 0 && (
+                                    <Box>
+                                      <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                                        Events:
+                                      </Typography>
+                                      <Box sx={{ mt: 0.5, maxHeight: 150, overflow: 'auto' }}>
+                                        {tick.events.slice(0, 10).map((event, idx) => (
+                                          <Box 
+                                            key={idx} 
+                                            sx={{ 
+                                              display: 'flex', 
+                                              alignItems: 'center', 
+                                              gap: 1, 
+                                              py: 0.25,
+                                              borderBottom: idx < tick.events.length - 1 ? '1px solid' : 'none',
+                                              borderColor: 'grey.100'
+                                            }}
+                                          >
+                                            <Chip 
+                                              size="small" 
+                                              label={event.event_type}
+                                              color={
+                                                event.event_type === 'created' ? 'success' :
+                                                event.event_type === 'updated' ? 'info' :
+                                                event.event_type === 'deleted' ? 'error' : 'default'
+                                              }
+                                              sx={{ fontSize: '0.65rem', height: 18 }}
+                                            />
+                                            <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                                              {event.entity_name}:{event.entity_id?.slice(0, 8)}
+                                            </Typography>
+                                            {event.attributes && Object.keys(event.attributes).length > 0 && (
+                                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                {Object.entries(event.attributes)
+                                                  .slice(0, 3)
+                                                  .map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
+                                                  .join(', ')}
+                                              </Typography>
+                                            )}
+                                          </Box>
+                                        ))}
+                                        {tick.events.length > 10 && (
+                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                            ... and {tick.events.length - 10} more events
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  )}
+                                </Paper>
+                              ))}
+                            </Box>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No ticks recorded yet
-                            </Typography>
+                            <Box sx={{ textAlign: 'center', py: 3, color: 'text.disabled' }}>
+                              <RunningIcon sx={{ fontSize: 40, mb: 1 }} />
+                              <Typography variant="body2">No ticks recorded yet</Typography>
+                              <Typography variant="caption">Start the simulation to see live data</Typography>
+                            </Box>
                           )}
                         </Box>
                       </Collapse>

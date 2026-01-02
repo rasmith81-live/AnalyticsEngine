@@ -372,6 +372,9 @@ class KPIInfo(BaseModel):
     required_objects: List[str]
     formula: Optional[str] = None
     category: Optional[str] = None
+    value_chain: Optional[str] = None
+    module: Optional[str] = None
+    description: Optional[str] = None
 
 
 @app.post("/simulations/quick-start", response_model=SimulationResponse)
@@ -456,6 +459,7 @@ async def list_available_kpis():
     
     Returns KPIs with their calculation_type and required_objects so the UI
     can display what entities will be simulated for each KPI.
+    Includes value_chain and module for hierarchical organization.
     """
     try:
         import httpx
@@ -475,12 +479,189 @@ async def list_available_kpis():
                         required_objects=defn.get("required_objects", []),
                         formula=defn.get("formula"),
                         category=defn.get("category"),
+                        value_chain=defn.get("value_chain", defn.get("domain", "General")),
+                        module=defn.get("module", defn.get("category", "Uncategorized")),
+                        description=defn.get("description"),
                     ))
                 return kpis
     except Exception as e:
         logger.warning(f"Failed to fetch KPIs from metadata service: {e}")
     
-    return []
+    # Return sample KPIs for demo purposes when metadata service is unavailable
+    return _get_sample_kpis()
+
+
+def _get_sample_kpis() -> List[KPIInfo]:
+    """Return sample KPIs for demo when metadata service is unavailable."""
+    return [
+        # Sales Value Chain
+        KPIInfo(
+            code="REVENUE",
+            name="Total Revenue",
+            calculation_type="simple",
+            required_objects=["orders", "order_items"],
+            value_chain="Sales",
+            module="Revenue Management",
+            description="Total revenue from all sales"
+        ),
+        KPIInfo(
+            code="AVG_ORDER_VALUE",
+            name="Average Order Value",
+            calculation_type="simple",
+            required_objects=["orders"],
+            value_chain="Sales",
+            module="Revenue Management",
+            description="Average value per order"
+        ),
+        KPIInfo(
+            code="CONVERSION_RATE",
+            name="Conversion Rate",
+            calculation_type="set_based",
+            required_objects=["leads", "opportunities", "deals"],
+            value_chain="Sales",
+            module="Pipeline Analytics",
+            description="Percentage of leads converted to deals"
+        ),
+        KPIInfo(
+            code="WIN_RATE",
+            name="Win Rate",
+            calculation_type="set_based",
+            required_objects=["opportunities", "deals"],
+            value_chain="Sales",
+            module="Pipeline Analytics",
+            description="Percentage of opportunities won"
+        ),
+        KPIInfo(
+            code="SALES_CYCLE_LENGTH",
+            name="Sales Cycle Length",
+            calculation_type="simple",
+            required_objects=["opportunities", "deals"],
+            value_chain="Sales",
+            module="Pipeline Analytics",
+            description="Average days from opportunity to close"
+        ),
+        # Customer Success Value Chain
+        KPIInfo(
+            code="CHURN_RATE",
+            name="Churn Rate",
+            calculation_type="set_based",
+            required_objects=["customers"],
+            value_chain="Customer Success",
+            module="Retention",
+            description="Percentage of customers lost in period"
+        ),
+        KPIInfo(
+            code="RETENTION_RATE",
+            name="Retention Rate",
+            calculation_type="set_based",
+            required_objects=["customers"],
+            value_chain="Customer Success",
+            module="Retention",
+            description="Percentage of customers retained"
+        ),
+        KPIInfo(
+            code="NPS",
+            name="Net Promoter Score",
+            calculation_type="simple",
+            required_objects=["customer_surveys"],
+            value_chain="Customer Success",
+            module="Customer Satisfaction",
+            description="Customer loyalty and satisfaction score"
+        ),
+        KPIInfo(
+            code="CSAT",
+            name="Customer Satisfaction Score",
+            calculation_type="simple",
+            required_objects=["customer_surveys"],
+            value_chain="Customer Success",
+            module="Customer Satisfaction",
+            description="Overall customer satisfaction rating"
+        ),
+        KPIInfo(
+            code="CLV",
+            name="Customer Lifetime Value",
+            calculation_type="set_based",
+            required_objects=["customers", "orders"],
+            value_chain="Customer Success",
+            module="Customer Value",
+            description="Predicted total value of a customer"
+        ),
+        # Marketing Value Chain
+        KPIInfo(
+            code="CAC",
+            name="Customer Acquisition Cost",
+            calculation_type="simple",
+            required_objects=["marketing_spend", "customers"],
+            value_chain="Marketing",
+            module="Acquisition",
+            description="Cost to acquire a new customer"
+        ),
+        KPIInfo(
+            code="MQL_COUNT",
+            name="Marketing Qualified Leads",
+            calculation_type="simple",
+            required_objects=["leads"],
+            value_chain="Marketing",
+            module="Lead Generation",
+            description="Number of marketing qualified leads"
+        ),
+        KPIInfo(
+            code="CAMPAIGN_ROI",
+            name="Campaign ROI",
+            calculation_type="set_based",
+            required_objects=["campaigns", "marketing_spend", "conversions"],
+            value_chain="Marketing",
+            module="Campaign Performance",
+            description="Return on investment for campaigns"
+        ),
+        # Operations Value Chain
+        KPIInfo(
+            code="ORDER_FULFILLMENT_TIME",
+            name="Order Fulfillment Time",
+            calculation_type="simple",
+            required_objects=["orders", "shipments"],
+            value_chain="Operations",
+            module="Fulfillment",
+            description="Average time to fulfill orders"
+        ),
+        KPIInfo(
+            code="INVENTORY_TURNOVER",
+            name="Inventory Turnover",
+            calculation_type="simple",
+            required_objects=["inventory", "sales"],
+            value_chain="Operations",
+            module="Inventory Management",
+            description="How often inventory is sold and replaced"
+        ),
+        # Finance Value Chain
+        KPIInfo(
+            code="GROSS_MARGIN",
+            name="Gross Margin",
+            calculation_type="simple",
+            required_objects=["revenue", "costs"],
+            value_chain="Finance",
+            module="Profitability",
+            description="Revenue minus cost of goods sold"
+        ),
+        KPIInfo(
+            code="MRR",
+            name="Monthly Recurring Revenue",
+            calculation_type="set_based",
+            required_objects=["subscriptions", "customers"],
+            value_chain="Finance",
+            module="Revenue Analytics",
+            description="Predictable monthly revenue"
+        ),
+        KPIInfo(
+            code="ARR",
+            name="Annual Recurring Revenue",
+            calculation_type="set_based",
+            required_objects=["subscriptions", "customers"],
+            value_chain="Finance",
+            module="Revenue Analytics",
+            description="Predictable annual revenue"
+        ),
+    ]
 
 
 @app.get("/kpis/{kpi_code}", response_model=KPIInfo)

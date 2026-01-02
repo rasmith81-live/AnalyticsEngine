@@ -13,6 +13,8 @@ Example Use Case: Churn Rate
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
+import asyncio
+import json
 
 from ..base_handler import (
     BaseCalculationHandler,
@@ -315,19 +317,19 @@ class SetBasedCalculationEngine:
     
     def __init__(
         self,
-        database_service_url: str,
-        metadata_service_url: str,
+        redis_url: str,
         schema_name: str = "analytics_data",
         cache_ttl_seconds: int = 60,
-        query_timeout_seconds: float = 0.8  # Leave 200ms buffer for overhead
+        query_timeout_seconds: float = 0.8,  # Leave 200ms buffer for overhead
+        service_name: str = "calculation_engine"
     ):
-        self.database_service_url = database_service_url
-        self.metadata_service_url = metadata_service_url
+        self.redis_url = redis_url
         self.schema_name = schema_name
         self.sql_generator = SetBasedSQLGenerator(schema_name=schema_name)
-        self._http_client: Optional[httpx.AsyncClient] = None
+        self._database_client: Optional[DatabaseClientPubSub] = None
         self._cache_ttl_seconds = cache_ttl_seconds
         self._query_timeout = query_timeout_seconds
+        self._service_name = service_name
         
         # Performance metrics
         self._metrics = {
@@ -339,27 +341,20 @@ class SetBasedCalculationEngine:
             "sla_violations": 0  # Calculations > 1000ms
         }
     
-    async def _get_http_client(self) -> httpx.AsyncClient:
+    async def _get_database_client(self) -> DatabaseClientPubSub:
         """
-        Get or create HTTP client with connection pooling.
+        Get or create database pub/sub client.
         
-        Uses aggressive timeouts and connection limits for performance.
+        Uses request/reply pattern over Redis for event-driven architecture.
         """
-        if self._http_client is None:
-            self._http_client = httpx.AsyncClient(
-                timeout=httpx.Timeout(
-                    connect=0.5,  # 500ms to connect
-                    read=self._query_timeout,  # Query timeout
-                    write=0.5,  # 500ms to send request
-                    pool=0.5  # 500ms to get connection from pool
-                ),
-                limits=httpx.Limits(
-                    max_keepalive_connections=20,
-                    max_connections=100,
-                    keepalive_expiry=30.0
-                )
+        if self._database_client is None:
+            self._database_client = DatabaseClientPubSub(
+                redis_url=self.redis_url,
+                service_name=self._service_name,
+                default_timeout=self._query_timeout + 0.5  # Add buffer for pub/sub overhead
             )
-        return self._http_client
+            await self._database_client.connect()
+        return self._database_client
     
     def _get_cache_key(
         self,
@@ -468,30 +463,30 @@ class SetBasedCalculationEngine:
         )
         sql_time_ms = (time.perf_counter() - sql_start) * 1000
         
-        # Execute query
+        # Execute query via pub/sub
         query_start = time.perf_counter()
         try:
-            client = await self._get_http_client()
-            response = await client.post(
-                f"{self.database_service_url}/api/v1/query/execute",
-                json={
-                    "query": sql,
-                    "params": {k: v.isoformat() if isinstance(v, datetime) else v 
-                              for k, v in params.items()}
-                }
+            db_client = await self._get_database_client()
+            
+            # Serialize datetime params
+            serialized_params = {
+                k: v.isoformat() if isinstance(v, datetime) else v 
+                for k, v in params.items()
+            }
+            
+            result = await db_client.execute_query(
+                query=sql,
+                parameters=serialized_params,
+                timeout=self._query_timeout
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                rows = result.get("rows", [])
-                value = float(rows[0].get("result", 0)) if rows else 0.0
-            else:
-                raise CalculationError(f"Query failed: {response.status_code}")
+            rows = result.get("rows", [])
+            value = float(rows[0].get("result", 0)) if rows else 0.0
                 
-        except httpx.TimeoutException:
+        except asyncio.TimeoutError:
             raise CalculationError("Query timeout - SLA exceeded")
-        except httpx.RequestError as e:
-            raise CalculationError(f"Database unavailable: {e}")
+        except Exception as e:
+            raise CalculationError(f"Database query failed: {e}")
         
         query_time_ms = (time.perf_counter() - query_start) * 1000
         total_time_ms = (time.perf_counter() - start_time) * 1000
@@ -624,7 +619,7 @@ class SetBasedCalculationEngine:
     
     async def close(self):
         """Clean up resources."""
-        if self._http_client:
-            await self._http_client.aclose()
-            self._http_client = None
+        if self._database_client:
+            await self._database_client.close()
+            self._database_client = None
         self.clear_cache()

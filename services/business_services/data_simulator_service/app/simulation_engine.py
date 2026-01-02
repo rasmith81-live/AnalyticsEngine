@@ -204,12 +204,16 @@ class SimulationEngine:
         self.state.last_tick_at = real_time
         self.state.entity_counts = entity_counts
         
+        # Compute KPI metrics based on entity counts and KPI definitions
+        metrics = self._compute_metrics(entity_counts, all_events)
+        
         tick = SimulationTick(
             tick_number=tick_number,
             simulated_time=simulated_time,
             real_time=real_time,
             events=all_events,
             entity_counts=entity_counts,
+            metrics=metrics,
         )
         
         if tick_number % 10 == 0:
@@ -322,6 +326,97 @@ class SimulationEngine:
         if entity_name in self.generators:
             return self.generators[entity_name].get_active_count()
         return 0
+    
+    def _compute_metrics(
+        self, 
+        entity_counts: Dict[str, int], 
+        events: List[EntityEvent]
+    ) -> Dict[str, float]:
+        """
+        Compute KPI metrics based on entity counts and events.
+        
+        This provides simulated KPI values based on the selected KPIs
+        and the current entity state.
+        """
+        metrics: Dict[str, float] = {}
+        
+        if not hasattr(self, '_kpi_definitions') or not self._kpi_definitions:
+            return metrics
+        
+        for kpi_def in self._kpi_definitions:
+            kpi_code = kpi_def.get("code", "")
+            required_objects = kpi_def.get("required_objects", [])
+            
+            # Compute metric based on KPI type
+            if kpi_code == "WIN_RATE":
+                # Win Rate = deals / opportunities * 100
+                opps = entity_counts.get("opportunities", 0)
+                deals = entity_counts.get("deals", 0)
+                if opps > 0:
+                    metrics[kpi_code] = round((deals / opps) * 100, 2)
+                    
+            elif kpi_code == "CONVERSION_RATE":
+                # Conversion Rate = deals / leads * 100
+                leads = entity_counts.get("leads", 0)
+                deals = entity_counts.get("deals", 0)
+                if leads > 0:
+                    metrics[kpi_code] = round((deals / leads) * 100, 2)
+                    
+            elif kpi_code == "CHURN_RATE":
+                # Churn Rate = churned / total * 100
+                total = entity_counts.get("customers", 0)
+                churned = entity_counts.get("customers_churned", 0)
+                if total > 0:
+                    metrics[kpi_code] = round((churned / total) * 100, 2)
+                    
+            elif kpi_code == "RETENTION_RATE":
+                # Retention Rate = 100 - churn rate
+                total = entity_counts.get("customers", 0)
+                churned = entity_counts.get("customers_churned", 0)
+                if total > 0:
+                    metrics[kpi_code] = round(100 - (churned / total) * 100, 2)
+                    
+            elif kpi_code == "MRR":
+                # Monthly Recurring Revenue = subscriptions * avg_value
+                subs = entity_counts.get("subscriptions", 0)
+                metrics[kpi_code] = round(subs * 99.0, 2)  # Assume $99 avg
+                
+            elif kpi_code == "ARR":
+                # Annual Recurring Revenue = MRR * 12
+                subs = entity_counts.get("subscriptions", 0)
+                metrics[kpi_code] = round(subs * 99.0 * 12, 2)
+                
+            elif kpi_code == "CLV":
+                # Customer Lifetime Value estimate
+                customers = entity_counts.get("customers", 0)
+                orders = entity_counts.get("orders", 0)
+                if customers > 0:
+                    avg_orders = orders / customers
+                    metrics[kpi_code] = round(avg_orders * 150.0, 2)  # $150 avg order
+                    
+            elif kpi_code == "REVENUE":
+                # Total Revenue = orders * avg_value
+                orders = entity_counts.get("orders", 0)
+                metrics[kpi_code] = round(orders * 150.0, 2)
+                
+            elif kpi_code == "AVG_ORDER_VALUE":
+                # Average Order Value (simulated)
+                import random
+                metrics[kpi_code] = round(random.uniform(120, 180), 2)
+                
+            elif kpi_code == "MQL_COUNT":
+                # Marketing Qualified Leads count
+                leads = entity_counts.get("leads", 0)
+                metrics[kpi_code] = float(leads)
+                
+            else:
+                # Generic metric based on first required object count
+                if required_objects:
+                    first_obj = required_objects[0]
+                    count = entity_counts.get(first_obj, 0)
+                    metrics[kpi_code] = float(count)
+        
+        return metrics
     
     def get_entities_at_time(
         self,
