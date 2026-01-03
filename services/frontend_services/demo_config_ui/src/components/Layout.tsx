@@ -57,7 +57,6 @@ const menuItems: MenuItem[] = [
     children: [
       { text: 'Excel Import', icon: <UploadFileIcon />, path: '/excel-import' },
       { text: 'Ontology Studio', icon: <AccountTreeIcon />, path: '/ontology-studio' },
-      { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
     ]
   },
   {
@@ -73,7 +72,6 @@ const menuItems: MenuItem[] = [
     text: 'Client Demo',
     icon: <SlideshowIcon />,
     children: [
-      { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
       { text: 'Simulation Controller', icon: <TuneIcon />, path: '/simulation' },
       { text: 'Analytics Demo', icon: <InsightsIcon />, path: '/analytics-demo' },
       { text: 'Service Proposal', icon: <AssignmentIcon />, path: '/proposal' },
@@ -83,8 +81,10 @@ const menuItems: MenuItem[] = [
     text: 'Deployment',
     icon: <RocketLaunchIcon />,
     children: [
+      { text: 'Data Sources', icon: <StorageIcon />, path: '/data-sources' },
       { text: 'Source to Target Mapping', icon: <TransformIcon />, path: '/mapping' },
       { text: 'Governance', icon: <PolicyIcon />, path: '/governance' },
+      { text: 'ML Model Registry', icon: <ModelTrainingIcon />, path: '/ml-registry' },
       { text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' },
       { text: 'SQL', icon: <TerminalIcon />, path: '/sql' },
     ]
