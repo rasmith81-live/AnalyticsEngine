@@ -13,16 +13,15 @@ import {
   Chip,
   Stack,
   Alert,
-  Divider,
   IconButton,
   Tooltip,
-  ToggleButton,
-  ToggleButtonGroup,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -30,8 +29,6 @@ import {
   TrendingFlat as TrendingFlatIcon,
   Refresh as RefreshIcon,
   Timeline as TimelineIcon,
-  BarChart as BarChartIcon,
-  ShowChart as LineChartIcon,
   People as PeopleIcon,
   Analytics as AnalyticsIcon,
   PlayCircle as ActiveIcon,
@@ -40,21 +37,13 @@ import {
   ZoomOut as ZoomOutIcon,
 } from '@mui/icons-material';
 import {
-  LineChart,
-  Line,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
-  Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 
 const API_BASE = '/api/v1/simulator';
@@ -132,9 +121,9 @@ export default function AnalyticsDemoPage() {
   const [selectedSimulation, setSelectedSimulation] = useState<string>('');
   const [tickHistory, setTickHistory] = useState<SimulationTick[]>([]);
   const [kpiCards, setKpiCards] = useState<KPICardData[]>([]);
-  const [chartType, setChartType] = useState<'line' | 'area' | 'bar'>('area');
   const [refreshInterval] = useState(2000);
   const [zoomLevel, setZoomLevel] = useState(50);
+  const [aggregationPeriod, setAggregationPeriod] = useState<'raw' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter'>('raw');
 
   const fetchSimulations = useCallback(async () => {
     try {
@@ -245,19 +234,69 @@ export default function AnalyticsDemoPage() {
     }
   };
 
-  const zoomedTickHistory = tickHistory.slice(-zoomLevel);
-  
-  const chartData = zoomedTickHistory.map(tick => {
-    const dataPoint: Record<string, any> = {
-      time: new Date(tick.simulated_time).toLocaleTimeString(),
-      tick: tick.tick_number,
-    };
-    Object.entries(tick.metrics).forEach(([code, value]) => {
-      dataPoint[code] = value;
-    });
-    return dataPoint;
-  });
+  const aggregateTickData = useCallback((ticks: SimulationTick[], period: string): SimulationTick[] => {
+    if (period === 'raw' || ticks.length === 0) return ticks;
 
+    const getGroupKey = (date: Date): string => {
+      switch (period) {
+        case 'minute':
+          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+        case 'hour':
+          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
+        case 'day':
+          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+        case 'week':
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          return `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
+        case 'month':
+          return `${date.getFullYear()}-${date.getMonth()}`;
+        case 'quarter':
+          return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3)}`;
+        default:
+          return date.toISOString();
+      }
+    };
+
+    const groups = new Map<string, SimulationTick[]>();
+    ticks.forEach(tick => {
+      const date = new Date(tick.simulated_time);
+      const key = getGroupKey(date);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(tick);
+    });
+
+    return Array.from(groups.entries()).map(([_, groupTicks]) => {
+      const lastTick = groupTicks[groupTicks.length - 1];
+      const aggregatedMetrics: Record<string, number> = {};
+      
+      const metricKeys = Object.keys(groupTicks[0].metrics);
+      metricKeys.forEach(key => {
+        const values = groupTicks.map(t => t.metrics[key]);
+        aggregatedMetrics[key] = values.reduce((a, b) => a + b, 0) / values.length;
+      });
+
+      const aggregatedEntityCounts: Record<string, number> = {};
+      const entityKeys = Object.keys(groupTicks[0].entity_counts);
+      entityKeys.forEach(key => {
+        if (key.includes('_new') || key.includes('_churned')) {
+          aggregatedEntityCounts[key] = groupTicks.reduce((sum, t) => sum + (t.entity_counts[key] || 0), 0);
+        } else {
+          aggregatedEntityCounts[key] = lastTick.entity_counts[key];
+        }
+      });
+
+      return {
+        ...lastTick,
+        metrics: aggregatedMetrics,
+        entity_counts: aggregatedEntityCounts,
+      };
+    });
+  }, []);
+
+  const aggregatedTickHistory = aggregateTickData(tickHistory, aggregationPeriod);
+  const zoomedTickHistory = aggregatedTickHistory.slice(-zoomLevel);
+  
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.max(5, Math.floor(prev / 2)));
   };
@@ -265,14 +304,6 @@ export default function AnalyticsDemoPage() {
   const handleZoomOut = () => {
     setZoomLevel(prev => Math.min(tickHistory.length, prev * 2));
   };
-
-  const entityData = latestTick ? Object.entries(latestTick.entity_counts)
-    .filter(([key]) => !key.includes('_churned') && !key.includes('_new'))
-    .map(([name, value], index) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value,
-      color: KPI_COLORS[index % KPI_COLORS.length],
-    })) : [];
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -333,6 +364,25 @@ export default function AnalyticsDemoPage() {
               <Typography variant="body2">
                 <strong>Scenario:</strong> {selectedSim.scenario}
               </Typography>
+              <Box sx={{ ml: 'auto' }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2" sx={{ mr: 1 }}><strong>Aggregate By:</strong></Typography>
+                  <ToggleButtonGroup
+                    value={aggregationPeriod}
+                    exclusive
+                    onChange={(_, value) => value && setAggregationPeriod(value)}
+                    size="small"
+                  >
+                    <ToggleButton value="raw">Raw</ToggleButton>
+                    <ToggleButton value="minute">Min</ToggleButton>
+                    <ToggleButton value="hour">Hour</ToggleButton>
+                    <ToggleButton value="day">Day</ToggleButton>
+                    <ToggleButton value="week">Week</ToggleButton>
+                    <ToggleButton value="month">Month</ToggleButton>
+                    <ToggleButton value="quarter">Qtr</ToggleButton>
+                  </ToggleButtonGroup>
+                </Stack>
+              </Box>
               <Typography variant="body2">
                 <strong>Simulated Time:</strong> {latestTick ? new Date(latestTick.simulated_time).toLocaleString() : 'N/A'}
               </Typography>
@@ -401,152 +451,58 @@ export default function AnalyticsDemoPage() {
           )}
 
           <Grid container spacing={2}>
-            <Grid item xs={12} lg={8}>
-              <Paper sx={{ p: 2, height: 400 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                  <Typography variant="h6">
-                    <TimelineIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                    KPI Trends Over Time
-                  </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Tooltip title="Zoom In (fewer data points)">
-                      <IconButton size="small" onClick={handleZoomIn} disabled={zoomLevel <= 5}>
-                        <ZoomInIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Zoom Out (more data points)">
-                      <IconButton size="small" onClick={handleZoomOut} disabled={zoomLevel >= tickHistory.length}>
-                        <ZoomOutIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Chip size="small" label={`${Math.min(zoomLevel, tickHistory.length)} pts`} />
-                    <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-                    <ToggleButtonGroup
-                      value={chartType}
-                      exclusive
-                      onChange={(_, value) => value && setChartType(value)}
-                      size="small"
-                    >
-                      <ToggleButton value="line">
-                        <LineChartIcon fontSize="small" />
-                      </ToggleButton>
-                      <ToggleButton value="area">
-                        <BarChartIcon fontSize="small" />
-                      </ToggleButton>
-                      <ToggleButton value="bar">
-                        <BarChartIcon fontSize="small" />
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Stack>
-                </Stack>
-                <ResponsiveContainer width="100%" height="85%">
-                  {chartType === 'line' ? (
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis />
-                      <RechartsTooltip />
-                      <Legend />
-                      {kpiCards.map((kpi) => (
-                        <Line
-                          key={kpi.code}
-                          type="monotone"
-                          dataKey={kpi.code}
-                          name={kpi.name}
-                          stroke={kpi.color}
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      ))}
-                    </LineChart>
-                  ) : chartType === 'area' ? (
-                    <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis />
-                      <RechartsTooltip />
-                      <Legend />
-                      {kpiCards.map((kpi) => (
-                        <Area
-                          key={kpi.code}
-                          type="monotone"
-                          dataKey={kpi.code}
-                          name={kpi.name}
-                          stroke={kpi.color}
-                          fill={kpi.color}
-                          fillOpacity={0.3}
-                        />
-                      ))}
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis />
-                      <RechartsTooltip />
-                      <Legend />
-                      {kpiCards.map((kpi) => (
-                        <Bar
-                          key={kpi.code}
-                          dataKey={kpi.code}
-                          name={kpi.name}
-                          fill={kpi.color}
-                        />
-                      ))}
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12} lg={4}>
-              <Paper sx={{ p: 2, height: 400 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  <PeopleIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Entity Distribution
-                </Typography>
-                {entityData.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height="60%">
-                      <PieChart>
-                        <Pie
-                          data={entityData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}
-                        >
-                          {entityData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <Divider sx={{ my: 1 }} />
-                    <Stack spacing={0.5}>
-                      {entityData.map((entity) => (
-                        <Stack key={entity.name} direction="row" justifyContent="space-between">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: entity.color }} />
-                            <Typography variant="body2">{entity.name}</Typography>
-                          </Stack>
-                          <Typography variant="body2" fontWeight="bold">
-                            {entity.value.toLocaleString()}
-                          </Typography>
-                        </Stack>
-                      ))}
+            {kpiCards.map((kpi) => (
+              <Grid item xs={12} md={6} key={kpi.code}>
+                <Paper sx={{ p: 2, height: 300 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography variant="h6" sx={{ color: kpi.color }}>
+                      <TimelineIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                      {kpi.name}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Tooltip title="Zoom In (fewer data points)">
+                        <IconButton size="small" onClick={handleZoomIn} disabled={zoomLevel <= 5}>
+                          <ZoomInIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Zoom Out (more data points)">
+                        <IconButton size="small" onClick={handleZoomOut} disabled={zoomLevel >= tickHistory.length}>
+                          <ZoomOutIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Chip size="small" label={`${Math.min(zoomLevel, tickHistory.length)} pts`} />
                     </Stack>
-                  </>
-                ) : (
-                  <Typography color="text.secondary">No entity data available</Typography>
-                )}
-              </Paper>
-            </Grid>
+                  </Stack>
+                  <ResponsiveContainer width="100%" height="85%">
+                    <AreaChart data={zoomedTickHistory.map(tick => ({
+                      time: new Date(tick.simulated_time).toLocaleTimeString(),
+                      value: tick.metrics[kpi.code] ?? 0,
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
+                      <YAxis 
+                        domain={['auto', 'auto']}
+                        tickFormatter={(value) => kpi.unit === '$' 
+                          ? `$${value >= 1000 ? (value/1000).toFixed(0) + 'K' : value}` 
+                          : kpi.unit === '%' ? `${value}%` : value}
+                      />
+                      <RechartsTooltip 
+                        formatter={(value: number) => [formatValue(value, kpi.unit), kpi.name]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="value"
+                        name={kpi.name}
+                        stroke={kpi.color}
+                        fill={kpi.color}
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </Paper>
+              </Grid>
+            ))}
 
             <Grid item xs={12}>
               <Paper sx={{ p: 2 }}>
