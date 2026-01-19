@@ -1,9 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Pages - import without @ alias to test
-import DemoPage from './pages/DemoPage';
+// Styles
+import './styles/globals.css';
+
+// Theme
+import { ThemeProvider } from './components/theme/ThemeProvider';
+
+// Layout
+import { AppLayout } from './components/layout/AppLayout';
+
+// New Portal Pages
+import StrategyCenterPage from './pages/StrategyCenterPage';
+import InsightsFeedPage from './pages/InsightsFeedPage';
+import StrategyDocumentsPage from './pages/StrategyDocumentsPage';
+import { ProcessScenarioModelerPage, PredictiveWhatIfPage } from './pages/analytics';
+
+// Legacy Pages (to be migrated)
 import ConfigPage from './pages/ConfigPage';
 import KPIDetailPage from './pages/KPIDetailPage';
 import ObjectModelViewer from './pages/ObjectModelViewer';
@@ -22,23 +35,11 @@ import ConversationServicePage from './pages/ConversationServicePage';
 import AnalyticsDemoPage from './pages/AnalyticsDemoPage';
 import MappingPage from './pages/MappingPage';
 import SQLPage from './pages/SQLPage';
-import Layout from './components/Layout';
+
+// Contexts
 import { CartProvider } from './contexts/CartContext';
 import { TreeActionsProvider } from './contexts/TreeActionsContext';
 import TreeActionsDialogs from './components/TreeActionsDialogs';
-
-// Create theme
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -54,35 +55,74 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <ThemeProvider defaultTheme="dark">
         <CartProvider>
           <TreeActionsProvider>
             <BrowserRouter>
-              <Layout>
+              <AppLayout>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/demo" replace />} />
-                  <Route path="/demo" element={<DemoPage />} />
-                  <Route path="/config" element={<ConfigPage />} />
+                  {/* Strategy Center (Home) */}
+                  <Route path="/" element={<StrategyCenterPage />} />
+                  
+                  {/* Design Studio */}
+                  <Route path="/design" element={<Navigate to="/design/interview" replace />} />
+                  <Route path="/design/interview" element={<ConversationServicePage />} />
+                  <Route path="/design/business-model" element={<OntologyManagerPage />} />
+                  <Route path="/design/kpis" element={<ConfigPage />} />
+                  <Route path="/design/objects" element={<ObjectModelsBrowser />} />
+                  <Route path="/design/gaps" element={<RequiredObjectsView />} />
+                  <Route path="/design/import" element={<ExcelImportPage />} />
+                  
+                  {/* Analytics Hub */}
+                  <Route path="/analytics" element={<Navigate to="/analytics/dashboards" replace />} />
+                  <Route path="/analytics/simulation" element={<SimulationPage />} />
+                  <Route path="/analytics/dashboards" element={<AnalyticsDemoPage />} />
+                  <Route path="/analytics/process-modeler" element={<ProcessScenarioModelerPage />} />
+                  <Route path="/analytics/what-if" element={<PredictiveWhatIfPage />} />
+                  <Route path="/analytics/ml" element={<MLDashboardPage />} />
+                  
+                  {/* Insights Feed */}
+                  <Route path="/insights" element={<InsightsFeedPage />} />
+                  
+                  {/* Strategy Documents */}
+                  <Route path="/documents" element={<StrategyDocumentsPage />} />
+                  
+                  {/* Deployment Center */}
+                  <Route path="/deployment" element={<Navigate to="/deployment/sources" replace />} />
+                  <Route path="/deployment/sources" element={<DataSourceConfig />} />
+                  <Route path="/deployment/mapping" element={<MappingPage />} />
+                  <Route path="/deployment/governance" element={<GovernancePage />} />
+                  <Route path="/deployment/admin" element={<AdminPage />} />
+                  <Route path="/deployment/monitor" element={<SystemMonitorPage />} />
+                  <Route path="/deployment/sql" element={<SQLPage />} />
+                  
+                  {/* Proposal Center */}
+                  <Route path="/proposal" element={<Navigate to="/proposal/estimate" replace />} />
+                  <Route path="/proposal/estimate" element={<ServiceProposal />} />
+                  <Route path="/proposal/contract" element={<ServiceProposal />} />
+                  <Route path="/proposal/project" element={<ServiceProposal />} />
+                  
+                  {/* Legacy Routes (redirects) */}
+                  <Route path="/demo" element={<Navigate to="/" replace />} />
+                  <Route path="/config" element={<Navigate to="/design/kpis" replace />} />
                   <Route path="/kpi/:kpiCode" element={<KPIDetailPage />} />
-                  <Route path="/object-models" element={<ObjectModelsBrowser />} />
+                  <Route path="/object-models" element={<Navigate to="/design/objects" replace />} />
                   <Route path="/object-model/:modelCode" element={<ObjectModelViewer />} />
-                  <Route path="/required-objects-view" element={<RequiredObjectsView />} />
-                  <Route path="/data-sources" element={<DataSourceConfig />} />
-                  <Route path="/proposal" element={<ServiceProposal />} />
-                  <Route path="/admin" element={<AdminPage />} />
-                  <Route path="/governance" element={<GovernancePage />} />
-                  <Route path="/excel-import" element={<ExcelImportPage />} />
-                  <Route path="/ontology-studio" element={<OntologyManagerPage />} />
-                  <Route path="/simulation" element={<SimulationPage />} />
-                  <Route path="/ml-registry" element={<MLDashboardPage />} />
-                  <Route path="/system-monitor" element={<SystemMonitorPage />} />
-                  <Route path="/conversation-service" element={<ConversationServicePage />} />
-                  <Route path="/analytics-demo" element={<AnalyticsDemoPage />} />
-                  <Route path="/mapping" element={<MappingPage />} />
-                  <Route path="/sql" element={<SQLPage />} />
+                  <Route path="/required-objects-view" element={<Navigate to="/design/gaps" replace />} />
+                  <Route path="/data-sources" element={<Navigate to="/deployment/sources" replace />} />
+                  <Route path="/governance" element={<Navigate to="/deployment/governance" replace />} />
+                  <Route path="/excel-import" element={<Navigate to="/design/import" replace />} />
+                  <Route path="/ontology-studio" element={<Navigate to="/design/business-model" replace />} />
+                  <Route path="/simulation" element={<Navigate to="/analytics/simulation" replace />} />
+                  <Route path="/ml-registry" element={<Navigate to="/analytics/ml" replace />} />
+                  <Route path="/system-monitor" element={<Navigate to="/deployment/monitor" replace />} />
+                  <Route path="/conversation-service" element={<Navigate to="/design/interview" replace />} />
+                  <Route path="/analytics-demo" element={<Navigate to="/analytics/dashboards" replace />} />
+                  <Route path="/mapping" element={<Navigate to="/deployment/mapping" replace />} />
+                  <Route path="/sql" element={<Navigate to="/deployment/sql" replace />} />
+                  <Route path="/admin" element={<Navigate to="/deployment/admin" replace />} />
                 </Routes>
-              </Layout>
+              </AppLayout>
             </BrowserRouter>
             <TreeActionsDialogs />
           </TreeActionsProvider>

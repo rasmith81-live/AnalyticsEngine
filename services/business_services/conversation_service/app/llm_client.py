@@ -1,25 +1,59 @@
+"""
+LLM Client for Conversation Service
 
-import openai
-from typing import List, Dict, Any, Optional
+This module provides LLM integration using Anthropic Claude as the primary provider.
+The multi-agent architecture uses Claude Opus 4.5 for coordination and Claude Sonnet 4
+for specialized sub-agents.
+
+Legacy OpenAI support is maintained for backward compatibility but Claude is preferred.
+"""
+
 import json
+import logging
+from typing import List, Dict, Any, Optional
+
+import anthropic
 from .config import settings
 from .models import BusinessIntent, CompanyValueChainModel, ValueChainNode, ValueChainLink
 
+logger = logging.getLogger(__name__)
+
+
 class LLMClient:
+    """
+    LLM Client that uses Anthropic Claude as the primary provider.
+    
+    This client provides:
+    - Intent extraction using Claude
+    - Response generation using Claude
+    - Value chain generation using Claude
+    
+    The multi-agent system (agents/) provides more sophisticated capabilities
+    and should be preferred for complex design tasks.
+    """
+    
     def __init__(self):
         self.provider = settings.LLM_PROVIDER
-        self.model = settings.LLM_MODEL
         
-        if self.provider == "azure":
-            self.client = openai.AzureOpenAI(
-                api_key=settings.AZURE_OPENAI_API_KEY,
-                api_version="2023-12-01-preview",
-                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT
-            )
+        # Use Anthropic Claude as primary
+        if settings.ANTHROPIC_API_KEY:
+            self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            self.model = settings.ANTHROPIC_SUBAGENT_MODEL or "claude-sonnet-4-20250514"
+            self.provider = "anthropic"
+            logger.info(f"LLMClient initialized with Anthropic Claude: {self.model}")
         else:
-            self.client = openai.OpenAI(
-                api_key=settings.OPENAI_API_KEY
-            )
+            # Fallback to OpenAI if no Anthropic key (legacy support)
+            import openai
+            self.model = settings.LLM_MODEL
+            if self.provider == "azure":
+                self.client = openai.AzureOpenAI(
+                    api_key=settings.AZURE_OPENAI_API_KEY,
+                    api_version="2023-12-01-preview",
+                    azure_endpoint=settings.AZURE_OPENAI_ENDPOINT
+                )
+            else:
+                self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            logger.info(f"LLMClient initialized with OpenAI: {self.model}")
 
     async def generate_value_chain(self, context: List[Dict[str, str]]) -> CompanyValueChainModel:
         """
@@ -58,22 +92,40 @@ class LLMClient:
         Note: The 'links' in the JSON should reference node names for convenience, the code will map them to IDs.
         """
         
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-        
-        # Add full context for model generation
-        messages.extend(context)
+        # Build conversation content
+        conversation_text = "\n".join([
+            f"{msg.get('role', 'user')}: {msg.get('content', '')}" 
+            for msg in context
+        ])
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={ "type": "json_object" },
-                temperature=0.2
-            )
+            if self.provider == "anthropic":
+                # Use Anthropic Claude API
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": f"Conversation history:\n{conversation_text}\n\nPlease analyze and return JSON."}]
+                )
+                content = response.content[0].text
+            else:
+                # Legacy OpenAI API
+                messages = [{"role": "system", "content": system_prompt}]
+                messages.extend(context)
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.2
+                )
+                content = response.choices[0].message.content
             
-            content = response.choices[0].message.content
+            # Parse JSON from response (handle markdown code blocks)
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            
             data = json.loads(content)
             
             # Construct the model
@@ -147,24 +199,42 @@ class LLMClient:
         IMPORTANT: Always populate target_entities and requested_metrics arrays based on what is mentioned or implied in the conversation.
         """
         
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-        
-        # Add recent context (last 5 messages)
-        # Assuming context is a list of dicts with 'role' and 'content' or mapped from Utterance
-        messages.extend(context[-5:])
-        messages.append({"role": "user", "content": text})
+        # Build conversation content
+        recent_context = context[-5:]
+        conversation_text = "\n".join([
+            f"{msg.get('role', 'user')}: {msg.get('content', '')}" 
+            for msg in recent_context
+        ])
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={ "type": "json_object" },
-                temperature=0.3
-            )
+            if self.provider == "anthropic":
+                # Use Anthropic Claude API
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=2048,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": f"Context:\n{conversation_text}\n\nNew message: {text}\n\nPlease extract intents and return JSON."}]
+                )
+                content = response.content[0].text
+            else:
+                # Legacy OpenAI API
+                messages = [{"role": "system", "content": system_prompt}]
+                messages.extend(recent_context)
+                messages.append({"role": "user", "content": text})
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.3
+                )
+                content = response.choices[0].message.content
             
-            content = response.choices[0].message.content
+            # Parse JSON from response (handle markdown code blocks)
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+            
             data = json.loads(content)
             
             intents = []
@@ -187,27 +257,64 @@ class LLMClient:
         Be concise and professional.
         """
         
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-        messages.extend(context[-5:])
+        # Build conversation content
+        recent_context = context[-5:]
+        conversation_text = "\n".join([
+            f"{msg.get('role', 'user')}: {msg.get('content', '')}" 
+            for msg in recent_context
+        ])
         
         # Add intent context
+        intent_summary = ""
         if intents:
-            intent_summary = ", ".join([f"{i.name} ({i.confidence})" for i in intents])
-            messages.append({"role": "system", "content": f"Identified Intents: {intent_summary}"})
-            
-        messages.append({"role": "user", "content": text})
+            intent_summary = f"\n\nIdentified Intents: " + ", ".join([f"{i.name} ({i.confidence})" for i in intents])
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.7
-            )
-            return response.choices[0].message.content
+            if self.provider == "anthropic":
+                # Use Anthropic Claude API
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=2048,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": f"Context:\n{conversation_text}{intent_summary}\n\nUser message: {text}"}]
+                )
+                return response.content[0].text
+            else:
+                # Legacy OpenAI API
+                messages = [{"role": "system", "content": system_prompt}]
+                messages.extend(recent_context)
+                if intents:
+                    messages.append({"role": "system", "content": f"Identified Intents: {', '.join([f'{i.name} ({i.confidence})' for i in intents])}"})
+                messages.append({"role": "user", "content": text})
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.7
+                )
+                return response.choices[0].message.content
         except Exception as e:
-            print(f"LLM Error during response generation: {e}")
+            logger.error(f"LLM Error during response generation: {e}")
             return "I apologize, but I'm having trouble processing your request right now."
 
-llm_client = LLMClient()
+
+# Lazy initialization to avoid import-time API calls
+_llm_client: Optional[LLMClient] = None
+
+
+def get_llm_client() -> LLMClient:
+    """Get or create the LLM client instance."""
+    global _llm_client
+    if _llm_client is None:
+        _llm_client = LLMClient()
+    return _llm_client
+
+
+class _LLMClientProxy:
+    """Proxy class for lazy initialization of LLMClient."""
+    
+    def __getattr__(self, name):
+        return getattr(get_llm_client(), name)
+
+
+# For backward compatibility - lazy initialization
+llm_client = _LLMClientProxy()

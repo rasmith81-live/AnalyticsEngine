@@ -1,58 +1,29 @@
 import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Chip,
-  Stack,
-  Alert,
-  Slider,
-  Divider,
-  IconButton,
-  Tooltip,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  CircularProgress,
-  Collapse,
-  Switch,
-  FormControlLabel,
-} from '@mui/material';
+  Play,
+  Square,
+  Pause,
+  PlayCircle,
+  BarChart3,
+  CheckCircle,
+  RefreshCw,
+  Cloud,
+  Zap,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Database,
+  Clock,
+  Activity,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 import KPITreeSelector, { KPIInfo } from '../components/KPITreeSelector';
-import {
-  PlayArrow as RunIcon,
-  Stop as StopIcon,
-  Pause as PauseIcon,
-  PlayCircle as ResumeIcon,
-  Timeline as GraphIcon,
-  CheckCircle as SuccessIcon,
-  Autorenew as RunningIcon,
-  CloudQueue as CloudIcon,
-  Speed as SpeedIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandIcon,
-  ExpandLess as CollapseIcon,
-  Refresh as RefreshIcon,
-  Storage as EntityIcon,
-} from '@mui/icons-material';
 
 const API_BASE = '/api/v1/simulator';
 
-// Scenario options
 const SCENARIOS = [
   { id: 'healthy', name: 'Healthy Business', description: 'Low churn (1%), steady growth (7.5%)' },
   { id: 'struggling', name: 'Struggling Business', description: 'High churn (4%), low growth (1.5%)' },
@@ -61,8 +32,6 @@ const SCENARIOS = [
   { id: 'stable', name: 'Stable', description: 'Minimal change, steady state' },
   { id: 'volatile', name: 'Volatile', description: 'High variance, unpredictable patterns' },
 ];
-
-// KPIInfo is now imported from KPITreeSelector
 
 interface Simulation {
   simulation_id: string;
@@ -97,50 +66,56 @@ interface SimulationTick {
   metrics: Record<string, number>;
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { color: string; icon: React.ReactNode }> = {
+    running: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: <RefreshCw className="w-3 h-3 animate-spin" /> },
+    completed: { color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CheckCircle className="w-3 h-3" /> },
+    paused: { color: 'bg-amber-500/20 text-amber-400 border-amber-500/30', icon: <Pause className="w-3 h-3" /> },
+    stopped: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: <Square className="w-3 h-3" /> },
+    pending: { color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', icon: <Clock className="w-3 h-3" /> },
+  };
+  
+  const { color, icon } = config[status] || config.pending;
+  
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border', color)}>
+      {icon}
+      {status}
+    </span>
+  );
+}
+
 export default function SimulationPage() {
-  // KPI Selection
   const [availableKPIs, setAvailableKPIs] = useState<KPIInfo[]>([]);
   const [selectedKPIs, setSelectedKPIs] = useState<KPIInfo[]>([]);
   const [loadingKPIs, setLoadingKPIs] = useState(false);
   
-  // Simulation Configuration
   const [simulationName, setSimulationName] = useState('');
   const [selectedScenario, setSelectedScenario] = useState('healthy');
   const [realIntervalSeconds, setRealIntervalSeconds] = useState(10);
   const [simulatedIntervalHours, setSimulatedIntervalHours] = useState(1);
   const [autoStart, setAutoStart] = useState(true);
   
-  // Active Simulations
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   const [expandedSimulation, setExpandedSimulation] = useState<string | null>(null);
   const [simulationTicks, setSimulationTicks] = useState<Record<string, SimulationTick[]>>({});
   
-  // UI State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available KPIs on mount
   useEffect(() => {
     fetchAvailableKPIs();
     fetchSimulations();
-    
-    // Poll for simulation updates every 3 seconds
     const interval = setInterval(fetchSimulations, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh ticks when a simulation is expanded
   useEffect(() => {
     if (!expandedSimulation) return;
-    
-    // Fetch immediately
     fetchSimulationTicks(expandedSimulation);
-    
-    // Then poll every 2 seconds for real-time updates
     const tickInterval = setInterval(() => {
       fetchSimulationTicks(expandedSimulation);
     }, 2000);
-    
     return () => clearInterval(tickInterval);
   }, [expandedSimulation]);
 
@@ -191,10 +166,8 @@ export default function SimulationPage() {
       setError('Please select at least one KPI');
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       const response = await fetch(`${API_BASE}/simulations`, {
         method: 'POST',
@@ -208,7 +181,6 @@ export default function SimulationPage() {
           auto_start: autoStart,
         }),
       });
-
       if (response.ok) {
         await fetchSimulations();
         setSelectedKPIs([]);
@@ -278,27 +250,6 @@ export default function SimulationPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'running': return <RunningIcon className="spin" color="primary" />;
-      case 'completed': return <SuccessIcon color="success" />;
-      case 'paused': return <PauseIcon color="warning" />;
-      case 'stopped': return <StopIcon color="error" />;
-      default: return <CloudIcon color="disabled" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running': return 'primary';
-      case 'completed': return 'success';
-      case 'paused': return 'warning';
-      case 'stopped': return 'error';
-      default: return 'default';
-    }
-  };
-
-  // Calculate acceleration display
   const accelerationFactor = (simulatedIntervalHours * 3600) / realIntervalSeconds;
   const getAccelerationText = () => {
     if (accelerationFactor >= 24) {
@@ -307,432 +258,428 @@ export default function SimulationPage() {
     return `${accelerationFactor.toFixed(1)} hours/minute`;
   };
 
-  // Get unique entities from selected KPIs
   const selectedEntities = [...new Set(selectedKPIs.flatMap(k => k.required_objects))];
+  const currentScenario = SCENARIOS.find(s => s.id === selectedScenario);
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          KPI Data Simulator
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Generate realistic demo data for selected KPIs with configurable time acceleration.
-        </Typography>
-      </Box>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-3xl font-bold theme-text-title tracking-wide">KPI Data Simulator</h1>
+        <p className="theme-text-muted mt-1">Generate realistic demo data for selected KPIs with configurable time acceleration.</p>
+      </div>
 
+      {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300">×</button>
+        </div>
       )}
 
-      <Grid container spacing={3}>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Configuration Panel */}
-        <Grid item xs={12} md={5}>
+        <div className="lg:col-span-2">
           <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                New Simulation
-              </Typography>
-              
-              <Stack spacing={3} sx={{ mt: 2 }}>
-                {/* KPI Selection - Hierarchical Tree View */}
+            <CardHeader>
+              <CardTitle>New Simulation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* KPI Selection */}
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Select KPIs</label>
                 <KPITreeSelector
                   kpis={availableKPIs}
                   selectedKPIs={selectedKPIs}
                   onSelectionChange={setSelectedKPIs}
                   loading={loadingKPIs}
                 />
+              </div>
 
-                {/* Selected Entities Display */}
-                {selectedEntities.length > 0 && (
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <EntityIcon fontSize="small" /> Required Entities ({selectedEntities.length})
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {selectedEntities.map(entity => (
-                        <Chip key={entity} label={entity} size="small" variant="outlined" />
-                      ))}
-                    </Box>
-                  </Paper>
-                )}
+              {/* Selected Entities */}
+              {selectedEntities.length > 0 && (
+                <div className="p-3 rounded-xl theme-card-bg border theme-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Database className="w-4 h-4 theme-info-icon" />
+                    <span className="text-sm font-medium theme-text-title">Required Entities ({selectedEntities.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedEntities.map(entity => (
+                      <span key={entity} className="px-2 py-0.5 rounded-full text-xs theme-card-bg border theme-border theme-text">
+                        {entity}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                <TextField
-                  label="Simulation Name"
+              {/* Simulation Name */}
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Simulation Name</label>
+                <input
+                  type="text"
                   value={simulationName}
                   onChange={(e) => setSimulationName(e.target.value)}
                   placeholder="Auto-generated if empty"
-                  fullWidth
+                  className="w-full px-4 py-3 rounded-xl theme-card-bg border theme-border
+                    theme-text placeholder:theme-text-muted
+                    focus:outline-none focus:ring-2 focus:ring-alpha-500"
                 />
+              </div>
 
-                {/* Scenario Selection */}
-                <FormControl fullWidth>
-                  <InputLabel>Scenario</InputLabel>
-                  <Select
-                    value={selectedScenario}
-                    label="Scenario"
-                    onChange={(e) => setSelectedScenario(e.target.value)}
-                  >
-                    {SCENARIOS.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        <Box>
-                          <Typography variant="body2">{s.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{s.description}</Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Divider />
-
-                {/* Time Acceleration Settings */}
-                <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <SpeedIcon fontSize="small" /> Time Acceleration
-                </Typography>
-
-                <Box>
-                  <Typography variant="body2" gutterBottom>
-                    Real-time Interval: {realIntervalSeconds} seconds
-                  </Typography>
-                  <Slider
-                    value={realIntervalSeconds}
-                    onChange={(_, value) => setRealIntervalSeconds(value as number)}
-                    min={1}
-                    max={60}
-                    step={1}
-                    marks={[
-                      { value: 1, label: '1s' },
-                      { value: 10, label: '10s' },
-                      { value: 30, label: '30s' },
-                      { value: 60, label: '60s' },
-                    ]}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" gutterBottom>
-                    Simulated Time per Interval: {simulatedIntervalHours} hour(s)
-                  </Typography>
-                  <Slider
-                    value={simulatedIntervalHours}
-                    onChange={(_, value) => setSimulatedIntervalHours(value as number)}
-                    min={0.5}
-                    max={24}
-                    step={0.5}
-                    marks={[
-                      { value: 1, label: '1h' },
-                      { value: 6, label: '6h' },
-                      { value: 12, label: '12h' },
-                      { value: 24, label: '24h' },
-                    ]}
-                  />
-                </Box>
-
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'primary.50' }}>
-                  <Typography variant="body2" color="primary.main">
-                    <strong>Acceleration:</strong> {getAccelerationText()} of real time
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Every {realIntervalSeconds}s = {simulatedIntervalHours}h simulated
-                  </Typography>
-                </Paper>
-
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={autoStart}
-                      onChange={(e) => setAutoStart(e.target.checked)}
-                    />
-                  }
-                  label="Auto-start simulation"
-                />
-
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <RunIcon />}
-                  onClick={handleCreateSimulation}
-                  disabled={selectedKPIs.length === 0 || loading}
-                  fullWidth
+              {/* Scenario Selection */}
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Scenario</label>
+                <select
+                  value={selectedScenario}
+                  onChange={(e) => setSelectedScenario(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl theme-card-bg border theme-border
+                    theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500"
                 >
-                  {loading ? 'Creating...' : 'Create Simulation'}
-                </Button>
-              </Stack>
+                  {SCENARIOS.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                {currentScenario && (
+                  <p className="text-xs theme-text-muted mt-1">{currentScenario.description}</p>
+                )}
+              </div>
+
+              {/* Time Acceleration */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 theme-info-icon" />
+                  <span className="text-sm font-medium theme-text-title">Time Acceleration</span>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="theme-text-muted">Real-time Interval: {realIntervalSeconds} seconds</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="60"
+                    value={realIntervalSeconds}
+                    onChange={(e) => setRealIntervalSeconds(Number(e.target.value))}
+                    className="w-full h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 appearance-none cursor-pointer
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
+                      [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-alpha-500"
+                  />
+                  <div className="flex justify-between text-xs theme-text-muted mt-1">
+                    <span>1s</span>
+                    <span>10s</span>
+                    <span>30s</span>
+                    <span>60s</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="theme-text-muted">Simulated Time per Interval: {simulatedIntervalHours} hour(s)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="24"
+                    value={simulatedIntervalHours}
+                    onChange={(e) => setSimulatedIntervalHours(Number(e.target.value))}
+                    className="w-full h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 appearance-none cursor-pointer
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
+                      [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-alpha-500"
+                  />
+                  <div className="flex justify-between text-xs theme-text-muted mt-1">
+                    <span>1h</span>
+                    <span>6h</span>
+                    <span>12h</span>
+                    <span>24h</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-alpha-500/10 border border-alpha-500/30">
+                  <p className="text-sm theme-text-vibrant font-medium">
+                    Acceleration: {getAccelerationText()} of real time
+                  </p>
+                  <p className="text-xs theme-text-muted mt-1">
+                    Every {realIntervalSeconds}s = {simulatedIntervalHours}h simulated
+                  </p>
+                </div>
+              </div>
+
+              {/* Auto-start Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={autoStart}
+                    onChange={(e) => setAutoStart(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 rounded-full bg-alpha-faded-300 dark:bg-alpha-faded-700 
+                    peer-checked:bg-alpha-500 transition-colors"></div>
+                  <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white 
+                    peer-checked:translate-x-4 transition-transform"></div>
+                </div>
+                <span className="text-sm theme-text">Auto-start simulation</span>
+              </label>
+
+              {/* Create Button */}
+              <Button
+                onClick={handleCreateSimulation}
+                disabled={selectedKPIs.length === 0 || loading}
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Create Simulation
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
         {/* Active Simulations */}
-        <Grid item xs={12} md={7}>
-          <Card sx={{ height: '100%' }}>
+        <div className="lg:col-span-3">
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 theme-info-icon" />
+                  Active Simulations
+                </CardTitle>
+                <button
+                  onClick={fetchSimulations}
+                  className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 theme-text-muted" />
+                </button>
+              </div>
+            </CardHeader>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <GraphIcon /> Active Simulations
-                </Typography>
-                <IconButton onClick={fetchSimulations} size="small">
-                  <RefreshIcon />
-                </IconButton>
-              </Box>
-              
               {simulations.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 5, color: 'text.disabled' }}>
-                  <CloudIcon sx={{ fontSize: 60, mb: 1 }} />
-                  <Typography>No active simulations</Typography>
-                  <Typography variant="caption">Create a simulation to get started</Typography>
-                </Box>
+                <div className="text-center py-12">
+                  <Cloud className="w-16 h-16 mx-auto theme-text-muted mb-4" />
+                  <p className="theme-text-muted">No active simulations</p>
+                  <p className="text-sm theme-text-muted">Create a simulation to get started</p>
+                </div>
               ) : (
-                <List disablePadding>
+                <div className="space-y-3">
                   {simulations.map((sim) => (
-                    <Paper key={sim.simulation_id} variant="outlined" sx={{ mb: 2 }}>
-                      <ListItem
-                        secondaryAction={
-                          <Stack direction="row" spacing={1}>
+                    <div key={sim.simulation_id} className="rounded-xl theme-card-bg border theme-border overflow-hidden">
+                      {/* Simulation Header */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold theme-text-title truncate">{sim.name}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              <StatusBadge status={sim.status} />
+                              <span className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
+                                {sim.scenario}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted flex items-center gap-1">
+                                <Zap className="w-3 h-3" />
+                                {sim.time_acceleration.acceleration_factor.toFixed(0)}x
+                              </span>
+                            </div>
+                            <p className="text-xs theme-text-muted mt-2">
+                              Ticks: {sim.ticks_completed} • 
+                              Entities: {Object.entries(sim.entity_counts).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                            </p>
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-1 ml-4">
                             {sim.status === 'pending' && (
-                              <Tooltip title="Start">
-                                <IconButton onClick={() => handleStartSimulation(sim.simulation_id)} color="primary">
-                                  <RunIcon />
-                                </IconButton>
-                              </Tooltip>
+                              <button
+                                onClick={() => handleStartSimulation(sim.simulation_id)}
+                                className="p-2 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors"
+                                title="Start"
+                              >
+                                <Play className="w-4 h-4" />
+                              </button>
                             )}
                             {sim.status === 'running' && (
-                              <Tooltip title="Pause">
-                                <IconButton onClick={() => handlePauseSimulation(sim.simulation_id)} color="warning">
-                                  <PauseIcon />
-                                </IconButton>
-                              </Tooltip>
+                              <button
+                                onClick={() => handlePauseSimulation(sim.simulation_id)}
+                                className="p-2 rounded-lg hover:bg-amber-500/20 text-amber-400 transition-colors"
+                                title="Pause"
+                              >
+                                <Pause className="w-4 h-4" />
+                              </button>
                             )}
                             {sim.status === 'paused' && (
-                              <Tooltip title="Resume">
-                                <IconButton onClick={() => handleResumeSimulation(sim.simulation_id)} color="primary">
-                                  <ResumeIcon />
-                                </IconButton>
-                              </Tooltip>
+                              <button
+                                onClick={() => handleResumeSimulation(sim.simulation_id)}
+                                className="p-2 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors"
+                                title="Resume"
+                              >
+                                <PlayCircle className="w-4 h-4" />
+                              </button>
                             )}
                             {(sim.status === 'running' || sim.status === 'paused') && (
-                              <Tooltip title="Stop">
-                                <IconButton onClick={() => handleStopSimulation(sim.simulation_id)} color="error">
-                                  <StopIcon />
-                                </IconButton>
-                              </Tooltip>
+                              <button
+                                onClick={() => handleStopSimulation(sim.simulation_id)}
+                                className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
+                                title="Stop"
+                              >
+                                <Square className="w-4 h-4" />
+                              </button>
                             )}
-                            <Tooltip title="Delete">
-                              <IconButton onClick={() => handleDeleteSimulation(sim.simulation_id)} color="error">
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <IconButton onClick={() => toggleExpanded(sim.simulation_id)}>
-                              {expandedSimulation === sim.simulation_id ? <CollapseIcon /> : <ExpandIcon />}
-                            </IconButton>
-                          </Stack>
-                        }
-                      >
-                        <ListItemIcon>
-                          {getStatusIcon(sim.status)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={sim.name}
-                          secondary={
-                            <Box sx={{ mt: 0.5 }}>
-                              <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
-                                <Chip
-                                  size="small"
-                                  label={sim.status}
-                                  color={getStatusColor(sim.status) as any}
-                                />
-                                <Chip
-                                  size="small"
-                                  label={sim.scenario}
-                                  variant="outlined"
-                                />
-                                <Chip
-                                  size="small"
-                                  icon={<SpeedIcon />}
-                                  label={`${sim.time_acceleration.acceleration_factor.toFixed(0)}x`}
-                                  variant="outlined"
-                                />
-                              </Stack>
-                              <Typography variant="caption" color="text.secondary">
-                                Ticks: {sim.ticks_completed} • 
-                                Entities: {Object.entries(sim.entity_counts).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      
-                      <Collapse in={expandedSimulation === sim.simulation_id}>
-                        <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
-                          {/* Live Tick Stream Header */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <RunningIcon sx={{ 
-                                animation: sim.status === 'running' ? 'spin 1s linear infinite' : 'none',
-                                '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } }
-                              }} />
-                              Live Tick Stream
-                            </Typography>
-                            <Chip 
-                              size="small" 
-                              label={`${simulationTicks[sim.simulation_id]?.length || 0} ticks buffered`}
-                              variant="outlined"
-                            />
-                          </Box>
+                            <button
+                              onClick={() => handleDeleteSimulation(sim.simulation_id)}
+                              className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => toggleExpanded(sim.simulation_id)}
+                              className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors"
+                            >
+                              {expandedSimulation === sim.simulation_id ? (
+                                <ChevronUp className="w-4 h-4 theme-text-muted" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 theme-text-muted" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Tick Stream */}
+                      {expandedSimulation === sim.simulation_id && (
+                        <div className="border-t theme-border p-4 bg-[var(--background)]">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <RefreshCw className={cn(
+                                "w-4 h-4 theme-info-icon",
+                                sim.status === 'running' && "animate-spin"
+                              )} />
+                              <span className="text-sm font-medium theme-text-title">Live Tick Stream</span>
+                            </div>
+                            <span className="text-xs theme-text-muted">
+                              {simulationTicks[sim.simulation_id]?.length || 0} ticks buffered
+                            </span>
+                          </div>
 
                           {simulationTicks[sim.simulation_id]?.length > 0 ? (
-                            <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
-                              {/* Reverse to show newest first */}
+                            <div className="max-h-96 overflow-y-auto space-y-2">
                               {[...simulationTicks[sim.simulation_id]].reverse().slice(0, 20).map((tick) => (
-                                <Paper 
-                                  key={tick.tick_number} 
-                                  variant="outlined" 
-                                  sx={{ 
-                                    p: 1.5, 
-                                    mb: 1, 
-                                    bgcolor: 'background.paper',
-                                    borderLeft: '3px solid',
-                                    borderLeftColor: tick.tick_number === simulationTicks[sim.simulation_id].length 
-                                      ? 'success.main' 
-                                      : 'grey.300'
-                                  }}
+                                <div
+                                  key={tick.tick_number}
+                                  className={cn(
+                                    "p-3 rounded-lg theme-card-bg border-l-2",
+                                    tick.tick_number === simulationTicks[sim.simulation_id].length
+                                      ? "border-l-green-500"
+                                      : "border-l-gray-600"
+                                  )}
                                 >
-                                  {/* Tick Header */}
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                    <Typography variant="subtitle2" fontWeight="bold">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-semibold theme-text-title">
                                       Tick #{tick.tick_number}
-                                    </Typography>
-                                    <Stack direction="row" spacing={1}>
-                                      <Chip 
-                                        size="small" 
-                                        label={new Date(tick.simulated_time).toLocaleString()} 
-                                        variant="outlined"
-                                        sx={{ fontSize: '0.7rem' }}
-                                      />
-                                      <Chip 
-                                        size="small" 
-                                        label={`${tick.events?.length || 0} events`}
-                                        color={tick.events?.length > 0 ? 'primary' : 'default'}
-                                        sx={{ fontSize: '0.7rem' }}
-                                      />
-                                    </Stack>
-                                  </Box>
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs theme-text-muted">
+                                        {new Date(tick.simulated_time).toLocaleString()}
+                                      </span>
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded-full text-xs",
+                                        tick.events?.length > 0
+                                          ? "bg-alpha-500/20 text-alpha-400"
+                                          : "bg-gray-500/20 text-gray-400"
+                                      )}>
+                                        {tick.events?.length || 0} events
+                                      </span>
+                                    </div>
+                                  </div>
 
                                   {/* Entity Counts */}
-                                  <Box sx={{ mb: 1 }}>
-                                    <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                                      Entity Counts:
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                  <div className="mb-2">
+                                    <span className="text-xs font-medium theme-text-muted">Entity Counts:</span>
+                                    <div className="flex flex-wrap gap-1 mt-1">
                                       {Object.entries(tick.entity_counts)
                                         .filter(([k]) => !k.includes('_'))
                                         .map(([entity, count]) => (
-                                          <Chip 
-                                            key={entity} 
-                                            size="small" 
-                                            label={`${entity}: ${count}`}
-                                            variant="outlined"
-                                            sx={{ fontSize: '0.7rem', height: 20 }}
-                                          />
+                                          <span key={entity} className="px-2 py-0.5 rounded text-xs theme-card-bg border theme-border">
+                                            {entity}: {count}
+                                          </span>
                                         ))}
-                                    </Box>
-                                  </Box>
+                                    </div>
+                                  </div>
 
                                   {/* KPI Metrics */}
                                   {tick.metrics && Object.keys(tick.metrics).length > 0 && (
-                                    <Box sx={{ mb: 1 }}>
-                                      <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                                        KPI Calculations:
-                                      </Typography>
-                                      <Table size="small" sx={{ mt: 0.5 }}>
-                                        <TableBody>
-                                          {Object.entries(tick.metrics).map(([kpi, value]) => (
-                                            <TableRow key={kpi} sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                                              <TableCell sx={{ py: 0.5, fontSize: '0.75rem', fontWeight: 500 }}>
-                                                {kpi}
-                                              </TableCell>
-                                              <TableCell align="right" sx={{ py: 0.5, fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                                                {typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value}
-                                              </TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    </Box>
+                                    <div className="mb-2">
+                                      <span className="text-xs font-medium theme-text-muted">KPI Calculations:</span>
+                                      <div className="grid grid-cols-2 gap-2 mt-1">
+                                        {Object.entries(tick.metrics).map(([kpi, value]) => (
+                                          <div key={kpi} className="flex justify-between text-xs">
+                                            <span className="theme-text font-medium">{kpi}</span>
+                                            <span className="font-mono theme-text-muted">
+                                              {typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
                                   )}
 
-                                  {/* Events Detail */}
+                                  {/* Events */}
                                   {tick.events && tick.events.length > 0 && (
-                                    <Box>
-                                      <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                                        Events:
-                                      </Typography>
-                                      <Box sx={{ mt: 0.5, maxHeight: 150, overflow: 'auto' }}>
+                                    <div>
+                                      <span className="text-xs font-medium theme-text-muted">Events:</span>
+                                      <div className="mt-1 space-y-1 max-h-32 overflow-y-auto">
                                         {tick.events.slice(0, 10).map((event, idx) => (
-                                          <Box 
-                                            key={idx} 
-                                            sx={{ 
-                                              display: 'flex', 
-                                              alignItems: 'center', 
-                                              gap: 1, 
-                                              py: 0.25,
-                                              borderBottom: idx < tick.events.length - 1 ? '1px solid' : 'none',
-                                              borderColor: 'grey.100'
-                                            }}
-                                          >
-                                            <Chip 
-                                              size="small" 
-                                              label={event.event_type}
-                                              color={
-                                                event.event_type === 'created' ? 'success' :
-                                                event.event_type === 'updated' ? 'info' :
-                                                event.event_type === 'deleted' ? 'error' : 'default'
-                                              }
-                                              sx={{ fontSize: '0.65rem', height: 18 }}
-                                            />
-                                            <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                                          <div key={idx} className="flex items-center gap-2 text-xs">
+                                            <span className={cn(
+                                              "px-1.5 py-0.5 rounded text-xs",
+                                              event.event_type === 'created' ? "bg-green-500/20 text-green-400" :
+                                              event.event_type === 'updated' ? "bg-blue-500/20 text-blue-400" :
+                                              event.event_type === 'deleted' ? "bg-red-500/20 text-red-400" :
+                                              "bg-gray-500/20 text-gray-400"
+                                            )}>
+                                              {event.event_type}
+                                            </span>
+                                            <span className="font-mono theme-text-muted">
                                               {event.entity_name}:{event.entity_id?.slice(0, 8)}
-                                            </Typography>
-                                            {event.attributes && Object.keys(event.attributes).length > 0 && (
-                                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                                                {Object.entries(event.attributes)
-                                                  .slice(0, 3)
-                                                  .map(([k, v]) => `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
-                                                  .join(', ')}
-                                              </Typography>
-                                            )}
-                                          </Box>
+                                            </span>
+                                          </div>
                                         ))}
                                         {tick.events.length > 10 && (
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                          <span className="text-xs theme-text-muted">
                                             ... and {tick.events.length - 10} more events
-                                          </Typography>
+                                          </span>
                                         )}
-                                      </Box>
-                                    </Box>
+                                      </div>
+                                    </div>
                                   )}
-                                </Paper>
+                                </div>
                               ))}
-                            </Box>
+                            </div>
                           ) : (
-                            <Box sx={{ textAlign: 'center', py: 3, color: 'text.disabled' }}>
-                              <RunningIcon sx={{ fontSize: 40, mb: 1 }} />
-                              <Typography variant="body2">No ticks recorded yet</Typography>
-                              <Typography variant="caption">Start the simulation to see live data</Typography>
-                            </Box>
+                            <div className="text-center py-8">
+                              <RefreshCw className="w-10 h-10 mx-auto theme-text-muted mb-2" />
+                              <p className="text-sm theme-text-muted">No ticks recorded yet</p>
+                              <p className="text-xs theme-text-muted">Start the simulation to see live data</p>
+                            </div>
                           )}
-                        </Box>
-                      </Collapse>
-                    </Paper>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </List>
+                </div>
               )}
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }

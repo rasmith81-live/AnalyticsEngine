@@ -1,41 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  Stack,
-  Alert,
-  IconButton,
-  Tooltip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  TrendingFlat as TrendingFlatIcon,
-  Refresh as RefreshIcon,
-  Timeline as TimelineIcon,
-  People as PeopleIcon,
-  Analytics as AnalyticsIcon,
-  PlayCircle as ActiveIcon,
-  PauseCircle as PausedIcon,
-  ZoomIn as ZoomInIcon,
-  ZoomOut as ZoomOutIcon,
-} from '@mui/icons-material';
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  RefreshCw,
+  BarChart3,
+  Users,
+  PlayCircle,
+  PauseCircle,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 import {
   AreaChart,
   Area,
@@ -86,35 +64,31 @@ interface KPICardData {
 }
 
 const KPI_COLORS = [
-  '#2196F3', '#4CAF50', '#FF9800', '#E91E63', '#9C27B0',
+  '#7d44ee', '#00998a', '#F79767', '#DA7194', '#9C27B0',
   '#00BCD4', '#FF5722', '#795548', '#607D8B', '#3F51B5',
 ];
 
 const KPI_UNITS: Record<string, string> = {
-  WIN_RATE: '%',
-  CONVERSION_RATE: '%',
-  CHURN_RATE: '%',
-  RETENTION_RATE: '%',
-  MRR: '$',
-  ARR: '$',
-  CLV: '$',
-  REVENUE: '$',
-  AVG_ORDER_VALUE: '$',
-  MQL_COUNT: '',
+  WIN_RATE: '%', CONVERSION_RATE: '%', CHURN_RATE: '%', RETENTION_RATE: '%',
+  MRR: '$', ARR: '$', CLV: '$', REVENUE: '$', AVG_ORDER_VALUE: '$', MQL_COUNT: '',
 };
 
 const KPI_NAMES: Record<string, string> = {
-  WIN_RATE: 'Win Rate',
-  CONVERSION_RATE: 'Conversion Rate',
-  CHURN_RATE: 'Churn Rate',
-  RETENTION_RATE: 'Retention Rate',
-  MRR: 'Monthly Recurring Revenue',
-  ARR: 'Annual Recurring Revenue',
-  CLV: 'Customer Lifetime Value',
-  REVENUE: 'Total Revenue',
-  AVG_ORDER_VALUE: 'Average Order Value',
+  WIN_RATE: 'Win Rate', CONVERSION_RATE: 'Conversion Rate', CHURN_RATE: 'Churn Rate',
+  RETENTION_RATE: 'Retention Rate', MRR: 'Monthly Recurring Revenue', ARR: 'Annual Recurring Revenue',
+  CLV: 'Customer Lifetime Value', REVENUE: 'Total Revenue', AVG_ORDER_VALUE: 'Average Order Value',
   MQL_COUNT: 'Marketing Qualified Leads',
 };
+
+const AGGREGATION_OPTIONS = [
+  { value: 'raw', label: 'Raw' },
+  { value: 'minute', label: 'Min' },
+  { value: 'hour', label: 'Hour' },
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+  { value: 'quarter', label: 'Qtr' },
+];
 
 export default function AnalyticsDemoPage() {
   const [simulations, setSimulations] = useState<Simulation[]>([]);
@@ -123,7 +97,7 @@ export default function AnalyticsDemoPage() {
   const [kpiCards, setKpiCards] = useState<KPICardData[]>([]);
   const [refreshInterval] = useState(2000);
   const [zoomLevel, setZoomLevel] = useState(50);
-  const [aggregationPeriod, setAggregationPeriod] = useState<'raw' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter'>('raw');
+  const [aggregationPeriod, setAggregationPeriod] = useState<string>('raw');
 
   const fetchSimulations = useCallback(async () => {
     try {
@@ -139,7 +113,6 @@ export default function AnalyticsDemoPage() {
 
   const fetchTickHistory = useCallback(async () => {
     if (!selectedSimulation) return;
-    
     try {
       const response = await fetch(`${API_BASE}/simulations/${selectedSimulation}/ticks?limit=50`);
       if (response.ok) {
@@ -152,11 +125,7 @@ export default function AnalyticsDemoPage() {
   }, [selectedSimulation]);
 
   useEffect(() => {
-    if (tickHistory.length === 0) {
-      setKpiCards([]);
-      return;
-    }
-
+    if (tickHistory.length === 0) { setKpiCards([]); return; }
     const latestTick = tickHistory[tickHistory.length - 1];
     const previousTick = tickHistory.length > 1 ? tickHistory[tickHistory.length - 2] : null;
     
@@ -164,25 +133,16 @@ export default function AnalyticsDemoPage() {
       const prevValue = previousTick?.metrics[code] ?? value;
       const change = value - prevValue;
       const changePercent = prevValue !== 0 ? (change / prevValue) * 100 : 0;
-      
       const history = tickHistory.map(tick => ({
         time: new Date(tick.simulated_time).toLocaleTimeString(),
         value: tick.metrics[code] ?? 0,
       }));
-
       return {
-        code,
-        name: KPI_NAMES[code] || code,
-        value,
-        previousValue: prevValue,
+        code, name: KPI_NAMES[code] || code, value, previousValue: prevValue,
         trend: change > 0.01 ? 'up' : change < -0.01 ? 'down' : 'flat',
-        changePercent,
-        unit: KPI_UNITS[code] || '',
-        color: KPI_COLORS[index % KPI_COLORS.length],
-        history,
+        changePercent, unit: KPI_UNITS[code] || '', color: KPI_COLORS[index % KPI_COLORS.length], history,
       };
     });
-
     setKpiCards(cards);
   }, [tickHistory]);
 
@@ -194,7 +154,6 @@ export default function AnalyticsDemoPage() {
 
   useEffect(() => {
     if (!selectedSimulation) return;
-    
     fetchTickHistory();
     const tickInterval = setInterval(fetchTickHistory, refreshInterval);
     return () => clearInterval(tickInterval);
@@ -203,9 +162,7 @@ export default function AnalyticsDemoPage() {
   useEffect(() => {
     if (!selectedSimulation && simulations.length > 0) {
       const running = simulations.find(s => s.status === 'running');
-      if (running) {
-        setSelectedSimulation(running.simulation_id);
-      }
+      if (running) setSelectedSimulation(running.simulation_id);
     }
   }, [simulations, selectedSimulation]);
 
@@ -214,313 +171,210 @@ export default function AnalyticsDemoPage() {
 
   const formatValue = (value: number, unit: string) => {
     if (unit === '$') {
-      return value >= 1000000 
-        ? `$${(value / 1000000).toFixed(2)}M`
-        : value >= 1000 
-          ? `$${(value / 1000).toFixed(1)}K`
-          : `$${value.toFixed(2)}`;
+      return value >= 1000000 ? `$${(value / 1000000).toFixed(2)}M` : value >= 1000 ? `$${(value / 1000).toFixed(1)}K` : `$${value.toFixed(2)}`;
     }
-    if (unit === '%') {
-      return `${value.toFixed(1)}%`;
-    }
+    if (unit === '%') return `${value.toFixed(1)}%`;
     return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value.toFixed(0);
-  };
-
-  const getTrendIcon = (trend: 'up' | 'down' | 'flat') => {
-    switch (trend) {
-      case 'up': return <TrendingUpIcon sx={{ color: 'success.main' }} />;
-      case 'down': return <TrendingDownIcon sx={{ color: 'error.main' }} />;
-      default: return <TrendingFlatIcon sx={{ color: 'text.secondary' }} />;
-    }
   };
 
   const aggregateTickData = useCallback((ticks: SimulationTick[], period: string): SimulationTick[] => {
     if (period === 'raw' || ticks.length === 0) return ticks;
-
     const getGroupKey = (date: Date): string => {
       switch (period) {
-        case 'minute':
-          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
-        case 'hour':
-          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
-        case 'day':
-          return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-        case 'week':
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          return `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
-        case 'month':
-          return `${date.getFullYear()}-${date.getMonth()}`;
-        case 'quarter':
-          return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3)}`;
-        default:
-          return date.toISOString();
+        case 'minute': return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+        case 'hour': return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
+        case 'day': return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+        case 'week': const ws = new Date(date); ws.setDate(date.getDate() - date.getDay()); return `${ws.getFullYear()}-${ws.getMonth()}-${ws.getDate()}`;
+        case 'month': return `${date.getFullYear()}-${date.getMonth()}`;
+        case 'quarter': return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3)}`;
+        default: return date.toISOString();
       }
     };
-
     const groups = new Map<string, SimulationTick[]>();
-    ticks.forEach(tick => {
-      const date = new Date(tick.simulated_time);
-      const key = getGroupKey(date);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(tick);
-    });
-
+    ticks.forEach(tick => { const key = getGroupKey(new Date(tick.simulated_time)); if (!groups.has(key)) groups.set(key, []); groups.get(key)!.push(tick); });
     return Array.from(groups.entries()).map(([_, groupTicks]) => {
       const lastTick = groupTicks[groupTicks.length - 1];
       const aggregatedMetrics: Record<string, number> = {};
-      
-      const metricKeys = Object.keys(groupTicks[0].metrics);
-      metricKeys.forEach(key => {
-        const values = groupTicks.map(t => t.metrics[key]);
-        aggregatedMetrics[key] = values.reduce((a, b) => a + b, 0) / values.length;
-      });
-
-      const aggregatedEntityCounts: Record<string, number> = {};
-      const entityKeys = Object.keys(groupTicks[0].entity_counts);
-      entityKeys.forEach(key => {
-        if (key.includes('_new') || key.includes('_churned')) {
-          aggregatedEntityCounts[key] = groupTicks.reduce((sum, t) => sum + (t.entity_counts[key] || 0), 0);
-        } else {
-          aggregatedEntityCounts[key] = lastTick.entity_counts[key];
-        }
-      });
-
-      return {
-        ...lastTick,
-        metrics: aggregatedMetrics,
-        entity_counts: aggregatedEntityCounts,
-      };
+      Object.keys(groupTicks[0].metrics).forEach(key => { aggregatedMetrics[key] = groupTicks.map(t => t.metrics[key]).reduce((a, b) => a + b, 0) / groupTicks.length; });
+      return { ...lastTick, metrics: aggregatedMetrics };
     });
   }, []);
 
   const aggregatedTickHistory = aggregateTickData(tickHistory, aggregationPeriod);
   const zoomedTickHistory = aggregatedTickHistory.slice(-zoomLevel);
-  
-  const handleZoomIn = () => {
-    setZoomLevel(prev => Math.max(5, Math.floor(prev / 2)));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel(prev => Math.min(tickHistory.length, prev * 2));
-  };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">
-          <AnalyticsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Analytics Demo Dashboard
-        </Typography>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 300 }}>
-            <InputLabel>Active Simulation</InputLabel>
-            <Select
-              value={selectedSimulation}
-              label="Active Simulation"
-              onChange={(e) => setSelectedSimulation(e.target.value)}
-            >
-              {simulations.length === 0 && (
-                <MenuItem value="" disabled>No active simulations</MenuItem>
-              )}
-              {simulations.map((sim) => (
-                <MenuItem key={sim.simulation_id} value={sim.simulation_id}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {sim.status === 'running' ? (
-                      <ActiveIcon fontSize="small" color="success" />
-                    ) : (
-                      <PausedIcon fontSize="small" color="warning" />
-                    )}
-                    <span>{sim.name}</span>
-                    <Chip size="small" label={`${sim.ticks_completed} ticks`} />
-                  </Stack>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Tooltip title="Refresh">
-            <IconButton onClick={fetchTickHistory}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold theme-text-title tracking-wide flex items-center gap-2">
+            <BarChart3 className="w-8 h-8 theme-info-icon" />
+            Live Dashboards
+          </h1>
+          <p className="theme-text-muted mt-1">Real-time KPI visualization from active simulations</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedSimulation}
+            onChange={(e) => setSelectedSimulation(e.target.value)}
+            className="px-4 py-2 rounded-xl theme-card-bg border theme-border theme-text min-w-[300px] focus:outline-none focus:ring-2 focus:ring-alpha-500"
+          >
+            {simulations.length === 0 && <option value="" disabled>No active simulations</option>}
+            {simulations.map((sim) => (
+              <option key={sim.simulation_id} value={sim.simulation_id}>
+                {sim.status === 'running' ? '▶' : '⏸'} {sim.name} ({sim.ticks_completed} ticks)
+              </option>
+            ))}
+          </select>
+          <button onClick={fetchTickHistory} className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors">
+            <RefreshCw className="w-5 h-5 theme-text-muted" />
+          </button>
+        </div>
+      </div>
 
       {!selectedSimulation && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          No active simulation selected. Start a simulation from the Simulation Controller page to see live analytics.
-        </Alert>
+        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+          No active simulation selected. Start a simulation from the Simulation page to see live analytics.
+        </div>
       )}
 
       {selectedSimulation && selectedSim && (
         <>
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
-              <Chip 
-                icon={selectedSim.status === 'running' ? <ActiveIcon /> : <PausedIcon />}
-                label={selectedSim.status.toUpperCase()}
-                color={selectedSim.status === 'running' ? 'success' : 'warning'}
-              />
-              <Typography variant="body2">
-                <strong>Scenario:</strong> {selectedSim.scenario}
-              </Typography>
-              <Box sx={{ ml: 'auto' }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="body2" sx={{ mr: 1 }}><strong>Aggregate By:</strong></Typography>
-                  <ToggleButtonGroup
-                    value={aggregationPeriod}
-                    exclusive
-                    onChange={(_, value) => value && setAggregationPeriod(value)}
-                    size="small"
-                  >
-                    <ToggleButton value="raw">Raw</ToggleButton>
-                    <ToggleButton value="minute">Min</ToggleButton>
-                    <ToggleButton value="hour">Hour</ToggleButton>
-                    <ToggleButton value="day">Day</ToggleButton>
-                    <ToggleButton value="week">Week</ToggleButton>
-                    <ToggleButton value="month">Month</ToggleButton>
-                    <ToggleButton value="quarter">Qtr</ToggleButton>
-                  </ToggleButtonGroup>
-                </Stack>
-              </Box>
-              <Typography variant="body2">
-                <strong>Simulated Time:</strong> {latestTick ? new Date(latestTick.simulated_time).toLocaleString() : 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Ticks:</strong> {selectedSim.ticks_completed}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Speed:</strong> {selectedSim.time_acceleration.acceleration_factor}x
-              </Typography>
-            </Stack>
-          </Paper>
+          {/* Status Bar */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium",
+                  selectedSim.status === 'running' ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+                )}>
+                  {selectedSim.status === 'running' ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+                  {selectedSim.status.toUpperCase()}
+                </span>
+                <span className="text-sm theme-text"><strong>Scenario:</strong> {selectedSim.scenario}</span>
+                <span className="text-sm theme-text"><strong>Time:</strong> {latestTick ? new Date(latestTick.simulated_time).toLocaleString() : 'N/A'}</span>
+                <span className="text-sm theme-text"><strong>Ticks:</strong> {selectedSim.ticks_completed}</span>
+                <span className="text-sm theme-text"><strong>Speed:</strong> {selectedSim.time_acceleration.acceleration_factor}x</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-sm theme-text-muted">Aggregate:</span>
+                  <div className="flex rounded-lg overflow-hidden border theme-border">
+                    {AGGREGATION_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setAggregationPeriod(opt.value)}
+                        className={cn(
+                          "px-2 py-1 text-xs font-medium transition-colors",
+                          aggregationPeriod === opt.value ? "bg-alpha-500 text-white" : "theme-text-muted hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
+          {/* KPI Cards */}
           {kpiCards.length > 0 ? (
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {kpiCards.map((kpi) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={kpi.code}>
-                  <Card sx={{ height: '100%', borderLeft: `4px solid ${kpi.color}` }}>
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                        <Box>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>
-                            {kpi.name}
-                          </Typography>
-                          <Typography variant="h4" sx={{ fontWeight: 'bold', color: kpi.color }}>
-                            {formatValue(kpi.value, kpi.unit)}
-                          </Typography>
-                        </Box>
-                        {getTrendIcon(kpi.trend)}
-                      </Stack>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            color: kpi.trend === 'up' ? 'success.main' : kpi.trend === 'down' ? 'error.main' : 'text.secondary' 
-                          }}
-                        >
-                          {kpi.changePercent >= 0 ? '+' : ''}{kpi.changePercent.toFixed(2)}%
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          vs previous tick
-                        </Typography>
-                      </Stack>
-                      <Box sx={{ height: 40, mt: 1 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={kpi.history.slice(-10)}>
-                            <Area 
-                              type="monotone" 
-                              dataKey="value" 
-                              stroke={kpi.color} 
-                              fill={kpi.color} 
-                              fillOpacity={0.2}
-                              strokeWidth={2}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                <Card key={kpi.code} className="overflow-hidden" style={{ borderLeftColor: kpi.color, borderLeftWidth: '4px' }}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-xs theme-text-muted mb-1">{kpi.name}</p>
+                        <p className="text-2xl font-bold" style={{ color: kpi.color }}>{formatValue(kpi.value, kpi.unit)}</p>
+                      </div>
+                      {kpi.trend === 'up' && <TrendingUp className="w-5 h-5 text-green-500" />}
+                      {kpi.trend === 'down' && <TrendingDown className="w-5 h-5 text-red-500" />}
+                      {kpi.trend === 'flat' && <Minus className="w-5 h-5 theme-text-muted" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={cn("text-sm font-medium", kpi.trend === 'up' ? "text-green-500" : kpi.trend === 'down' ? "text-red-500" : "theme-text-muted")}>
+                        {kpi.changePercent >= 0 ? '+' : ''}{kpi.changePercent.toFixed(2)}%
+                      </span>
+                      <span className="text-xs theme-text-muted">vs previous</span>
+                    </div>
+                    <div className="h-10 mt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={kpi.history.slice(-10)}>
+                          <Area type="monotone" dataKey="value" stroke={kpi.color} fill={kpi.color} fillOpacity={0.2} strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </Grid>
+            </div>
           ) : (
-            <Alert severity="info" sx={{ mb: 2 }}>
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
               Waiting for KPI data... Make sure the simulation is running.
-            </Alert>
+            </div>
           )}
 
-          <Grid container spacing={2}>
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {kpiCards.map((kpi) => (
-              <Grid item xs={12} md={6} key={kpi.code}>
-                <Paper sx={{ p: 2, height: 300 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                    <Typography variant="h6" sx={{ color: kpi.color }}>
-                      <TimelineIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              <Card key={kpi.code}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2" style={{ color: kpi.color }}>
+                      <BarChart3 className="w-5 h-5" />
                       {kpi.name}
-                    </Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Tooltip title="Zoom In (fewer data points)">
-                        <IconButton size="small" onClick={handleZoomIn} disabled={zoomLevel <= 5}>
-                          <ZoomInIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Zoom Out (more data points)">
-                        <IconButton size="small" onClick={handleZoomOut} disabled={zoomLevel >= tickHistory.length}>
-                          <ZoomOutIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Chip size="small" label={`${Math.min(zoomLevel, tickHistory.length)} pts`} />
-                    </Stack>
-                  </Stack>
-                  <ResponsiveContainer width="100%" height="85%">
-                    <AreaChart data={zoomedTickHistory.map(tick => ({
-                      time: new Date(tick.simulated_time).toLocaleTimeString(),
-                      value: tick.metrics[kpi.code] ?? 0,
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} />
-                      <YAxis 
-                        domain={['auto', 'auto']}
-                        tickFormatter={(value) => kpi.unit === '$' 
-                          ? `$${value >= 1000 ? (value/1000).toFixed(0) + 'K' : value}` 
-                          : kpi.unit === '%' ? `${value}%` : value}
-                      />
-                      <RechartsTooltip 
-                        formatter={(value: number) => [formatValue(value, kpi.unit), kpi.name]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        name={kpi.name}
-                        stroke={kpi.color}
-                        fill={kpi.color}
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </Paper>
-              </Grid>
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setZoomLevel(prev => Math.max(5, Math.floor(prev / 2)))} disabled={zoomLevel <= 5} className="p-1 rounded hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 disabled:opacity-50">
+                        <ZoomIn className="w-4 h-4 theme-text-muted" />
+                      </button>
+                      <button onClick={() => setZoomLevel(prev => Math.min(tickHistory.length, prev * 2))} disabled={zoomLevel >= tickHistory.length} className="p-1 rounded hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 disabled:opacity-50">
+                        <ZoomOut className="w-4 h-4 theme-text-muted" />
+                      </button>
+                      <span className="text-xs theme-text-muted">{Math.min(zoomLevel, tickHistory.length)} pts</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={zoomedTickHistory.map(tick => ({ time: new Date(tick.simulated_time).toLocaleTimeString(), value: tick.metrics[kpi.code] ?? 0 }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
+                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={(value) => kpi.unit === '$' ? `$${value >= 1000 ? (value/1000).toFixed(0) + 'K' : value}` : kpi.unit === '%' ? `${value}%` : value} />
+                        <RechartsTooltip formatter={(value: number) => [formatValue(value, kpi.unit), kpi.name]} contentStyle={{ backgroundColor: 'var(--card-background)', border: '1px solid var(--border)', borderRadius: '8px' }} />
+                        <Area type="monotone" dataKey="value" name={kpi.name} stroke={kpi.color} fill={kpi.color} fillOpacity={0.3} strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
+          </div>
 
-            <Grid item xs={12}>
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
+          {/* Entity Activity */}
+          {latestTick && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 theme-info-icon" />
                   Entity Activity Summary
-                </Typography>
-                {latestTick && (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Entity Type</TableCell>
-                        <TableCell align="right">Active Count</TableCell>
-                        <TableCell align="right">New (This Tick)</TableCell>
-                        <TableCell align="right">Churned (This Tick)</TableCell>
-                        <TableCell align="right">Net Change</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b theme-border">
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Entity Type</th>
+                        <th className="px-4 py-2 text-right theme-text-muted font-medium">Active Count</th>
+                        <th className="px-4 py-2 text-right theme-text-muted font-medium">New</th>
+                        <th className="px-4 py-2 text-right theme-text-muted font-medium">Churned</th>
+                        <th className="px-4 py-2 text-right theme-text-muted font-medium">Net Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {Object.entries(latestTick.entity_counts)
                         .filter(([key]) => !key.includes('_churned') && !key.includes('_new'))
                         .map(([entityName, count]) => {
@@ -528,51 +382,36 @@ export default function AnalyticsDemoPage() {
                           const churnedCount = latestTick.entity_counts[`${entityName}_churned`] || 0;
                           const netChange = newCount - churnedCount;
                           return (
-                            <TableRow key={entityName}>
-                              <TableCell>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <PeopleIcon fontSize="small" color="primary" />
-                                  <Typography>{entityName.charAt(0).toUpperCase() + entityName.slice(1)}</Typography>
-                                </Stack>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography fontWeight="bold">{count.toLocaleString()}</Typography>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Chip 
-                                  size="small" 
-                                  label={`+${newCount}`} 
-                                  color="success" 
-                                  variant={newCount > 0 ? 'filled' : 'outlined'}
-                                />
-                              </TableCell>
-                              <TableCell align="right">
-                                <Chip 
-                                  size="small" 
-                                  label={`-${churnedCount}`} 
-                                  color="error" 
-                                  variant={churnedCount > 0 ? 'filled' : 'outlined'}
-                                />
-                              </TableCell>
-                              <TableCell align="right">
-                                <Typography 
-                                  fontWeight="bold"
-                                  color={netChange > 0 ? 'success.main' : netChange < 0 ? 'error.main' : 'text.secondary'}
-                                >
+                            <tr key={entityName} className="border-b theme-border">
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Users className="w-4 h-4 theme-info-icon" />
+                                  <span className="theme-text">{entityName.charAt(0).toUpperCase() + entityName.slice(1)}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-right font-bold theme-text">{count.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-right">
+                                <span className={cn("px-2 py-0.5 rounded-full text-xs", newCount > 0 ? "bg-green-500/20 text-green-400" : "theme-text-muted")}>+{newCount}</span>
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <span className={cn("px-2 py-0.5 rounded-full text-xs", churnedCount > 0 ? "bg-red-500/20 text-red-400" : "theme-text-muted")}>-{churnedCount}</span>
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <span className={cn("font-bold", netChange > 0 ? "text-green-500" : netChange < 0 ? "text-red-500" : "theme-text-muted")}>
                                   {netChange >= 0 ? '+' : ''}{netChange}
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
+                                </span>
+                              </td>
+                            </tr>
                           );
                         })}
-                    </TableBody>
-                  </Table>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
-    </Box>
+    </div>
   );
 }

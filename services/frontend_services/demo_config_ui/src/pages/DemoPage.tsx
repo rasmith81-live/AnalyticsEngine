@@ -1,202 +1,152 @@
-import { Typography, Paper, Box, Grid, Button } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import SettingsIcon from '@mui/icons-material/Settings';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import {
+  LayoutDashboard,
+  Settings,
+  Upload,
+  HeartPulse,
+  Zap,
+  Server,
+  Brain,
+  Database,
+  Radio,
+  Shield,
+  ExternalLink,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+
+const QUICK_START_STEPS = [
+  {
+    step: 1,
+    title: 'Configure Your KPIs',
+    description: 'Browse the metric tree and select KPIs relevant to your business. Choose from Supply Chain, CRM, Sales, and Financial value chains.',
+    href: '/config',
+    icon: <Settings className="w-4 h-4" />,
+    buttonText: 'Go to KPI Configuration',
+  },
+  {
+    step: 2,
+    title: 'Import KPI Definitions',
+    description: 'Upload Excel files with KPI definitions for bulk import. The system validates formulas and object references automatically.',
+    href: '/excel-import',
+    icon: <Upload className="w-4 h-4" />,
+    buttonText: 'Go to Excel Import',
+  },
+  {
+    step: 3,
+    title: 'Explore Object Models',
+    description: 'View UML diagrams and understand the data structures required for your selected KPIs.',
+    href: '/object-models',
+    icon: <LayoutDashboard className="w-4 h-4" />,
+    buttonText: 'Browse Object Models',
+  },
+  {
+    step: 4,
+    title: 'Monitor System Health',
+    description: 'Check the status of all backend services and view real-time system metrics.',
+    href: '/system-monitor',
+    icon: <HeartPulse className="w-4 h-4" />,
+    buttonText: 'View System Monitor',
+  },
+];
+
+const CAPABILITIES = [
+  { title: 'Real-Time Analytics', description: 'On-demand KPI calculations with sub-second latency. No pre-computed batch processing - all metrics calculated in real-time.', icon: <Zap className="w-5 h-5" /> },
+  { title: 'Microservices Architecture', description: '21 independent services working together. Scale calculation engines independently based on workload requirements.', icon: <Server className="w-5 h-5" /> },
+  { title: 'AI-Powered Guidance', description: 'OpenAI-powered conversation service helps you select the right KPIs and design your analytics value chain.', icon: <Brain className="w-5 h-5" /> },
+  { title: 'TimescaleDB Integration', description: 'Optimized time-series database with hypertables and continuous aggregates for high-performance analytics.', icon: <Database className="w-5 h-5" /> },
+  { title: 'Event-Driven Updates', description: 'Redis-powered messaging ensures all services stay synchronized. Real-time data propagation across the platform.', icon: <Radio className="w-5 h-5" /> },
+  { title: 'Enterprise Ready', description: 'Built-in data governance, row-level security, audit logging, and compliance features for enterprise deployments.', icon: <Shield className="w-5 h-5" /> },
+];
+
+const API_DOCS = [
+  { name: 'Business Metadata API', url: 'http://localhost:8020/docs' },
+  { name: 'Calculation Engine API', url: 'http://localhost:8021/docs' },
+  { name: 'Demo Config API', url: 'http://localhost:8022/docs' },
+  { name: 'Metadata Ingestion API', url: 'http://localhost:8025/docs' },
+  { name: 'Conversation API', url: 'http://localhost:8026/docs' },
+  { name: 'API Gateway', url: 'http://127.0.0.1:8090/docs' },
+];
 
 export default function DemoPage() {
-
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Analytics Engine Demo
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Welcome to the Analytics Engine - a real-time, microservices-based analytics platform for on-demand KPI calculations.
-      </Typography>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold theme-text-title tracking-wide">Analytics Engine Demo</h1>
+        <p className="theme-text-muted mt-1">
+          Welcome to the Analytics Engine - a real-time, microservices-based analytics platform for on-demand KPI calculations.
+        </p>
+      </div>
 
       {/* Quick Start Guide */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Quick Start Guide
-        </Typography>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 2, flexShrink: 0 }}>
-                1
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  Configure Your KPIs
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Browse the metric tree and select KPIs relevant to your business. Choose from Supply Chain, CRM, Sales, and Financial value chains.
-                </Typography>
-                <Button variant="outlined" size="small" href="/config" startIcon={<SettingsIcon />}>
-                  Go to KPI Configuration
-                </Button>
-              </Box>
-            </Box>
-          </Grid>
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Start Guide</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {QUICK_START_STEPS.map((item) => (
+              <div key={item.step} className="flex gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-alpha-500 text-white flex items-center justify-center font-bold text-sm">
+                  {item.step}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold theme-text-title mb-1">{item.title}</h3>
+                  <p className="text-sm theme-text-muted mb-3">{item.description}</p>
+                  <a href={item.href}>
+                    <Button variant="outline" size="sm">
+                      {item.icon}
+                      <span className="ml-2">{item.buttonText}</span>
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 2, flexShrink: 0 }}>
-                2
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  Import KPI Definitions
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Upload Excel files with KPI definitions for bulk import. The system validates formulas and object references automatically.
-                </Typography>
-                <Button variant="outlined" size="small" href="/excel-import" startIcon={<UploadFileIcon />}>
-                  Go to Excel Import
-                </Button>
-              </Box>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 2, flexShrink: 0 }}>
-                3
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  Explore Object Models
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  View UML diagrams and understand the data structures required for your selected KPIs.
-                </Typography>
-                <Button variant="outlined" size="small" href="/object-models" startIcon={<DashboardIcon />}>
-                  Browse Object Models
-                </Button>
-              </Box>
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 2, flexShrink: 0 }}>
-                4
-              </Box>
-              <Box>
-                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                  Monitor System Health
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Check the status of all backend services and view real-time system metrics.
-                </Typography>
-                <Button variant="outlined" size="small" href="/system-monitor" startIcon={<MonitorHeartIcon />}>
-                  View System Monitor
-                </Button>
-              </Box>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Key Features */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Platform Capabilities
-        </Typography>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              Real-Time Analytics
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              On-demand KPI calculations with sub-second latency. No pre-computed batch processing - all metrics calculated in real-time.
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              Microservices Architecture
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              21 independent services working together. Scale calculation engines independently based on workload requirements.
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              AI-Powered Guidance
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              OpenAI-powered conversation service helps you select the right KPIs and design your analytics value chain.
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              TimescaleDB Integration
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Optimized time-series database with hypertables and continuous aggregates for high-performance analytics.
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              Event-Driven Updates
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Redis-powered messaging ensures all services stay synchronized. Real-time data propagation across the platform.
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-              Enterprise Ready
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Built-in data governance, row-level security, audit logging, and compliance features for enterprise deployments.
-            </Typography>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* Platform Capabilities */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform Capabilities</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {CAPABILITIES.map((cap) => (
+              <div key={cap.title} className="flex gap-3">
+                <div className="flex-shrink-0 p-2 rounded-lg bg-alpha-500/20 text-alpha-500 h-fit">
+                  {cap.icon}
+                </div>
+                <div>
+                  <h3 className="font-semibold theme-text-title mb-1">{cap.title}</h3>
+                  <p className="text-sm theme-text-muted">{cap.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* API Documentation */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          API Documentation
-        </Typography>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          Explore the interactive API documentation for each service:
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://localhost:8020/docs" target="_blank">
-              Business Metadata API
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://localhost:8021/docs" target="_blank">
-              Calculation Engine API
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://localhost:8022/docs" target="_blank">
-              Demo Config API
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://localhost:8025/docs" target="_blank">
-              Metadata Ingestion API
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://localhost:8026/docs" target="_blank">
-              Conversation API
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="outlined" size="small" href="http://127.0.0.1:8090/docs" target="_blank">
-              API Gateway
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-    </Box>
+      <Card>
+        <CardHeader>
+          <CardTitle>API Documentation</CardTitle>
+          <p className="text-sm theme-text-muted">Explore the interactive API documentation for each service</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {API_DOCS.map((api) => (
+              <a key={api.name} href={api.url} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm">
+                  {api.name}
+                  <ExternalLink className="w-3 h-3 ml-2" />
+                </Button>
+              </a>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

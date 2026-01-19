@@ -350,7 +350,140 @@ This document provides a detailed breakdown of the features for the Analytics En
     - Return matched concepts as rationale for alignment scores
 *   **[1 pt]** Expose API endpoint for Conversation Service to request mappings.
 
-### 6. Connector Service
+#### Feature: Multi-Agent Design System [COMPLETED]
+**Description:** AI-powered collaborative design using Claude multi-agent architecture.
+*   **[2 pts]** Implement `StrategyCoordinator` (Claude Opus 4.5) as strategic advisor for C-suite interviews.
+    - Listens and responds to executives (does NOT drive conversation)
+    - Interview driven by 4 core questions: Business/Strategy, Pain Points, Success Metrics, Decision Impact
+    - Applies Porter's frameworks internally to analyze client responses
+    - Asks ONE pertinent follow-up question when gaps identified (Porter-based)
+    - Follow-up categories: competitive pressure, supplier/customer dynamics, operations, strategy positioning
+    - Orchestrates sub-agents after gathering sufficient context
+*   **[2 pts]** Implement `ArchitectAgent` (Claude Sonnet 4) for DDD-based technical architecture.
+    - Deeply versed in "Patterns, Principles, and Practices of Domain-Driven Design" (Millett/Tune)
+    - Identifies bounded contexts with ubiquitous language
+    - Designs aggregates with consistency boundaries and invariants
+    - Models entities vs value objects, defines domain events
+    - Creates context maps with integration patterns (ACL, OHS, Published Language)
+    - Aligns value chains with subdomains (core, supporting, generic)
+*   **[2 pts]** Implement `BusinessAnalystAgent` (Claude Sonnet 4) for industry expertise.
+    - Assumes deep expertise for any industry/value chain
+    - Identifies relevant KPIs and metrics
+    - Provides industry benchmarks and best practices
+*   **[2 pts]** Implement `DataAnalystAgent` (Claude Sonnet 4) for set-based KPI design.
+    - Designs set-based KPIs with multi-step calculation workflows
+    - Creates cohort analysis metrics (retention, churn, engagement)
+    - Optimizes KPIs for TimescaleDB continuous aggregates
+*   **[2 pts]** Implement `DeploymentSpecialistAgent` (Claude Sonnet 4) for Azure deployment.
+    - Generates Azure infrastructure templates (ARM/Bicep)
+    - Creates Kubernetes manifests and Helm charts
+    - Configures CI/CD pipelines (GitHub Actions, Azure DevOps)
+    - Produces deployment checklists and runbooks
+*   **[2 pts]** Implement `DeveloperAgent` (Claude Sonnet 4) for code generation.
+    - Generates TimescaleDB schemas
+    - Creates Pydantic model definitions
+    - Builds KPI calculation formulas
+*   **[1 pt]** Implement `TesterAgent` (Claude Sonnet 4) for validation.
+    - Validates schema integrity
+    - Tests KPI formula correctness
+    - Generates test cases
+*   **[1 pt]** Implement `DocumenterAgent` (Claude Sonnet 4) for documentation.
+    - Generates comprehensive documentation
+    - Creates data dictionaries and API docs
+*   **[2 pts]** Implement `ProjectManagerAgent` (Claude Sonnet 4) for Agile planning.
+    - Analyzes scope from design artifacts to create epics
+    - Plans sprints with goals, capacity, and story selection
+    - Generates user stories with acceptance criteria (Given-When-Then)
+    - Creates technical tasks for infrastructure, refactoring, spikes
+    - Generates project roadmaps with milestones
+    - Identifies risks with probability, impact, and mitigation strategies
+*   **[2 pts]** Implement `AgentOrchestrator` for session management.
+    - Manages multi-agent design sessions
+    - Coordinates parallel agent execution
+    - Aggregates and synthesizes results
+*   **[2 pts]** Implement REST and WebSocket API endpoints for multi-agent design.
+    - `POST /agents/design-session` - Create new design session
+    - `POST /agents/sessions/{id}/message` - Send message to session
+    - `POST /agents/sessions/{id}/analyze` - Run parallel analysis
+    - `POST /agents/sessions/{id}/finalize` - Finalize and generate artifacts
+    - `WebSocket /agents/ws/{id}` - Real-time streaming responses
+*   **[2 pts]** Implement `SalesManagerAgent` (Claude Sonnet 4) for CRM lifecycle.
+    - Manages prospect → lead → opportunity → client lifecycle
+    - Designs sales pipeline stages and conversion metrics
+    - Coordinates with Marketing Manager for MQL handoffs
+*   **[2 pts]** Implement `AccountantAgent` (Claude Sonnet 4) for financial documents.
+    - Generates proposals, SOW, and invoicing workflows
+    - Designs AR/AP tracking and financial reporting
+*   **[2 pts]** Implement `MarketingManagerAgent` (Claude Sonnet 4) for marketing strategy.
+    - Designs campaigns, lead scoring models, and buyer personas
+    - Creates content calendars and marketing analytics
+    - Coordinates with Sales Manager for lead handoffs
+*   **[2 pts]** Implement `UIDesignerAgent` (Claude Sonnet 4) for dashboard design.
+    - Creates dashboard layouts, stylesheets, and component specifications
+    - Ensures accessibility and responsive design
+*   **[2 pts]** Implement `OperationsManagerAgent` (Claude Sonnet 4) for holistic KPI analysis.
+    - Analyzes KPI results across all business areas
+    - Identifies correlating patterns and bottlenecks
+    - Makes optimization recommendations
+*   **[2 pts]** Implement `CustomerSuccessManagerAgent` (Claude Sonnet 4) for customer health.
+    - Designs health scores, churn risk models, and NPS tracking
+    - Creates onboarding and expansion playbooks
+*   **[2 pts]** Implement `HRTalentAnalystAgent` (Claude Sonnet 4) for people analytics.
+    - Designs retention, engagement, and skills gap metrics
+    - Creates compensation and workforce planning models
+*   **[2 pts]** Implement `RiskComplianceOfficerAgent` (Claude Sonnet 4) for risk management.
+    - Designs risk assessment frameworks and compliance tracking
+    - Creates audit support and control monitoring
+*   **[2 pts]** Implement `SupplyChainAnalystAgent` (Claude Sonnet 4) for SCOR model.
+    - Applies ASCM SCOR framework for supply chain analytics
+    - Designs inventory, supplier, and logistics metrics
+*   **[2 pts]** Implement `ITILManagerAgent` (Claude Sonnet 4) for IT service management.
+    - Applies ITIL 4 framework for incident/problem/change management
+    - Designs SLA tracking, CMDB, and CSI metrics
+*   **[2 pts]** Implement `MappingSpecialistAgent` (Claude Sonnet 4) for data mapping.
+    - Designs source-to-analytics attribute mappings
+    - Creates transformation rules and data lineage
+*   **[2 pts]** Implement `ConnectionSpecialistAgent` (Claude Sonnet 4) for system integration.
+    - Designs API wrappers, webhooks, and event handlers
+    - Creates connector configurations for external systems
+*   **[2 pts]** Implement `DocumentAnalyzerAgent` (Claude Sonnet 4) for document analysis.
+    - Analyzes business documents, technical specs, and data dictionaries
+    - Extracts entities, processes, KPIs, and terminology
+    - Identifies gaps and generates clarification questions
+    - Routes findings to Architect and Business Analyst agents
+*   **[2 pts]** Implement `CompetitiveAnalystAgent` (Claude Sonnet 4) for competitive intelligence.
+    - Searches for peer companies with similar business models via web search
+    - Profiles competitors (identity, business model, offerings, position)
+    - Analyzes competitive landscape using Porter's Five Forces
+    - Identifies market gaps and differentiation opportunities
+    - Triggered automatically by Business Strategist after model elicitation
+
+#### Feature: Adaptive Communication Style [COMPLETED]
+**Description:** Master Coordinator adapts response format to match interviewee's communication style.
+*   **[2 pts]** Implement style detection to identify Executive, Technical, or Analyst communication patterns.
+    - Executive indicators: vision, growth, ROI, stakeholders, strategic
+    - Technical indicators: API, database, schema, architecture, microservices
+    - Analyst indicators: metrics, KPI, dashboard, trend, correlation
+*   **[2 pts]** Implement `CommunicationStyleProfile` to track session-level style preferences.
+    - Detected role, abstraction level, vocabulary type, detail preference
+    - Preferred response agent for formatting
+*   **[2 pts]** Implement dynamic detail level adjustment (1=Summary to 4=Comprehensive).
+    - Detect drill-down requests ("tell me more", "dig deeper")
+    - Detect zoom-out requests ("summarize", "high level", "bottom line")
+    - Maintain core communication style while adjusting depth
+*   **[1 pt]** Implement response formatting delegation to appropriate agent based on style.
+
+#### Feature: Cross-Agent Collaboration Framework [COMPLETED]
+**Description:** Agents collaborate behind the scenes without overwhelming the interviewee.
+*   **[2 pts]** Implement collaboration request/response pattern via context artifacts.
+    - Request tools: `request_entity_validation`, `request_kpi_requirements`, etc.
+    - Response tools: `share_entity_validation`, `share_schema_artifacts`, etc.
+*   **[2 pts]** Implement Business Strategist → Competitive Analyst trigger.
+    - Automatically triggers competitive analysis after business model elicitation
+    - Passes business description, industry, and generic strategy
+*   **[1 pt]** Implement collaboration tracking in `context.artifacts["collaboration_requests"]`.
+
+### 5. Connector Service
 **Bounded Context:** Data Connectivity & Adapters
 
 #### Feature: Connection Management [COMPLETED]
@@ -365,7 +498,7 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement logic to fetch and normalize source schema (tables, columns, types) into `DataSourceDefinition`.
 *   **[1 pt]** Implement API to preview sample data from a selected source entity.
 
-### 7. Ingestion Service
+### 6. Ingestion Service
 **Bounded Context:** Data Movement & Scheduling
 
 #### Feature: Ingestion Pipeline [COMPLETED]
@@ -385,7 +518,7 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[2 pts]** Implement **Python Sandbox** (using WebAssembly/Pyodide or isolated containers) for advanced custom ETL scripts.
 *   **[1 pt]** Implement validation to ensure custom logic produces the expected target data type.
 
-### 8. Entity Resolution Service
+### 7. Entity Resolution Service
 **Bounded Context:** Master Data Management
 **Architecture Pattern:** Lambda Architecture (Eventually Consistent)
 
@@ -400,7 +533,7 @@ This document provides a detailed breakdown of the features for the Analytics En
 *   **[1 pt]** Implement persistent storage for canonical "Golden Records".
 *   **[2 pts]** Implement "Retroactive Fix" logic to recalculate downstream KPIs when Entity Resolution merges identities.
 
-### 9. Metadata Ingestion Service
+### 8. Metadata Ingestion Service
 **Bounded Context:** Knowledge Acquisition & Semantic Understanding
 
 #### Feature: Industry Knowledge Base [COMPLETED]

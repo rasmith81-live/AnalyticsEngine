@@ -1,27 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  Checkbox,
-  Chip,
-  IconButton,
-  Collapse,
-  InputAdornment,
-  Badge,
-  Tooltip,
-  Stack,
-} from '@mui/material';
-import {
-  ExpandMore as ExpandIcon,
-  ChevronRight as CollapseIcon,
-  Search as SearchIcon,
-  AccountTree as ValueChainIcon,
-  Folder as ModuleIcon,
-  Functions as KPIIcon,
-  Clear as ClearIcon,
-} from '@mui/icons-material';
+  ChevronDown,
+  ChevronRight,
+  Search,
+  GitBranch,
+  Folder,
+  Calculator,
+  X,
+} from 'lucide-react';
+import { cn } from '../lib/utils';
 
 export interface KPIInfo {
   code: string;
@@ -51,6 +38,39 @@ interface TreeNode {
   kpiCount?: number;
 }
 
+function Checkbox({ 
+  checked, 
+  indeterminate, 
+  onChange 
+}: { 
+  checked: boolean; 
+  indeterminate?: boolean; 
+  onChange: () => void;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      className={cn(
+        "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors",
+        checked 
+          ? "bg-alpha-500 border-alpha-500" 
+          : indeterminate 
+            ? "bg-alpha-500/50 border-alpha-500" 
+            : "border-gray-500 hover:border-alpha-400"
+      )}
+    >
+      {checked && (
+        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        </svg>
+      )}
+      {indeterminate && !checked && (
+        <div className="w-2 h-0.5 bg-white rounded" />
+      )}
+    </button>
+  );
+}
+
 export default function KPITreeSelector({
   kpis,
   selectedKPIs,
@@ -60,11 +80,9 @@ export default function KPITreeSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  // Build hierarchical tree from flat KPI list
   const treeData = useMemo(() => {
     const valueChainMap = new Map<string, Map<string, KPIInfo[]>>();
 
-    // Filter KPIs based on search
     const filteredKPIs = kpis.filter((kpi) => {
       if (!searchTerm) return true;
       const search = searchTerm.toLowerCase();
@@ -77,7 +95,6 @@ export default function KPITreeSelector({
       );
     });
 
-    // Group by value chain -> module -> KPIs
     filteredKPIs.forEach((kpi) => {
       const valueChain = kpi.value_chain || 'General';
       const module = kpi.module || 'Uncategorized';
@@ -93,7 +110,6 @@ export default function KPITreeSelector({
       moduleMap.get(module)!.push(kpi);
     });
 
-    // Convert to tree structure
     const tree: TreeNode[] = [];
     valueChainMap.forEach((moduleMap, valueChain) => {
       const moduleNodes: TreeNode[] = [];
@@ -115,7 +131,6 @@ export default function KPITreeSelector({
         });
       });
 
-      // Sort modules alphabetically
       moduleNodes.sort((a, b) => a.label.localeCompare(b.label));
 
       tree.push({
@@ -127,13 +142,10 @@ export default function KPITreeSelector({
       });
     });
 
-    // Sort value chains alphabetically
     tree.sort((a, b) => a.label.localeCompare(b.label));
-
     return tree;
   }, [kpis, searchTerm]);
 
-  // Auto-expand when searching
   useMemo(() => {
     if (searchTerm) {
       const allNodes = new Set<string>();
@@ -176,11 +188,9 @@ export default function KPITreeSelector({
     const allSelected = moduleKPIs.every((kpi) => isKPISelected(kpi));
 
     if (allSelected) {
-      // Deselect all in module
       const moduleCodes = new Set(moduleKPIs.map((k) => k.code));
       onSelectionChange(selectedKPIs.filter((s) => !moduleCodes.has(s.code)));
     } else {
-      // Select all in module
       const newSelection = [...selectedKPIs];
       moduleKPIs.forEach((kpi) => {
         if (!isKPISelected(kpi)) {
@@ -236,40 +246,30 @@ export default function KPITreeSelector({
     const selected = isKPISelected(kpi);
 
     return (
-      <Box
+      <div
         key={node.id}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          py: 0.5,
-          px: 1,
-          pl: depth * 3 + 1,
-          cursor: 'pointer',
-          borderRadius: 1,
-          bgcolor: selected ? 'primary.50' : 'transparent',
-          '&:hover': { bgcolor: selected ? 'primary.100' : 'grey.100' },
-        }}
         onClick={() => toggleKPI(kpi)}
+        className={cn(
+          "flex items-center gap-2 py-1.5 px-2 rounded-lg cursor-pointer transition-colors",
+          selected ? "bg-alpha-500/20" : "hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800"
+        )}
+        style={{ paddingLeft: `${depth * 24 + 8}px` }}
       >
-        <Checkbox
-          size="small"
-          checked={selected}
-          sx={{ p: 0.5, mr: 1 }}
-        />
-        <KPIIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" noWrap>
-            {kpi.name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" noWrap>
+        <Checkbox checked={selected} onChange={() => toggleKPI(kpi)} />
+        <Calculator className="w-4 h-4 theme-text-muted flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm theme-text truncate">{kpi.name}</p>
+          <p className="text-xs theme-text-muted truncate">
             {kpi.code} • {kpi.calculation_type}
             {kpi.required_objects.length > 0 && ` • ${kpi.required_objects.length} entities`}
-          </Typography>
-        </Box>
+          </p>
+        </div>
         {kpi.calculation_type === 'set_based' && (
-          <Chip size="small" label="Set-Based" color="primary" sx={{ ml: 1, height: 20 }} />
+          <span className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400 flex-shrink-0">
+            Set-Based
+          </span>
         )}
-      </Box>
+      </div>
     );
   };
 
@@ -278,49 +278,38 @@ export default function KPITreeSelector({
     const selectionState = getModuleSelectionState(node);
 
     return (
-      <Box key={node.id}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            py: 0.75,
-            px: 1,
-            pl: depth * 3 + 1,
-            cursor: 'pointer',
-            borderRadius: 1,
-            '&:hover': { bgcolor: 'grey.100' },
-          }}
+      <div key={node.id}>
+        <div
+          className="flex items-center gap-2 py-2 px-2 rounded-lg cursor-pointer hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors"
+          style={{ paddingLeft: `${depth * 24 + 8}px` }}
         >
-          <IconButton size="small" onClick={() => toggleNode(node.id)} sx={{ p: 0.25, mr: 0.5 }}>
-            {isExpanded ? <ExpandIcon fontSize="small" /> : <CollapseIcon fontSize="small" />}
-          </IconButton>
+          <button onClick={() => toggleNode(node.id)} className="p-0.5">
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 theme-text-muted" />
+            ) : (
+              <ChevronRight className="w-4 h-4 theme-text-muted" />
+            )}
+          </button>
           <Checkbox
-            size="small"
             checked={selectionState === 'all'}
             indeterminate={selectionState === 'some'}
-            onClick={(e) => {
-              e.stopPropagation();
-              selectAllInModule(node);
-            }}
-            sx={{ p: 0.5, mr: 1 }}
+            onChange={() => selectAllInModule(node)}
           />
-          <ModuleIcon sx={{ fontSize: 18, mr: 1, color: 'warning.main' }} />
-          <Typography
-            variant="body2"
-            fontWeight={500}
-            sx={{ flex: 1, cursor: 'pointer' }}
+          <Folder className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <span
+            className="flex-1 text-sm font-medium theme-text cursor-pointer"
             onClick={() => toggleNode(node.id)}
           >
             {node.label}
-          </Typography>
-          <Badge badgeContent={node.kpiCount} color="default" sx={{ mr: 1 }}>
-            <Box />
-          </Badge>
-        </Box>
-        <Collapse in={isExpanded}>
-          {node.children?.map((child) => renderKPINode(child, depth + 1))}
-        </Collapse>
-      </Box>
+          </span>
+          <span className="text-xs theme-text-muted">{node.kpiCount}</span>
+        </div>
+        {isExpanded && (
+          <div>
+            {node.children?.map((child) => renderKPINode(child, depth + 1))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -329,155 +318,131 @@ export default function KPITreeSelector({
     const selectionState = getValueChainSelectionState(node);
 
     return (
-      <Box key={node.id} sx={{ mb: 1 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            py: 1,
-            px: 1,
-            cursor: 'pointer',
-            borderRadius: 1,
-            bgcolor: 'grey.50',
-            '&:hover': { bgcolor: 'grey.100' },
-          }}
-        >
-          <IconButton size="small" onClick={() => toggleNode(node.id)} sx={{ p: 0.25, mr: 0.5 }}>
-            {isExpanded ? <ExpandIcon /> : <CollapseIcon />}
-          </IconButton>
+      <div key={node.id} className="mb-2">
+        <div className="flex items-center gap-2 py-2 px-2 rounded-lg theme-card-bg cursor-pointer hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors">
+          <button onClick={() => toggleNode(node.id)} className="p-0.5">
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 theme-text-muted" />
+            ) : (
+              <ChevronRight className="w-4 h-4 theme-text-muted" />
+            )}
+          </button>
           <Checkbox
-            size="small"
             checked={selectionState === 'all'}
             indeterminate={selectionState === 'some'}
-            onClick={(e) => {
-              e.stopPropagation();
-              selectAllInValueChain(node);
-            }}
-            sx={{ p: 0.5, mr: 1 }}
+            onChange={() => selectAllInValueChain(node)}
           />
-          <ValueChainIcon sx={{ fontSize: 20, mr: 1, color: 'primary.main' }} />
-          <Typography
-            variant="subtitle2"
-            fontWeight={600}
-            sx={{ flex: 1, cursor: 'pointer' }}
+          <GitBranch className="w-4 h-4 theme-info-icon flex-shrink-0" />
+          <span
+            className="flex-1 text-sm font-semibold theme-text-title cursor-pointer"
             onClick={() => toggleNode(node.id)}
           >
             {node.label}
-          </Typography>
-          <Chip
-            size="small"
-            label={`${node.kpiCount} KPIs`}
-            variant="outlined"
-            sx={{ height: 24 }}
-          />
-        </Box>
-        <Collapse in={isExpanded}>
-          <Box sx={{ ml: 1, borderLeft: '2px solid', borderColor: 'grey.200', pl: 1 }}>
+          </span>
+          <span className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
+            {node.kpiCount} KPIs
+          </span>
+        </div>
+        {isExpanded && (
+          <div className="ml-4 border-l-2 border-alpha-faded-300 dark:border-alpha-faded-700 pl-2">
             {node.children?.map((child) => renderModuleNode(child, 1))}
-          </Box>
-        </Collapse>
-      </Box>
+          </div>
+        )}
+      </div>
     );
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-          Select KPIs
-        </Typography>
-        <TextField
-          fullWidth
-          size="small"
+    <div className="rounded-xl theme-card-bg border theme-border p-4">
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 theme-text-muted" />
+        <input
+          type="text"
           placeholder="Search KPIs by name, code, or description..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" color="action" />
-              </InputAdornment>
-            ),
-            endAdornment: searchTerm && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')}>
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
+          className="w-full h-10 pl-10 pr-10 rounded-lg theme-card-bg border theme-border
+            focus:outline-none focus:ring-2 focus:ring-alpha-500 focus:border-transparent
+            theme-text placeholder:theme-text-muted text-sm transition-all duration-200"
         />
-      </Box>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800"
+          >
+            <X className="w-4 h-4 theme-text-muted" />
+          </button>
+        )}
+      </div>
 
       {/* Selected KPIs summary */}
       {selectedKPIs.length > 0 && (
-        <Box sx={{ mb: 2, p: 1.5, bgcolor: 'primary.50', borderRadius: 1 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography variant="body2" fontWeight={500} color="primary.main">
+        <div className="mb-3 p-3 rounded-lg bg-alpha-500/10 border border-alpha-500/30">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium theme-text-vibrant">
               {selectedKPIs.length} KPI{selectedKPIs.length !== 1 ? 's' : ''} selected
-            </Typography>
-            <Tooltip title="Clear all">
-              <IconButton size="small" onClick={() => onSelectionChange([])}>
-                <ClearIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            </span>
+            <button
+              onClick={() => onSelectionChange([])}
+              className="text-xs theme-text-muted hover:theme-text transition-colors"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {selectedKPIs.slice(0, 10).map((kpi) => (
-              <Chip
+              <span
                 key={kpi.code}
-                label={kpi.code}
-                size="small"
-                onDelete={() => toggleKPI(kpi)}
-                color={kpi.calculation_type === 'set_based' ? 'primary' : 'default'}
-              />
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs",
+                  kpi.calculation_type === 'set_based'
+                    ? "bg-alpha-500/20 text-alpha-400"
+                    : "theme-card-bg border theme-border theme-text"
+                )}
+              >
+                {kpi.code}
+                <button
+                  onClick={() => toggleKPI(kpi)}
+                  className="hover:text-red-400 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
             ))}
             {selectedKPIs.length > 10 && (
-              <Chip
-                label={`+${selectedKPIs.length - 10} more`}
-                size="small"
-                variant="outlined"
-              />
+              <span className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
+                +{selectedKPIs.length - 10} more
+              </span>
             )}
-          </Box>
-        </Box>
+          </div>
+        </div>
       )}
 
       {/* Tree view */}
-      <Box
-        sx={{
-          maxHeight: 400,
-          overflow: 'auto',
-          border: '1px solid',
-          borderColor: 'grey.200',
-          borderRadius: 1,
-          p: 1,
-        }}
-      >
+      <div className="max-h-80 overflow-y-auto rounded-lg border theme-border p-2">
         {loading ? (
-          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-            Loading KPIs...
-          </Typography>
+          <p className="text-center py-8 theme-text-muted">Loading KPIs...</p>
         ) : treeData.length === 0 ? (
-          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+          <p className="text-center py-8 theme-text-muted">
             {searchTerm ? 'No KPIs match your search' : 'No KPIs available'}
-          </Typography>
+          </p>
         ) : (
           treeData.map((node) => renderValueChainNode(node))
         )}
-      </Box>
+      </div>
 
       {/* Stats */}
-      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between' }}>
-        <Typography variant="caption" color="text.secondary">
+      <div className="mt-2 flex justify-between text-xs theme-text-muted">
+        <span>
           {kpis.length} total KPIs across {new Set(kpis.map((k) => k.value_chain)).size} value chains
-        </Typography>
+        </span>
         {searchTerm && (
-          <Typography variant="caption" color="text.secondary">
+          <span>
             Showing {treeData.reduce((sum, vc) => sum + (vc.kpiCount || 0), 0)} results
-          </Typography>
+          </span>
         )}
-      </Box>
-    </Paper>
+      </div>
+    </div>
   );
 }

@@ -5,34 +5,17 @@
 
 import { useState } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  InputAdornment,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Chip,
-  Stack,
-  CircularProgress,
-  Alert,
-  Divider,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import StorageIcon from '@mui/icons-material/Storage';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+  Search,
+  GitBranch,
+  Database,
+  ArrowRight,
+  ArrowLeft,
+  ArrowLeftRight,
+  RefreshCw,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent } from '../components/ui/Card';
+import { cn } from '../lib/utils';
 import { useObjectModels } from '../hooks/useObjectModels';
 import ResizableSplitPanel from '../components/ResizableSplitPanel';
 import ObjectModelDiagram from '../components/ObjectModelDiagram';
@@ -47,22 +30,10 @@ interface Relationship {
   direction: 'forward' | 'backward' | 'bidirectional';
 }
 
-// Parse PlantUML UML class diagram relationships
 function parseRelationships(uml: string, entityCode: string): Relationship[] {
   const relationships: Relationship[] = [];
   const lines = uml.split('\n');
   
-  console.log('Parsing relationships for entity:', entityCode);
-  console.log('UML content:', uml);
-  
-  // Regex patterns for different UML relationship types
-  // Association: Entity1 "1" -- "0..*" Entity2 : label
-  // Composition: Entity1 "1" *-- "0..*" Entity2 : label
-  // Aggregation: Entity1 "1" o-- "0..*" Entity2 : label
-  // Generalization: Entity1 --|> Entity2
-  // Dependency: Entity1 ..> Entity2
-  
-  // Use [A-Za-z0-9_]+ to match entity names (including camelCase and PascalCase)
   const associationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
   const compositionPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(\*--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
   const aggregationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(o--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
@@ -70,7 +41,6 @@ function parseRelationships(uml: string, entityCode: string): Relationship[] {
   const dependencyPattern = /([A-Za-z0-9_]+)\s+(\.\.>)\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
   
   for (const line of lines) {
-    // Skip comments
     if (line.trim().startsWith("'")) continue;
     
     let match;
@@ -81,66 +51,37 @@ function parseRelationships(uml: string, entityCode: string): Relationship[] {
     let to = '';
     let label = '';
     
-    // Try composition
     if ((match = line.match(compositionPattern))) {
       [, from, fromCard, , toCard, to, label] = match;
       type = 'composition';
-    }
-    // Try aggregation
-    else if ((match = line.match(aggregationPattern))) {
+    } else if ((match = line.match(aggregationPattern))) {
       [, from, fromCard, , toCard, to, label] = match;
       type = 'aggregation';
-    }
-    // Try generalization
-    else if ((match = line.match(generalizationPattern))) {
+    } else if ((match = line.match(generalizationPattern))) {
       [, from, , to] = match;
       type = 'generalization';
-      fromCard = '';
-      toCard = '';
       label = 'inherits from';
-    }
-    // Try dependency
-    else if ((match = line.match(dependencyPattern))) {
+    } else if ((match = line.match(dependencyPattern))) {
       [, from, , to, label] = match;
       type = 'dependency';
-      fromCard = '';
-      toCard = '';
-    }
-    // Try association
-    else if ((match = line.match(associationPattern))) {
+    } else if ((match = line.match(associationPattern))) {
       [, from, fromCard, , toCard, to, label] = match;
       type = 'association';
     }
     
     if (match && (from === entityCode || to === entityCode)) {
       let direction: 'forward' | 'backward' | 'bidirectional' = 'bidirectional';
-      
-      // Determine direction based on position
       if (type === 'generalization') {
         direction = from === entityCode ? 'forward' : 'backward';
       } else if (type === 'dependency') {
         direction = 'forward';
-      } else {
-        // For association, composition, aggregation
-        direction = 'bidirectional';
       }
       
       const cardinality = fromCard && toCard ? `${fromCard} to ${toCard}` : '';
-      
-      relationships.push({
-        from,
-        to,
-        type,
-        cardinality,
-        label: label.trim(),
-        direction
-      });
-      
-      console.log('Found relationship:', { from, to, type, cardinality, label: label.trim() });
+      relationships.push({ from, to, type, cardinality, label: label.trim(), direction });
     }
   }
   
-  console.log('Total relationships found:', relationships.length);
   return relationships;
 }
 
@@ -151,7 +92,6 @@ export default function ObjectModelsBrowser() {
   
   const { data: objectModels, isLoading, error } = useObjectModels();
 
-  // Filter object models based on search
   const filteredModels = objectModels?.filter(model => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -164,7 +104,6 @@ export default function ObjectModelsBrowser() {
     );
   });
 
-  // Group models by module
   const modelsByModule = filteredModels?.reduce((acc, model) => {
     const modules = model.metadata_?.modules || ['Other'];
     modules.forEach(module => {
@@ -176,285 +115,227 @@ export default function ObjectModelsBrowser() {
 
   const selectedModelData = objectModels?.find(m => m.code === selectedModel);
 
-  const handleModelClick = (modelCode: string) => {
-    setSelectedModel(modelCode);
-  };
-
-  const handleViewFullDetails = (modelCode: string) => {
-    navigate(`/object-model/${modelCode}`);
-  };
+  const handleModelClick = (modelCode: string) => setSelectedModel(modelCode);
+  const handleViewFullDetails = (modelCode: string) => navigate(`/object-model/${modelCode}`);
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center h-full">
+        <RefreshCw className="w-8 h-8 text-alpha-500 animate-spin" />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error">
+      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
         Failed to load object models. Please check if the metadata service is running.
-      </Alert>
+      </div>
     );
   }
 
   const leftPanel = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-          <AccountTreeIcon color="primary" />
-          <Typography variant="h5" fontWeight="bold">
-            Object Models
-          </Typography>
-        </Stack>
+      <div className="p-4 border-b theme-border">
+        <div className="flex items-center gap-2 mb-4">
+          <GitBranch className="w-6 h-6 text-alpha-500" />
+          <h2 className="text-xl font-bold theme-text-title">Object Models</h2>
+        </div>
         
         {/* Search */}
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Search object models..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 theme-text-muted" />
+          <input
+            type="text"
+            placeholder="Search object models..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-xl theme-card-bg border theme-border theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
+          />
+        </div>
         
-        {/* Stats */}
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          {filteredModels?.length || 0} object models
-        </Typography>
-      </Box>
+        <p className="text-xs theme-text-muted mt-2">{filteredModels?.length || 0} object models</p>
+      </div>
 
       {/* Models List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <div className="flex-1 overflow-auto">
         {modelsByModule && Object.entries(modelsByModule).map(([module, models]) => (
-          <Box key={module}>
-            <Box sx={{ px: 2, py: 1, bgcolor: 'grey.50', borderBottom: 1, borderColor: 'divider' }}>
-              <Typography variant="subtitle2" fontWeight="bold" color="primary">
-                {module}
-              </Typography>
-            </Box>
-            <List dense>
+          <div key={module}>
+            <div className="px-4 py-2 theme-card-bg border-b theme-border">
+              <span className="text-sm font-semibold text-alpha-500">{module}</span>
+            </div>
+            <div className="divide-y theme-border">
               {models.map((model) => (
-                <ListItem key={model.code} disablePadding>
-                  <ListItemButton
-                    selected={selectedModel === model.code}
-                    onClick={() => handleModelClick(model.code)}
-                  >
-                    <ListItemText
-                      primary={
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <StorageIcon fontSize="small" color="action" />
-                          <Typography variant="body2" fontWeight="medium">
-                            {model.display_name || model.name}
-                          </Typography>
-                        </Stack>
-                      }
-                      secondary={
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {model.description}
-                        </Typography>
-                      }
-                    />
-                  </ListItemButton>
-                </ListItem>
+                <button
+                  key={model.code}
+                  onClick={() => handleModelClick(model.code)}
+                  className={cn(
+                    "w-full px-4 py-3 text-left hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900 transition-colors",
+                    selectedModel === model.code && "bg-alpha-500/10 border-l-2 border-alpha-500"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Database className="w-4 h-4 theme-text-muted flex-shrink-0" />
+                    <span className="text-sm font-medium theme-text truncate">
+                      {model.display_name || model.name}
+                    </span>
+                  </div>
+                  {model.description && (
+                    <p className="text-xs theme-text-muted mt-1 truncate pl-6">{model.description}</p>
+                  )}
+                </button>
               ))}
-            </List>
-          </Box>
+            </div>
+          </div>
         ))}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 
   const rightPanel = selectedModelData ? (
-    <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+    <div className="h-full overflow-auto p-6 space-y-6">
       {/* Header */}
-      <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
-              {selectedModelData.display_name || selectedModelData.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {selectedModelData.description}
-            </Typography>
-          </Box>
-          <Chip label={selectedModelData.code} size="small" />
-        </Stack>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold theme-text-title">
+            {selectedModelData.display_name || selectedModelData.name}
+          </h2>
+          <p className="text-sm theme-text-muted mt-1">{selectedModelData.description}</p>
+        </div>
+        <span className="px-2 py-1 rounded-full text-xs theme-card-bg border theme-border theme-text-muted">
+          {selectedModelData.code}
+        </span>
+      </div>
 
-        {/* Modules */}
-        {selectedModelData.metadata_?.modules && selectedModelData.metadata_.modules.length > 0 && (
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Used in Modules
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              {selectedModelData.metadata_.modules.map((module) => (
-                <Chip key={module} label={module} size="small" variant="outlined" />
-              ))}
-            </Stack>
-          </Box>
-        )}
+      {/* Modules */}
+      {selectedModelData.metadata_?.modules && selectedModelData.metadata_.modules.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium theme-text-muted mb-2">Used in Modules</h3>
+          <div className="flex flex-wrap gap-2">
+            {selectedModelData.metadata_.modules.map((module) => (
+              <span key={module} className="px-2 py-1 rounded-full text-xs border theme-border theme-text">
+                {module}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
-        <Divider />
+      <div className="border-t theme-border" />
 
-        {/* Technical Details */}
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-            Technical Details
-          </Typography>
-          <Stack spacing={1}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Table Name
-              </Typography>
-              <Typography variant="body2" fontFamily="monospace">
-                {selectedModelData.table_name}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Schema
-              </Typography>
-              <Typography variant="body2" fontFamily="monospace">
-                {typeof selectedModelData.table_schema === 'string' 
-                  ? selectedModelData.table_schema 
-                  : 'public'}
-              </Typography>
-            </Box>
-          </Stack>
-        </Box>
+      {/* Technical Details */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <h3 className="font-semibold theme-text-title">Technical Details</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs theme-text-muted">Table Name</p>
+              <p className="text-sm font-mono theme-text">{selectedModelData.table_name}</p>
+            </div>
+            <div>
+              <p className="text-xs theme-text-muted">Schema</p>
+              <p className="text-sm font-mono theme-text">
+                {typeof selectedModelData.table_schema === 'string' ? selectedModelData.table_schema : 'public'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Divider />
-
-        {/* Relationships Table */}
-        {selectedModelData.schema_definition && (() => {
-          const relationships = parseRelationships(selectedModelData.schema_definition, selectedModelData.code);
-          return relationships.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                Relationships ({relationships.length})
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>From</strong></TableCell>
-                      <TableCell align="center"><strong>Direction</strong></TableCell>
-                      <TableCell><strong>To</strong></TableCell>
-                      <TableCell><strong>Type</strong></TableCell>
-                      <TableCell><strong>Cardinality</strong></TableCell>
-                      <TableCell><strong>Relationship</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
+      {/* Relationships Table */}
+      {selectedModelData.schema_definition && (() => {
+        const relationships = parseRelationships(selectedModelData.schema_definition, selectedModelData.code);
+        return relationships.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="font-semibold theme-text-title mb-3">Relationships ({relationships.length})</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b theme-border">
+                      <th className="px-3 py-2 text-left theme-text-muted font-medium">From</th>
+                      <th className="px-3 py-2 text-center theme-text-muted font-medium">Direction</th>
+                      <th className="px-3 py-2 text-left theme-text-muted font-medium">To</th>
+                      <th className="px-3 py-2 text-left theme-text-muted font-medium">Type</th>
+                      <th className="px-3 py-2 text-left theme-text-muted font-medium">Cardinality</th>
+                      <th className="px-3 py-2 text-left theme-text-muted font-medium">Relationship</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {relationships.map((rel, index) => (
-                      <TableRow key={index} hover>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {rel.from}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          {rel.direction === 'forward' && <ArrowForwardIcon fontSize="small" color="action" />}
-                          {rel.direction === 'backward' && <ArrowBackIcon fontSize="small" color="action" />}
-                          {rel.direction === 'bidirectional' && <SwapHorizIcon fontSize="small" color="action" />}
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {rel.to}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={rel.type} 
-                            size="small" 
-                            color={
-                              rel.type === 'composition' ? 'error' :
-                              rel.type === 'aggregation' ? 'warning' :
-                              rel.type === 'generalization' ? 'info' :
-                              rel.type === 'dependency' ? 'secondary' :
-                              'default'
-                            }
-                            variant="outlined" 
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption" color="text.secondary" fontFamily="monospace">
-                            {rel.cardinality || '-'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {rel.label || '-'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
+                      <tr key={index} className="border-b theme-border hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900">
+                        <td className="px-3 py-2 font-medium theme-text">{rel.from}</td>
+                        <td className="px-3 py-2 text-center">
+                          {rel.direction === 'forward' && <ArrowRight className="w-4 h-4 theme-text-muted inline" />}
+                          {rel.direction === 'backward' && <ArrowLeft className="w-4 h-4 theme-text-muted inline" />}
+                          {rel.direction === 'bidirectional' && <ArrowLeftRight className="w-4 h-4 theme-text-muted inline" />}
+                        </td>
+                        <td className="px-3 py-2 font-medium theme-text">{rel.to}</td>
+                        <td className="px-3 py-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs border",
+                            rel.type === 'composition' && "bg-red-500/20 text-red-400 border-red-500/30",
+                            rel.type === 'aggregation' && "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                            rel.type === 'generalization' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                            rel.type === 'dependency' && "bg-purple-500/20 text-purple-400 border-purple-500/30",
+                            rel.type === 'association' && "bg-gray-500/20 theme-text-muted border-gray-500/30"
+                          )}>
+                            {rel.type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs theme-text-muted">{rel.cardinality || '-'}</td>
+                        <td className="px-3 py-2 theme-text-muted">{rel.label || '-'}</td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          );
-        })()}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
-        <Divider />
-
-        {/* UML Diagram */}
-        {selectedModelData.schema_definition && (
-          <Box>
-            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-              Entity Relationships Diagram
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+      {/* UML Diagram */}
+      {selectedModelData.schema_definition && (
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="font-semibold theme-text-title mb-3">Entity Relationships Diagram</h3>
+            <div className="p-4 rounded-xl theme-card-bg border theme-border">
               <ObjectModelDiagram
                 schemaDefinition={selectedModelData.schema_definition}
                 highlightEntity={selectedModelData.code}
               />
-            </Paper>
-          </Box>
-        )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* View Full Details Button */}
-        <Box sx={{ pt: 2 }}>
-          <Typography
-            variant="body2"
-            color="primary"
-            sx={{ cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={() => handleViewFullDetails(selectedModelData.code)}
-          >
-            View Full Details →
-          </Typography>
-        </Box>
-      </Stack>
-    </Box>
+      {/* View Full Details */}
+      <button
+        onClick={() => handleViewFullDetails(selectedModelData.code)}
+        className="text-sm text-alpha-500 hover:underline"
+      >
+        View Full Details →
+      </button>
+    </div>
   ) : (
-    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Stack spacing={2} alignItems="center">
-        <AccountTreeIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
-        <Typography variant="h6" color="text.secondary">
-          Select an object model to view details
-        </Typography>
-      </Stack>
-    </Box>
+    <div className="h-full flex items-center justify-center">
+      <div className="text-center">
+        <GitBranch className="w-16 h-16 mx-auto theme-text-muted opacity-30 mb-4" />
+        <p className="text-lg theme-text-muted">Select an object model to view details</p>
+      </div>
+    </div>
   );
 
   return (
-    <Box sx={{ height: '100%' }}>
+    <div className="h-full">
       <ResizableSplitPanel
         leftPanel={leftPanel}
         rightPanel={rightPanel}
         defaultLeftWidth={50}
         minLeftWidth={30}
       />
-    </Box>
+    </div>
   );
 }

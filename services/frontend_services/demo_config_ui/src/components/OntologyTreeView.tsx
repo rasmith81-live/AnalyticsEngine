@@ -1,42 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  IconButton,
-  TextField,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Collapse,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  Chip,
-  Tooltip,
-  Paper,
-  Divider,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Alert
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Business as ValueChainIcon,
-  Category as ModuleIcon,
-  Assessment as KPIIcon,
-  Storage as EntityIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  Building2,
+  Layers,
+  BarChart3,
+  Database,
+  RefreshCw,
+  X,
+} from 'lucide-react';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 import axios from 'axios';
 
 const BASE_URL = 'http://127.0.0.1:8090/api/v1/metadata';
@@ -62,17 +40,24 @@ interface OntologyTreeViewProps {
 }
 
 const DEFINITION_KINDS = [
-  { kind: 'value_chain_pattern_definition', label: 'Value Chain', icon: <ValueChainIcon /> },
-  { kind: 'business_process_definition', label: 'Module/Process', icon: <ModuleIcon /> },
-  { kind: 'metric_definition', label: 'KPI/Metric', icon: <KPIIcon /> },
-  { kind: 'entity_definition', label: 'Entity', icon: <EntityIcon /> },
+  { kind: 'value_chain_pattern_definition', label: 'Value Chain' },
+  { kind: 'business_process_definition', label: 'Module/Process' },
+  { kind: 'metric_definition', label: 'KPI/Metric' },
+  { kind: 'entity_definition', label: 'Entity' },
 ];
 
 const KIND_COLORS: Record<string, string> = {
-  'value_chain_pattern_definition': '#4caf50',
-  'business_process_definition': '#2196f3',
-  'metric_definition': '#ff9800',
-  'entity_definition': '#9c27b0',
+  'value_chain_pattern_definition': 'border-l-green-500',
+  'business_process_definition': 'border-l-blue-500',
+  'metric_definition': 'border-l-amber-500',
+  'entity_definition': 'border-l-purple-500',
+};
+
+const KIND_ICON_COLORS: Record<string, string> = {
+  'value_chain_pattern_definition': 'text-green-500',
+  'business_process_definition': 'text-blue-500',
+  'metric_definition': 'text-amber-500',
+  'entity_definition': 'text-purple-500',
 };
 
 export default function OntologyTreeView({ onRefresh, onSnackbar }: OntologyTreeViewProps) {
@@ -80,28 +65,14 @@ export default function OntologyTreeView({ onRefresh, onSnackbar }: OntologyTree
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root', '_orphan_kpis', '_orphan_modules', '_entities']));
   const [selectedNode, setSelectedNode] = useState<OntologyNode | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [parentForAdd, setParentForAdd] = useState<OntologyNode | null>(null);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    description: '',
-    kind: 'value_chain_pattern_definition',
-    process_type: 'core',
-    formula: '',
-    unit: '',
-  });
+  const [formData, setFormData] = useState({ code: '', name: '', description: '', kind: 'value_chain_pattern_definition', process_type: 'core', formula: '', unit: '' });
 
-  useEffect(() => {
-    fetchOntologyData();
-  }, []);
+  useEffect(() => { fetchOntologyData(); }, []);
 
   const fetchOntologyData = async () => {
     setLoading(true);
@@ -113,46 +84,24 @@ export default function OntologyTreeView({ onRefresh, onSnackbar }: OntologyTree
         axios.get(`${BASE_URL}/definitions/entity_definition`, { params: { limit: 100 } }).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL}/relationships`).catch(() => ({ data: [] }))
       ]);
-
-      const valueChains = vcRes.data || [];
-      const modules = modRes.data || [];
-      const kpis = kpiRes.data || [];
-      const entities = entityRes.data || [];
-      const rels = relRes.data || [];
-      
-      // Build tree structure based on relationships
-      const tree = buildTree(valueChains, modules, kpis, entities, rels);
+      const tree = buildTree(vcRes.data || [], modRes.data || [], kpiRes.data || [], entityRes.data || [], relRes.data || []);
       setTreeData(tree);
     } catch (err) {
       console.error('Failed to fetch ontology data:', err);
       onSnackbar?.('Failed to fetch ontology data', 'error');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const buildTree = (
-    valueChains: any[],
-    modules: any[],
-    kpis: any[],
-    entities: any[],
-    relationships: Relationship[]
-  ): OntologyNode[] => {
-    // Create lookup maps (case-insensitive for matching)
+  const buildTree = (valueChains: any[], modules: any[], kpis: any[], entities: any[], relationships: Relationship[]): OntologyNode[] => {
     const modulesByCode = new Map(modules.map(m => [m.code.toLowerCase(), m]));
     const kpisByCode = new Map(kpis.map(k => [k.code.toLowerCase(), k]));
     const entitiesByCode = new Map(entities.map(e => [e.code.toLowerCase(), e]));
-    
-    // Build relationship maps (store original codes for display)
     const moduleToVC = new Map<string, string>();
     const kpiToModule = new Map<string, string>();
     const kpiToVC = new Map<string, string>();
     const entityToKpi = new Map<string, Set<string>>();
     const kpiToEntities = new Map<string, Set<string>>();
-    
-    // Build relationships based on existence, not type
-    // Determine parent-child by checking what kind of entity is on each side
-    // Use lowercase for comparison to handle mixed-case codes
+
     relationships.forEach(rel => {
       const fromLower = rel.from_entity_code.toLowerCase();
       const toLower = rel.to_entity_code.toLowerCase();
@@ -161,380 +110,142 @@ export default function OntologyTreeView({ onRefresh, onSnackbar }: OntologyTree
       const toIsVC = valueChains.some(vc => vc.code.toLowerCase() === toLower);
       const toIsModule = modulesByCode.has(toLower);
       const toIsKpi = kpisByCode.has(toLower);
-      
-      // Module -> ValueChain relationship
-      if (fromIsModule && toIsVC) {
-        moduleToVC.set(fromLower, toLower);
-      }
-      // Module -> KPI relationship (module contains KPI)
-      else if (fromIsModule && toIsKpi) {
-        kpiToModule.set(toLower, fromLower);
-      }
-      // KPI -> Module relationship (KPI belongs to module)
-      else if (fromIsKpi && toIsModule) {
-        kpiToModule.set(fromLower, toLower);
-      }
-      // KPI -> ValueChain relationship (direct, no module)
-      else if (fromIsKpi && toIsVC) {
-        kpiToVC.set(fromLower, toLower);
-      }
-      // KPI -> Entity relationship
+
+      if (fromIsModule && toIsVC) moduleToVC.set(fromLower, toLower);
+      else if (fromIsModule && toIsKpi) kpiToModule.set(toLower, fromLower);
+      else if (fromIsKpi && toIsModule) kpiToModule.set(fromLower, toLower);
+      else if (fromIsKpi && toIsVC) kpiToVC.set(fromLower, toLower);
       else if (fromIsKpi && !toIsVC && !toIsModule && !toIsKpi) {
-        if (!entityToKpi.has(toLower)) {
-          entityToKpi.set(toLower, new Set());
-        }
+        if (!entityToKpi.has(toLower)) entityToKpi.set(toLower, new Set());
         entityToKpi.get(toLower)!.add(fromLower);
-        
-        // Also track entities per KPI (for adding entities as children of KPIs)
-        if (!kpiToEntities.has(fromLower)) {
-          kpiToEntities.set(fromLower, new Set());
-        }
+        if (!kpiToEntities.has(fromLower)) kpiToEntities.set(fromLower, new Set());
         kpiToEntities.get(fromLower)!.add(toLower);
       }
     });
-    
-    // Build tree nodes
+
     const tree: OntologyNode[] = [];
-    
-    // Value Chains as root nodes
+
     valueChains.forEach(vc => {
-      const vcNode: OntologyNode = {
-        code: vc.code,
-        name: vc.name,
-        kind: 'value_chain_pattern_definition',
-        description: vc.description,
-        fields: { domain: vc.domain },
-        children: []
-      };
-      
-      // Find modules belonging to this value chain
+      const vcNode: OntologyNode = { code: vc.code, name: vc.name, kind: 'value_chain_pattern_definition', description: vc.description, fields: { domain: vc.domain }, children: [] };
       modules.forEach(mod => {
-        const modCodeLower = mod.code.toLowerCase();
-        const vcCodeLower = vc.code.toLowerCase();
-        if (moduleToVC.get(modCodeLower) === vcCodeLower) {
-          const modNode: OntologyNode = {
-            code: mod.code,
-            name: mod.name,
-            kind: 'business_process_definition',
-            description: mod.description,
-            fields: { process_type: mod.process_type },
-            children: []
-          };
-          
-          // Find KPIs belonging to this module
+        if (moduleToVC.get(mod.code.toLowerCase()) === vc.code.toLowerCase()) {
+          const modNode: OntologyNode = { code: mod.code, name: mod.name, kind: 'business_process_definition', description: mod.description, fields: { process_type: mod.process_type }, children: [] };
           kpis.forEach(kpi => {
-            const kpiCodeLower = kpi.code.toLowerCase();
-            if (kpiToModule.get(kpiCodeLower) === modCodeLower) {
-              // Build entity children for this KPI
+            if (kpiToModule.get(kpi.code.toLowerCase()) === mod.code.toLowerCase()) {
               const entityChildren: OntologyNode[] = [];
-              const entityCodes = kpiToEntities.get(kpiCodeLower) || new Set<string>();
-              entityCodes.forEach(entityCodeLower => {
+              (kpiToEntities.get(kpi.code.toLowerCase()) || new Set()).forEach(entityCodeLower => {
                 const entity = entitiesByCode.get(entityCodeLower);
-                if (entity) {
-                  entityChildren.push({
-                    code: entity.code,
-                    name: entity.name,
-                    kind: 'entity_definition',
-                    description: entity.description,
-                    children: []
-                  });
-                }
+                if (entity) entityChildren.push({ code: entity.code, name: entity.name, kind: 'entity_definition', description: entity.description, children: [] });
               });
-              
-              const kpiNode: OntologyNode = {
-                code: kpi.code,
-                name: kpi.name,
-                kind: 'metric_definition',
-                description: kpi.description,
-                fields: { 
-                  formula: kpi.formula,
-                  math_expression: kpi.math_expression,
-                  unit: kpi.unit 
-                },
-                children: entityChildren
-              };
-              modNode.children!.push(kpiNode);
+              modNode.children!.push({ code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit }, children: entityChildren });
             }
           });
-          
           vcNode.children!.push(modNode);
         }
       });
-      
-      // Find KPIs directly under value chain (not in a module)
       kpis.forEach(kpi => {
-        const kpiCodeLower = kpi.code.toLowerCase();
-        const vcCodeLower = vc.code.toLowerCase();
-        if (kpiToVC.get(kpiCodeLower) === vcCodeLower && !kpiToModule.has(kpiCodeLower)) {
-          // Build entity children for this KPI
+        if (kpiToVC.get(kpi.code.toLowerCase()) === vc.code.toLowerCase() && !kpiToModule.has(kpi.code.toLowerCase())) {
           const entityChildren: OntologyNode[] = [];
-          const entityCodes = kpiToEntities.get(kpiCodeLower) || new Set<string>();
-          entityCodes.forEach(entityCodeLower => {
+          (kpiToEntities.get(kpi.code.toLowerCase()) || new Set()).forEach(entityCodeLower => {
             const entity = entitiesByCode.get(entityCodeLower);
-            if (entity) {
-              entityChildren.push({
-                code: entity.code,
-                name: entity.name,
-                kind: 'entity_definition',
-                description: entity.description,
-                children: []
-              });
-            }
+            if (entity) entityChildren.push({ code: entity.code, name: entity.name, kind: 'entity_definition', description: entity.description, children: [] });
           });
-          
-          const kpiNode: OntologyNode = {
-            code: kpi.code,
-            name: kpi.name,
-            kind: 'metric_definition',
-            description: kpi.description,
-            fields: { 
-              formula: kpi.formula,
-              math_expression: kpi.math_expression,
-              unit: kpi.unit 
-            },
-            children: entityChildren
-          };
-          vcNode.children!.push(kpiNode);
+          vcNode.children!.push({ code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit }, children: entityChildren });
         }
       });
-      
       tree.push(vcNode);
     });
-    
-    // Add orphan modules (not linked to any value chain)
-    const orphanModules: OntologyNode[] = [];
-    modules.forEach(mod => {
-      const modCodeLower = mod.code.toLowerCase();
-      if (!moduleToVC.has(modCodeLower)) {
-        orphanModules.push({
-          code: mod.code,
-          name: mod.name,
-          kind: 'business_process_definition',
-          description: mod.description,
-          fields: { process_type: mod.process_type },
-          children: []
-        });
-      }
+
+    const orphanModules = modules.filter(mod => !moduleToVC.has(mod.code.toLowerCase())).map(mod => ({ code: mod.code, name: mod.name, kind: 'business_process_definition', description: mod.description, fields: { process_type: mod.process_type }, children: [] }));
+    if (orphanModules.length > 0) tree.push({ code: '_orphan_modules', name: 'Unassigned Modules', kind: 'folder', children: orphanModules });
+
+    const orphanKpis = kpis.filter(kpi => !kpiToModule.has(kpi.code.toLowerCase()) && !kpiToVC.has(kpi.code.toLowerCase())).map(kpi => {
+      const entityChildren: OntologyNode[] = [];
+      (kpiToEntities.get(kpi.code.toLowerCase()) || new Set()).forEach(entityCodeLower => {
+        const entity = entitiesByCode.get(entityCodeLower);
+        if (entity) entityChildren.push({ code: entity.code, name: entity.name, kind: 'entity_definition', description: entity.description, children: [] });
+      });
+      return { code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, unit: kpi.unit }, children: entityChildren };
     });
-    
-    if (orphanModules.length > 0) {
-      tree.push({
-        code: '_orphan_modules',
-        name: 'Unassigned Modules',
-        kind: 'folder',
-        children: orphanModules
-      });
-    }
-    
-    // Add orphan KPIs
-    const orphanKpis: OntologyNode[] = [];
-    kpis.forEach(kpi => {
-      const kpiCodeLower = kpi.code.toLowerCase();
-      if (!kpiToModule.has(kpiCodeLower) && !kpiToVC.has(kpiCodeLower)) {
-        // Build entity children for this orphan KPI
-        const entityChildren: OntologyNode[] = [];
-        const entityCodes = kpiToEntities.get(kpiCodeLower) || new Set<string>();
-        entityCodes.forEach(entityCodeLower => {
-          const entity = entitiesByCode.get(entityCodeLower);
-          if (entity) {
-            entityChildren.push({
-              code: entity.code,
-              name: entity.name,
-              kind: 'entity_definition',
-              description: entity.description,
-              children: []
-            });
-          }
-        });
-        
-        orphanKpis.push({
-          code: kpi.code,
-          name: kpi.name,
-          kind: 'metric_definition',
-          description: kpi.description,
-          fields: { formula: kpi.formula, unit: kpi.unit },
-          children: entityChildren
-        });
-      }
-    });
-    
-    if (orphanKpis.length > 0) {
-      tree.push({
-        code: '_orphan_kpis',
-        name: 'Unassigned KPIs',
-        kind: 'folder',
-        children: orphanKpis
-      });
-    }
-    
-    // Add orphan entities section (entities not linked to any KPI)
-    const orphanEntities = entities.filter(e => !entityToKpi.has(e.code.toLowerCase()));
-    if (orphanEntities.length > 0) {
-      tree.push({
-        code: '_orphan_entities',
-        name: 'Unassigned Entities',
-        kind: 'folder',
-        children: orphanEntities.map(e => ({
-          code: e.code,
-          name: e.name,
-          kind: 'entity_definition',
-          description: e.description,
-          fields: e,
-          children: []
-        }))
-      });
-    }
-    
+    if (orphanKpis.length > 0) tree.push({ code: '_orphan_kpis', name: 'Unassigned KPIs', kind: 'folder', children: orphanKpis });
+
+    const orphanEntities = entities.filter(e => !entityToKpi.has(e.code.toLowerCase())).map(e => ({ code: e.code, name: e.name, kind: 'entity_definition', description: e.description, fields: e, children: [] }));
+    if (orphanEntities.length > 0) tree.push({ code: '_orphan_entities', name: 'Unassigned Entities', kind: 'folder', children: orphanEntities });
+
     return tree;
   };
 
   const toggleNode = (code: string) => {
-    setExpandedNodes(prev => {
-      const next = new Set(prev);
-      if (next.has(code)) {
-        next.delete(code);
-      } else {
-        next.add(code);
-      }
-      return next;
-    });
-  };
-
-  const handleNodeClick = (node: OntologyNode) => {
-    setSelectedNode(node);
+    setExpandedNodes(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
   };
 
   const handleAddClick = (parentNode?: OntologyNode) => {
     setParentForAdd(parentNode || null);
     setDialogMode('add');
-    
-    // Set default kind based on parent
     let defaultKind = 'value_chain_pattern_definition';
     if (parentNode) {
-      if (parentNode.kind === 'value_chain_pattern_definition') {
-        defaultKind = 'business_process_definition';
-      } else if (parentNode.kind === 'business_process_definition') {
-        defaultKind = 'metric_definition';
-      }
+      if (parentNode.kind === 'value_chain_pattern_definition') defaultKind = 'business_process_definition';
+      else if (parentNode.kind === 'business_process_definition') defaultKind = 'metric_definition';
     }
-    
-    setFormData({
-      code: '',
-      name: '',
-      description: '',
-      kind: defaultKind,
-      process_type: 'core',
-      formula: '',
-      unit: '',
-    });
+    setFormData({ code: '', name: '', description: '', kind: defaultKind, process_type: 'core', formula: '', unit: '' });
     setAddDialogOpen(true);
   };
 
   const handleEditClick = (node: OntologyNode) => {
     setSelectedNode(node);
     setDialogMode('edit');
-    setFormData({
-      code: node.code,
-      name: node.name,
-      description: node.description || '',
-      kind: node.kind,
-      process_type: node.fields?.process_type || 'core',
-      formula: node.fields?.formula || '',
-      unit: node.fields?.unit || '',
-    });
+    setFormData({ code: node.code, name: node.name, description: node.description || '', kind: node.kind, process_type: node.fields?.process_type || 'core', formula: node.fields?.formula || '', unit: node.fields?.unit || '' });
     setEditDialogOpen(true);
   };
 
-  const handleDeleteClick = (node: OntologyNode) => {
-    setSelectedNode(node);
-    setDeleteDialogOpen(true);
-  };
+  const handleDeleteClick = (node: OntologyNode) => { setSelectedNode(node); setDeleteDialogOpen(true); };
 
   const handleSave = async () => {
     try {
-      const definition: any = {
-        code: formData.code,
-        name: formData.name,
-        description: formData.description,
-      };
-      
-      // Add kind-specific fields
-      if (formData.kind === 'business_process_definition') {
-        definition.process_type = formData.process_type;
-      }
-      if (formData.kind === 'metric_definition') {
-        definition.formula = formData.formula;
-        definition.unit = formData.unit;
-      }
-      
+      const definition: any = { code: formData.code, name: formData.name, description: formData.description };
+      if (formData.kind === 'business_process_definition') definition.process_type = formData.process_type;
+      if (formData.kind === 'metric_definition') { definition.formula = formData.formula; definition.unit = formData.unit; }
+
       if (dialogMode === 'add') {
-        await axios.post(`${BASE_URL}/definitions`, {
-          ...definition,
-          kind: formData.kind
-        }, {
-          params: { created_by: 'admin' }
-        });
-        
-        // Create relationship if parent exists
+        await axios.post(`${BASE_URL}/definitions`, { ...definition, kind: formData.kind }, { params: { created_by: 'admin' } });
         if (parentForAdd && parentForAdd.kind !== 'folder') {
           let relType = 'belongs_to';
-          if (parentForAdd.kind === 'value_chain_pattern_definition') {
-            relType = 'belongs_to';
-          } else if (parentForAdd.kind === 'business_process_definition') {
-            relType = 'belongs_to_module';
-          }
-          
-          await axios.post(`${BASE_URL}/relationships`, {
-            from_entity_code: formData.code,
-            to_entity_code: parentForAdd.code,
-            relationship_type: relType
-          }, {
-            params: { created_by: 'admin' }
-          });
+          if (parentForAdd.kind === 'value_chain_pattern_definition') relType = 'belongs_to';
+          else if (parentForAdd.kind === 'business_process_definition') relType = 'belongs_to_module';
+          await axios.post(`${BASE_URL}/relationships`, { from_entity_code: formData.code, to_entity_code: parentForAdd.code, relationship_type: relType }, { params: { created_by: 'admin' } });
         }
-        
         onSnackbar?.(`${formData.name} created successfully`, 'success');
       } else {
-        await axios.put(`${BASE_URL}/definitions/${selectedNode?.kind}/${selectedNode?.code}`, definition, {
-          params: { changed_by: 'admin' }
-        });
+        await axios.put(`${BASE_URL}/definitions/${selectedNode?.kind}/${selectedNode?.code}`, definition, { params: { changed_by: 'admin' } });
         onSnackbar?.(`${formData.name} updated successfully`, 'success');
       }
-      
       setAddDialogOpen(false);
       setEditDialogOpen(false);
       fetchOntologyData();
       onRefresh?.();
-    } catch (err: any) {
-      onSnackbar?.(`Failed to save: ${err.message}`, 'error');
-    }
+    } catch (err: any) { onSnackbar?.(`Failed to save: ${err.message}`, 'error'); }
   };
 
   const handleDelete = async () => {
     if (!selectedNode) return;
-    
     try {
-      await axios.delete(`${BASE_URL}/definitions/${selectedNode.kind}/${selectedNode.code}`, {
-        params: { deleted_by: 'admin' }
-      });
+      await axios.delete(`${BASE_URL}/definitions/${selectedNode.kind}/${selectedNode.code}`, { params: { deleted_by: 'admin' } });
       onSnackbar?.(`${selectedNode.name} deleted successfully`, 'success');
       setDeleteDialogOpen(false);
       setSelectedNode(null);
       fetchOntologyData();
       onRefresh?.();
-    } catch (err: any) {
-      onSnackbar?.(`Failed to delete: ${err.message}`, 'error');
-    }
+    } catch (err: any) { onSnackbar?.(`Failed to delete: ${err.message}`, 'error'); }
   };
 
   const getIcon = (kind: string) => {
+    const colorClass = KIND_ICON_COLORS[kind] || 'theme-text-muted';
     switch (kind) {
-      case 'value_chain_pattern_definition': return <ValueChainIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'business_process_definition': return <ModuleIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'metric_definition': return <KPIIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'entity_definition': return <EntityIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'folder': return <ChevronRightIcon />;
-      default: return <ChevronRightIcon />;
+      case 'value_chain_pattern_definition': return <Building2 className={cn("w-4 h-4", colorClass)} />;
+      case 'business_process_definition': return <Layers className={cn("w-4 h-4", colorClass)} />;
+      case 'metric_definition': return <BarChart3 className={cn("w-4 h-4", colorClass)} />;
+      case 'entity_definition': return <Database className={cn("w-4 h-4", colorClass)} />;
+      default: return <ChevronRight className="w-4 h-4 theme-text-muted" />;
     }
   };
 
@@ -543,326 +254,185 @@ export default function OntologyTreeView({ onRefresh, onSnackbar }: OntologyTree
     const isExpanded = expandedNodes.has(node.code);
     const isSelected = selectedNode?.code === node.code;
     const isFolder = node.kind === 'folder';
-    
+
     return (
-      <Box key={node.code}>
-        <ListItem
-          sx={{
-            pl: depth * 3,
-            backgroundColor: isSelected ? 'action.selected' : 'transparent',
-            '&:hover': { backgroundColor: 'action.hover' },
-            cursor: 'pointer',
-            borderLeft: !isFolder ? `3px solid ${KIND_COLORS[node.kind] || '#ccc'}` : 'none',
-          }}
-          onClick={() => !isFolder && handleNodeClick(node)}
-        >
-          <ListItemIcon sx={{ minWidth: 32 }}>
-            {hasChildren ? (
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); toggleNode(node.code); }}>
-                {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-              </IconButton>
-            ) : (
-              <Box sx={{ width: 32 }} />
-            )}
-          </ListItemIcon>
-          <ListItemIcon sx={{ minWidth: 32 }}>
-            {getIcon(node.kind)}
-          </ListItemIcon>
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>
-                  {node.name}
-                </Typography>
-                {!isFolder && (
-                  <Chip 
-                    label={node.code} 
-                    size="small" 
-                    variant="outlined"
-                    sx={{ fontSize: '0.65rem', height: 18 }}
-                  />
-                )}
-              </Box>
-            }
-            secondary={node.description ? node.description.substring(0, 60) + (node.description.length > 60 ? '...' : '') : null}
-          />
-          {!isFolder && (
-            <ListItemSecondaryAction>
-              <Tooltip title="Add child">
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleAddClick(node); }}>
-                  <AddIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Edit">
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditClick(node); }}>
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete">
-                <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </ListItemSecondaryAction>
+      <div key={node.code}>
+        <div
+          className={cn(
+            "flex items-center py-2 px-2 cursor-pointer transition-colors hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900 group",
+            isSelected && "bg-alpha-500/10",
+            !isFolder && "border-l-2",
+            !isFolder && KIND_COLORS[node.kind]
           )}
-        </ListItem>
-        {hasChildren && (
-          <Collapse in={isExpanded}>
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
-          </Collapse>
-        )}
-      </Box>
+          style={{ paddingLeft: `${depth * 24 + 8}px` }}
+          onClick={() => !isFolder && setSelectedNode(node)}
+        >
+          <div className="w-7 flex-shrink-0">
+            {hasChildren ? (
+              <button onClick={(e) => { e.stopPropagation(); toggleNode(node.code); }} className="p-0.5 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded">
+                {isExpanded ? <ChevronDown className="w-4 h-4 theme-text-muted" /> : <ChevronRight className="w-4 h-4 theme-text-muted" />}
+              </button>
+            ) : null}
+          </div>
+          <div className="w-6 flex-shrink-0">{getIcon(node.kind)}</div>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <span className={cn("text-sm truncate", isSelected ? "font-semibold theme-text-title" : "theme-text")}>{node.name}</span>
+            {!isFolder && <span className="px-1.5 py-0.5 rounded text-[10px] theme-card-bg border theme-border theme-text-muted">{node.code}</span>}
+          </div>
+          {!isFolder && (
+            <div className="hidden group-hover:flex items-center gap-1">
+              <button onClick={(e) => { e.stopPropagation(); handleAddClick(node); }} className="p-1 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded" title="Add child"><Plus className="w-3.5 h-3.5 theme-text-muted" /></button>
+              <button onClick={(e) => { e.stopPropagation(); handleEditClick(node); }} className="p-1 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded" title="Edit"><Pencil className="w-3.5 h-3.5 theme-text-muted" /></button>
+              <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(node); }} className="p-1 hover:bg-red-500/20 rounded text-red-400" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          )}
+        </div>
+        {hasChildren && isExpanded && <div>{node.children!.map(child => renderTreeNode(child, depth + 1))}</div>}
+      </div>
     );
   };
 
   const renderDetailsPanel = () => {
     if (!selectedNode || selectedNode.kind === 'folder') {
-      return (
-        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-          <Typography>Select a node to view details</Typography>
-        </Box>
-      );
+      return <div className="p-4 text-center theme-text-muted">Select a node to view details</div>;
     }
-
     return (
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-2">
           {getIcon(selectedNode.kind)}
-          <Typography variant="h6">{selectedNode.name}</Typography>
-        </Box>
-        
-        <Divider sx={{ mb: 2 }} />
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Code</Typography>
-            <Typography variant="body2" fontFamily="monospace">{selectedNode.code}</Typography>
-          </Box>
-          
-          <Box>
-            <Typography variant="caption" color="text.secondary">Type</Typography>
-            <Typography variant="body2">
-              {DEFINITION_KINDS.find(k => k.kind === selectedNode.kind)?.label || selectedNode.kind}
-            </Typography>
-          </Box>
-          
-          {selectedNode.description && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Description</Typography>
-              <Typography variant="body2">{selectedNode.description}</Typography>
-            </Box>
-          )}
-          
+          <h3 className="font-semibold theme-text-title">{selectedNode.name}</h3>
+        </div>
+        <div className="border-t theme-border" />
+        <div className="space-y-3 text-sm">
+          <div><p className="text-xs theme-text-muted">Code</p><p className="font-mono theme-text">{selectedNode.code}</p></div>
+          <div><p className="text-xs theme-text-muted">Type</p><p className="theme-text">{DEFINITION_KINDS.find(k => k.kind === selectedNode.kind)?.label || selectedNode.kind}</p></div>
+          {selectedNode.description && <div><p className="text-xs theme-text-muted">Description</p><p className="theme-text">{selectedNode.description}</p></div>}
           {selectedNode.fields && Object.keys(selectedNode.fields).length > 0 && (
             <>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="subtitle2" color="text.secondary">Fields</Typography>
-              {Object.entries(selectedNode.fields).map(([key, value]) => (
-                value && (
-                  <Box key={key}>
-                    <Typography variant="caption" color="text.secondary">{key}</Typography>
-                    <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                    </Typography>
-                  </Box>
-                )
+              <div className="border-t theme-border pt-3"><p className="text-xs theme-text-muted mb-2">Fields</p></div>
+              {Object.entries(selectedNode.fields).map(([key, value]) => value && (
+                <div key={key}><p className="text-xs theme-text-muted">{key}</p><p className="theme-text break-words">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</p></div>
               ))}
             </>
           )}
-        </Box>
-        
-        <Box sx={{ mt: 3, display: 'flex', gap: 1 }}>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            startIcon={<EditIcon />}
-            onClick={() => handleEditClick(selectedNode)}
-          >
-            Edit
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => handleDeleteClick(selectedNode)}
-          >
-            Delete
-          </Button>
-        </Box>
-      </Box>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => handleEditClick(selectedNode)}><Pencil className="w-4 h-4 mr-1" />Edit</Button>
+          <Button variant="outline" size="sm" className="text-red-400 border-red-500/30 hover:bg-red-500/10" onClick={() => handleDeleteClick(selectedNode)}><Trash2 className="w-4 h-4 mr-1" />Delete</Button>
+        </div>
+      </div>
     );
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <Typography>Loading ontology...</Typography>
-      </Box>
-    );
+    return <div className="flex items-center justify-center p-8"><RefreshCw className="w-5 h-5 text-alpha-500 animate-spin mr-2" /><span className="theme-text-muted">Loading ontology...</span></div>;
   }
 
   return (
-    <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
+    <div className="flex gap-4 h-full">
       {/* Tree Panel */}
-      <Paper sx={{ flex: 2, overflow: 'auto', maxHeight: 600 }}>
-        <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>Ontology Structure</Typography>
-          <Box>
-            <Tooltip title="Add Value Chain">
-              <IconButton size="small" onClick={() => handleAddClick()}>
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Refresh">
-              <IconButton size="small" onClick={fetchOntologyData}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-        
-        {treeData.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Alert severity="info">
-              No ontology data found. Click the + button to add a value chain.
-            </Alert>
-          </Box>
-        ) : (
-          <List dense disablePadding>
-            {treeData.map(node => renderTreeNode(node))}
-          </List>
-        )}
-      </Paper>
-      
-      {/* Details Panel */}
-      <Paper sx={{ flex: 1, minWidth: 300, maxHeight: 600, overflow: 'auto' }}>
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>Details</Typography>
-        </Box>
-        {renderDetailsPanel()}
-      </Paper>
-      
-      {/* Add/Edit Dialog */}
-      <Dialog open={addDialogOpen || editDialogOpen} onClose={() => { setAddDialogOpen(false); setEditDialogOpen(false); }} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {dialogMode === 'add' ? 'Add New' : 'Edit'} {DEFINITION_KINDS.find(k => k.kind === formData.kind)?.label || 'Item'}
-          {parentForAdd && dialogMode === 'add' && (
-            <Typography variant="body2" color="text.secondary">
-              Under: {parentForAdd.name}
-            </Typography>
+      <Card className="flex-[2] overflow-hidden flex flex-col max-h-[600px]">
+        <div className="p-3 flex items-center justify-between border-b theme-border">
+          <h3 className="font-semibold theme-text-title">Ontology Structure</h3>
+          <div className="flex items-center gap-1">
+            <button onClick={() => handleAddClick()} className="p-1.5 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800" title="Add Value Chain"><Plus className="w-4 h-4 theme-text-muted" /></button>
+            <button onClick={fetchOntologyData} className="p-1.5 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800" title="Refresh"><RefreshCw className="w-4 h-4 theme-text-muted" /></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {treeData.length === 0 ? (
+            <div className="p-4"><div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">No ontology data found. Click the + button to add a value chain.</div></div>
+          ) : (
+            <div>{treeData.map(node => renderTreeNode(node))}</div>
           )}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            {dialogMode === 'add' && (
-              <FormControl fullWidth>
-                <InputLabel>Type</InputLabel>
-                <Select
-                  value={formData.kind}
-                  label="Type"
-                  onChange={(e) => setFormData({ ...formData, kind: e.target.value })}
-                >
-                  {DEFINITION_KINDS.map(k => (
-                    <MenuItem key={k.kind} value={k.kind}>{k.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            
-            <TextField
-              label="Code"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-              fullWidth
-              disabled={dialogMode === 'edit'}
-              helperText="Unique identifier (lowercase, underscores)"
-            />
-            
-            <TextField
-              label="Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              fullWidth
-              autoFocus
-            />
-            
-            <TextField
-              label="Description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              fullWidth
-              multiline
-              rows={2}
-            />
-            
-            {formData.kind === 'business_process_definition' && (
-              <FormControl fullWidth>
-                <InputLabel>Process Type</InputLabel>
-                <Select
-                  value={formData.process_type}
-                  label="Process Type"
-                  onChange={(e) => setFormData({ ...formData, process_type: e.target.value })}
-                >
-                  <MenuItem value="core">Core</MenuItem>
-                  <MenuItem value="support">Support</MenuItem>
-                  <MenuItem value="management">Management</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-            
-            {formData.kind === 'metric_definition' && (
-              <>
-                <TextField
-                  label="Formula"
-                  value={formData.formula}
-                  onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
-                  fullWidth
-                  multiline
-                  rows={2}
-                  helperText="Natural language formula description"
-                />
-                <TextField
-                  label="Unit"
-                  value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  fullWidth
-                  placeholder="e.g., %, USD, count"
-                />
-              </>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setAddDialogOpen(false); setEditDialogOpen(false); }}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSave}
-            disabled={!formData.code || !formData.name}
-          >
-            {dialogMode === 'add' ? 'Create' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
+        </div>
+      </Card>
+
+      {/* Details Panel */}
+      <Card className="flex-1 min-w-[300px] max-h-[600px] overflow-auto">
+        <div className="p-3 border-b theme-border"><h3 className="font-semibold theme-text-title">Details</h3></div>
+        {renderDetailsPanel()}
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      {(addDialogOpen || editDialogOpen) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="w-full max-w-md rounded-xl theme-card-bg border theme-border shadow-2xl">
+            <div className="p-4 border-b theme-border flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold theme-text-title">{dialogMode === 'add' ? 'Add New' : 'Edit'} {DEFINITION_KINDS.find(k => k.kind === formData.kind)?.label || 'Item'}</h2>
+                {parentForAdd && dialogMode === 'add' && <p className="text-xs theme-text-muted">Under: {parentForAdd.name}</p>}
+              </div>
+              <button onClick={() => { setAddDialogOpen(false); setEditDialogOpen(false); }} className="p-1 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded"><X className="w-5 h-5 theme-text-muted" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              {dialogMode === 'add' && (
+                <div>
+                  <label className="block text-sm font-medium theme-text mb-1">Type</label>
+                  <select value={formData.kind} onChange={(e) => setFormData({ ...formData, kind: e.target.value })} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500">
+                    {DEFINITION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium theme-text mb-1">Code</label>
+                <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toLowerCase().replace(/\s+/g, '_') })} disabled={dialogMode === 'edit'} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500 disabled:opacity-50" placeholder="Unique identifier (lowercase, underscores)" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium theme-text mb-1">Name</label>
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500" autoFocus />
+              </div>
+              <div>
+                <label className="block text-sm font-medium theme-text mb-1">Description</label>
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500 resize-none" />
+              </div>
+              {formData.kind === 'business_process_definition' && (
+                <div>
+                  <label className="block text-sm font-medium theme-text mb-1">Process Type</label>
+                  <select value={formData.process_type} onChange={(e) => setFormData({ ...formData, process_type: e.target.value })} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500">
+                    <option value="core">Core</option>
+                    <option value="support">Support</option>
+                    <option value="management">Management</option>
+                  </select>
+                </div>
+              )}
+              {formData.kind === 'metric_definition' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium theme-text mb-1">Formula</label>
+                    <textarea value={formData.formula} onChange={(e) => setFormData({ ...formData, formula: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500 resize-none" placeholder="Natural language formula description" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium theme-text mb-1">Unit</label>
+                    <input type="text" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="w-full px-3 py-2 rounded-lg theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500" placeholder="e.g., %, USD, count" />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 border-t theme-border flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setAddDialogOpen(false); setEditDialogOpen(false); }}>Cancel</Button>
+              <Button onClick={handleSave} disabled={!formData.code || !formData.name}>{dialogMode === 'add' ? 'Create' : 'Save'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete "{selectedNode?.name}"?
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDelete}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {deleteDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="w-full max-w-sm rounded-xl theme-card-bg border theme-border shadow-2xl">
+            <div className="p-4 border-b theme-border"><h2 className="text-lg font-semibold theme-text-title">Confirm Delete</h2></div>
+            <div className="p-4">
+              <p className="theme-text">Are you sure you want to delete "{selectedNode?.name}"?</p>
+              <p className="text-sm theme-text-muted mt-1">This action cannot be undone.</p>
+            </div>
+            <div className="p-4 border-t theme-border flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-red-500 hover:bg-red-600" onClick={handleDelete}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

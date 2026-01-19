@@ -26,11 +26,12 @@ from .models import (
     InterviewSession, CompanyValueChainModel, ValueChainNode, ValueChainLink,
     SenderType, RecommendStrategyRequest
 )
-from .llm_client import llm_client
+from .llm_client import llm_client, get_llm_client
 from .engine.pattern_matcher import PatternMatcher, DesignSuggester
 from .engine.strategic_recommender import StrategicRecommender, StrategyScore
 from .database import init_db, close_db
 from .client_config_api import router as client_config_router
+from .agents_api import router as agents_router
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +95,9 @@ app.add_middleware(
 
 # Include client configuration API router
 app.include_router(client_config_router, prefix=settings.API_V1_STR)
+
+# Include multi-agent design API router
+app.include_router(agents_router, prefix=settings.API_V1_STR)
 
 # In-memory session stores
 active_sessions: Dict[str, List[Dict[str, str]]] = {} # Stores chat history for LLM context
@@ -251,9 +255,13 @@ async def recommend_strategy(request: RecommendStrategyRequest):
     """Recommend value chains based on business description."""
     return await strategic_recommender.recommend_value_chains(request.business_description, request.use_cases)
 
-# WebSocket Endpoint for Real-time Chat
+# WebSocket Endpoint for Real-time Chat (Legacy - uses simple LLM client)
 @app.websocket("/ws/chat/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """
+    Legacy WebSocket endpoint for simple chat.
+    For multi-agent design sessions, use /ws/agents/{session_id} instead.
+    """
     await websocket.accept()
     session_id = f"session_{user_id}"
     
@@ -268,9 +276,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             # Context
             session_context = active_sessions[session_id]
             
-            # Async processing
-            intents = await llm_client.extract_intents(data, session_context)
-            response_text = await llm_client.generate_response(data, session_context, intents)
+            # Async processing using Claude (or fallback to OpenAI)
+            client = get_llm_client()
+            intents = await client.extract_intents(data, session_context)
+            response_text = await client.generate_response(data, session_context, intents)
             
             # Update Context
             session_context.append({"role": "user", "content": data})
@@ -279,7 +288,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             # Send back
             response_data = {
                 "message": response_text,
-                "intents": [intent.model_dump() for intent in intents]
+                "intents": [intent.model_dump() for intent in intents],
+                "provider": client.provider
             }
             await websocket.send_text(json.dumps(response_data))
             
@@ -287,6 +297,83 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         logger.info(f"User {user_id} disconnected")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
+        await websocket.close()
+
+
+# WebSocket Endpoint for Multi-Agent Design Sessions
+@app.websocket("/ws/agents/{session_id}")
+async def websocket_agents_endpoint(websocket: WebSocket, session_id: str):
+    """
+    WebSocket endpoint for multi-agent design sessions.
+    Uses Claude Opus 4.5 coordinator with specialized Sonnet 4 sub-agents.
+    """
+    from .agents.orchestrator import get_orchestrator
+    
+    await websocket.accept()
+    
+    try:
+        orchestrator = await get_orchestrator()
+        
+        # Check if session exists, create if not
+        session = orchestrator._sessions.get(session_id)
+        if not session:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"Session {session_id} not found. Create via POST /api/v1/agents/design-session first."
+            }))
+            await websocket.close()
+            return
+        
+        await websocket.send_text(json.dumps({
+            "type": "connected",
+            "session_id": session_id,
+            "message": "Connected to multi-agent design session"
+        }))
+        
+        while True:
+            data = await websocket.receive_text()
+            
+            try:
+                message_data = json.loads(data)
+                message = message_data.get("message", data)
+            except json.JSONDecodeError:
+                message = data
+            
+            # Stream response from multi-agent system
+            await websocket.send_text(json.dumps({
+                "type": "processing",
+                "message": "Processing with multi-agent system..."
+            }))
+            
+            full_response = []
+            async for chunk in orchestrator.stream_message(session_id, message):
+                full_response.append(chunk)
+                await websocket.send_text(json.dumps({
+                    "type": "chunk",
+                    "content": chunk
+                }))
+            
+            # Send completion with artifacts
+            session = orchestrator._sessions.get(session_id)
+            await websocket.send_text(json.dumps({
+                "type": "complete",
+                "content": "".join(full_response),
+                "artifacts": list(session.context.artifacts.keys()) if session else [],
+                "entities": session.context.identified_entities if session else [],
+                "kpis": session.context.identified_kpis if session else []
+            }))
+            
+    except WebSocketDisconnect:
+        logger.info(f"Multi-agent session {session_id} disconnected")
+    except Exception as e:
+        logger.error(f"Multi-agent WebSocket error: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
+        except Exception:
+            pass
         await websocket.close()
 
 if __name__ == "__main__":
