@@ -3,30 +3,18 @@
  * Cart badge for header showing KPI count with dropdown
  */
 
+import { useState, useRef, useEffect } from 'react';
 import {
-  Box,
-  IconButton,
-  Badge,
-  Popover,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Typography,
-  Button,
-  Divider,
-  Tooltip,
-} from '@mui/material';
-import {
-  ShoppingCart as CartIcon,
-  Delete as DeleteIcon,
-  DeleteSweep as ClearIcon,
-  Save as SaveIcon,
-  Visibility as ViewIcon,
-  AccountTree as ObjectsIcon,
-} from '@mui/icons-material';
-import { useState } from 'react';
+  ShoppingCart,
+  Trash2,
+  Trash,
+  Save,
+  Eye,
+  GitBranch,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 import { useKPIDetails } from '../hooks/useKPIDetails';
 
 interface KPICartBadgeProps {
@@ -47,18 +35,25 @@ export default function KPICartBadge({
   currentViewKPI,
 }: KPICartBadgeProps) {
   const navigate = useNavigate();
-  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { data: kpiDetails } = useKPIDetails(selectedKPIs);
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const open = Boolean(anchorEl);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getKPIDisplayName = (kpiCode: string): string => {
     const kpi = kpiDetails?.find((k) => k.code === kpiCode);
@@ -75,187 +70,119 @@ export default function KPICartBadge({
   };
 
   return (
-    <>
-      <Tooltip title="View KPI Cart">
-        <IconButton
-          color="inherit"
-          onClick={handleClick}
-          sx={{ ml: 2 }}
-        >
-          <Badge badgeContent={selectedKPIs.length} color="error">
-            <CartIcon />
-          </Badge>
-        </IconButton>
-      </Tooltip>
-
-      <Popover
-        open={open}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        PaperProps={{
-          sx: { width: 350, maxHeight: 500 },
-        }}
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors"
+        title="View KPI Cart"
       >
-        {/* Header */}
-        <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">KPI Cart</Typography>
-            {selectedKPIs.length > 0 && (
-              <Tooltip title="Clear All">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    onClearAll();
-                    handleClose();
-                  }}
-                  sx={{ color: 'inherit' }}
-                >
-                  <ClearIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-        </Box>
-
-        {/* Empty State */}
-        {selectedKPIs.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <CartIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-            <Typography variant="body2" color="text.secondary">
-              Your cart is empty
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Select KPIs to add them to your cart
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            {/* Summary Stats */}
-            <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Total KPIs:
-                </Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  {selectedKPIs.length}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Required Objects:
-                </Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  {getTotalRequiredObjects()}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Divider />
-
-            {/* KPI List */}
-            <List dense sx={{ maxHeight: 300, overflowY: 'auto' }}>
-              {selectedKPIs.map((kpiCode, index) => (
-                <Box key={kpiCode}>
-                  <ListItem
-                    sx={{
-                      bgcolor: currentViewKPI === kpiCode ? 'action.selected' : 'transparent',
-                      '&:hover': { bgcolor: 'action.hover' },
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => {
-                      onViewKPI(kpiCode);
-                      handleClose();
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="body2" noWrap>
-                          {getKPIDisplayName(kpiCode)}
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {kpiCode}
-                        </Typography>
-                      }
-                    />
-                    <ListItemSecondaryAction>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            edge="end"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onViewKPI(kpiCode);
-                              handleClose();
-                            }}
-                          >
-                            <ViewIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Remove">
-                          <IconButton
-                            edge="end"
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRemoveKPI(kpiCode);
-                            }}
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  {index < selectedKPIs.length - 1 && <Divider />}
-                </Box>
-              ))}
-            </List>
-
-            <Divider />
-
-            {/* Actions */}
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                fullWidth
-                startIcon={<ObjectsIcon />}
-                onClick={() => {
-                  navigate('/required-objects-view', { state: { kpiCodes: selectedKPIs } });
-                  handleClose();
-                }}
-                disabled={selectedKPIs.length === 0}
-              >
-                View Required Objects
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                startIcon={<SaveIcon />}
-                onClick={() => {
-                  onSaveConfiguration();
-                  handleClose();
-                }}
-              >
-                Save Configuration
-              </Button>
-            </Box>
-          </>
+        <ShoppingCart className="w-5 h-5 theme-text" />
+        {selectedKPIs.length > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
+            {selectedKPIs.length}
+          </span>
         )}
-      </Popover>
-    </>
+      </button>
+
+      {isOpen && (
+        <div
+          ref={popoverRef}
+          className="absolute right-0 top-full mt-2 w-[350px] max-h-[500px] rounded-xl theme-card-bg border theme-border shadow-2xl z-50 overflow-hidden"
+        >
+          {/* Header */}
+          <div className="p-3 bg-alpha-500 text-white flex items-center justify-between">
+            <h3 className="font-semibold">KPI Cart</h3>
+            {selectedKPIs.length > 0 && (
+              <button
+                onClick={() => { onClearAll(); setIsOpen(false); }}
+                className="p-1 hover:bg-white/20 rounded"
+                title="Clear All"
+              >
+                <Trash className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Empty State */}
+          {selectedKPIs.length === 0 ? (
+            <div className="p-8 text-center">
+              <ShoppingCart className="w-12 h-12 mx-auto theme-text-muted opacity-30 mb-2" />
+              <p className="theme-text-muted">Your cart is empty</p>
+              <p className="text-xs theme-text-muted">Select KPIs to add them to your cart</p>
+            </div>
+          ) : (
+            <>
+              {/* Summary Stats */}
+              <div className="p-3 theme-card-bg border-b theme-border">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="theme-text-muted">Total KPIs:</span>
+                  <span className="font-semibold theme-text">{selectedKPIs.length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="theme-text-muted">Required Objects:</span>
+                  <span className="font-semibold theme-text">{getTotalRequiredObjects()}</span>
+                </div>
+              </div>
+
+              {/* KPI List */}
+              <div className="max-h-[250px] overflow-y-auto divide-y theme-border">
+                {selectedKPIs.map((kpiCode) => (
+                  <div
+                    key={kpiCode}
+                    className={cn(
+                      "p-3 flex items-center gap-2 cursor-pointer hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900 transition-colors",
+                      currentViewKPI === kpiCode && "bg-alpha-500/10"
+                    )}
+                    onClick={() => { onViewKPI(kpiCode); setIsOpen(false); }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium theme-text truncate">{getKPIDisplayName(kpiCode)}</p>
+                      <p className="text-xs theme-text-muted truncate">{kpiCode}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onViewKPI(kpiCode); setIsOpen(false); }}
+                        className="p-1.5 rounded hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4 theme-text-muted" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRemoveKPI(kpiCode); }}
+                        className="p-1.5 rounded hover:bg-red-500/20 text-red-400"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="p-3 border-t theme-border space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => { navigate('/required-objects-view', { state: { kpiCodes: selectedKPIs } }); setIsOpen(false); }}
+                  disabled={selectedKPIs.length === 0}
+                >
+                  <GitBranch className="w-4 h-4 mr-2" />
+                  View Required Objects
+                </Button>
+                <Button
+                  className="w-full"
+                  onClick={() => { onSaveConfiguration(); setIsOpen(false); }}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Configuration
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

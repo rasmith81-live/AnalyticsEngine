@@ -5,6 +5,53 @@ All notable changes to the Analytics Engine project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-01-18] - Multi-Agent Design System for Conversation Service
+
+### Added
+- **Multi-Agent Architecture**: Implemented collaborative AI system using Anthropic Claude models
+  - `StrategyCoordinator` (Claude Opus 4.5): Master orchestrator for value chain design
+  - `ArchitectAgent` (Claude Sonnet 4): Technical architecture and entity design
+  - `BusinessAnalystAgent` (Claude Sonnet 4): Industry expertise and KPI identification
+  - `DataAnalystAgent` (Claude Sonnet 4): Set-based KPI design for calculation engine
+  - `DeploymentSpecialistAgent` (Claude Sonnet 4): Azure infrastructure and deployment automation
+  - `DeveloperAgent` (Claude Sonnet 4): Schema and code generation
+  - `TesterAgent` (Claude Sonnet 4): Validation and quality assurance
+  - `DocumenterAgent` (Claude Sonnet 4): Documentation generation
+
+- **Agent Framework** (`app/agents/`):
+  - `base_agent.py`: Base agent class with Claude API integration
+  - `coordinator.py`: Strategy Coordinator with delegation tools
+  - `sub_agents.py`: All specialized sub-agents
+  - `orchestrator.py`: Session management and parallel execution
+  - `tools.py`: MCP-style tools for artifact generation
+
+- **API Endpoints** (`agents_api.py`):
+  - `POST /api/v1/agents/design-session`: Create new design session
+  - `POST /api/v1/agents/sessions/{id}/message`: Send message to session
+  - `POST /api/v1/agents/sessions/{id}/analyze`: Run parallel analysis
+  - `GET /api/v1/agents/sessions/{id}/artifacts`: Get generated artifacts
+  - `POST /api/v1/agents/sessions/{id}/finalize`: Finalize and validate
+  - `WebSocket /api/v1/agents/ws/{id}`: Real-time streaming responses
+
+- **Configuration**: Added Anthropic API settings to `config.py`
+  - `ANTHROPIC_API_KEY`: API key for Claude models
+  - `ANTHROPIC_COORDINATOR_MODEL`: Model for coordinator (claude-opus-4-20250514)
+  - `ANTHROPIC_SUBAGENT_MODEL`: Model for sub-agents (claude-sonnet-4-20250514)
+
+- **Documentation**: Created `docs/MULTI_AGENT_ARCHITECTURE.md` with full architecture design
+
+### Technical Details
+- Parallel agent execution for faster analysis
+- Context isolation between sub-agents
+- Tool-based artifact generation (schemas, models, KPIs, docs)
+- WebSocket support for streaming responses
+- Session management with timeout and cleanup
+
+### Files Modified
+- `services/business_services/conversation_service/app/main.py`: Added agents router
+- `services/business_services/conversation_service/app/config.py`: Added Anthropic settings
+- `features.md`: Documented Multi-Agent Design System feature
+
 ## [2025-12-26] - Neo4j-Style Graph Visualization for Ontology Studio
 
 ### Added

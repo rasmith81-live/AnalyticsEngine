@@ -1,37 +1,19 @@
 import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  IconButton,
-  TextField,
-  Button,
-  Collapse,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  Chip,
-  Tooltip,
-  Paper,
-  Divider,
-  Checkbox,
-  InputAdornment,
-  CircularProgress,
-  Alert
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
-  Business as ValueChainIcon,
-  Category as ModuleIcon,
-  Assessment as KPIIcon,
-  Storage as EntityIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
-  ShoppingCart as CartIcon
-} from '@mui/icons-material';
+  ChevronDown,
+  ChevronRight,
+  Building2,
+  Layers,
+  BarChart3,
+  Database,
+  RefreshCw,
+  Search,
+  X,
+  ShoppingCart,
+} from 'lucide-react';
+import { cn } from '../lib/utils';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
 import axios from 'axios';
 
 const BASE_URL = 'http://127.0.0.1:8090/api/v1/metadata';
@@ -64,10 +46,17 @@ interface KPITreeViewProps {
 }
 
 const KIND_COLORS: Record<string, string> = {
-  'value_chain_pattern_definition': '#4caf50',
-  'business_process_definition': '#2196f3',
-  'metric_definition': '#ff9800',
-  'entity_definition': '#9c27b0',
+  'value_chain_pattern_definition': 'text-green-500',
+  'business_process_definition': 'text-blue-500',
+  'metric_definition': 'text-amber-500',
+  'entity_definition': 'text-purple-500',
+};
+
+const KIND_BORDER_COLORS: Record<string, string> = {
+  'value_chain_pattern_definition': 'border-l-green-500',
+  'business_process_definition': 'border-l-blue-500',
+  'metric_definition': 'border-l-amber-500',
+  'entity_definition': 'border-l-purple-500',
 };
 
 export default function KPITreeView({ 
@@ -83,9 +72,7 @@ export default function KPITreeView({
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchOntologyData();
-  }, []);
+  useEffect(() => { fetchOntologyData(); }, []);
 
   const fetchOntologyData = async () => {
     setLoading(true);
@@ -97,19 +84,9 @@ export default function KPITreeView({
         axios.get(`${BASE_URL}/definitions/entity_definition`, { params: { limit: 100 } }).catch(() => ({ data: [] })),
         axios.get(`${BASE_URL}/relationships`).catch(() => ({ data: [] }))
       ]);
-
-      const valueChains = vcRes.data || [];
-      const modules = modRes.data || [];
-      const kpis = kpiRes.data || [];
-      const entities = entityRes.data || [];
-      const rels = relRes.data || [];
-      
-      const tree = buildTree(valueChains, modules, kpis, entities, rels);
+      const tree = buildTree(vcRes.data || [], modRes.data || [], kpiRes.data || [], entityRes.data || [], relRes.data || []);
       setTreeData(tree);
-      
-      // Auto-expand first level
-      const firstLevelCodes = tree.map(n => n.code);
-      setExpandedNodes(new Set(['root', ...firstLevelCodes]));
+      setExpandedNodes(new Set(['root', ...tree.map(n => n.code)]));
     } catch (err) {
       console.error('Failed to fetch ontology data:', err);
       onSnackbar?.('Failed to fetch KPI data', 'error');
@@ -118,18 +95,9 @@ export default function KPITreeView({
     }
   };
 
-  const buildTree = (
-    valueChains: any[],
-    modules: any[],
-    kpis: any[],
-    _entities: any[],
-    relationships: Relationship[]
-  ): OntologyNode[] => {
-    // Use lowercase keys for case-insensitive matching
+  const buildTree = (valueChains: any[], modules: any[], kpis: any[], _entities: any[], relationships: Relationship[]): OntologyNode[] => {
     const modulesByCode = new Map(modules.map(m => [m.code.toLowerCase(), m]));
     const kpisByCode = new Map(kpis.map(k => [k.code.toLowerCase(), k]));
-    
-    // Maps use lowercase keys for case-insensitive matching
     const moduleToVC = new Map<string, string>();
     const kpiToModule = new Map<string, string>();
     const kpiToVC = new Map<string, string>();
@@ -138,198 +106,68 @@ export default function KPITreeView({
     relationships.forEach(rel => {
       const fromLower = rel.from_entity_code.toLowerCase();
       const toLower = rel.to_entity_code.toLowerCase();
-      
       if (rel.relationship_type === 'belongs_to' || rel.relationship_type === 'belongs_to_value_chain') {
-        if (modulesByCode.has(fromLower)) {
-          moduleToVC.set(fromLower, toLower);
-        }
-        if (kpisByCode.has(fromLower) && !modulesByCode.has(toLower)) {
-          kpiToVC.set(fromLower, toLower);
-        }
+        if (modulesByCode.has(fromLower)) moduleToVC.set(fromLower, toLower);
+        if (kpisByCode.has(fromLower) && !modulesByCode.has(toLower)) kpiToVC.set(fromLower, toLower);
       }
-      if (rel.relationship_type === 'belongs_to_module') {
-        kpiToModule.set(fromLower, toLower);
-      }
-      // 'contains' is Module -> KPI (opposite direction)
-      if (rel.relationship_type === 'contains') {
-        if (modulesByCode.has(fromLower) && kpisByCode.has(toLower)) {
-          kpiToModule.set(toLower, fromLower);
-        }
-      }
+      if (rel.relationship_type === 'belongs_to_module') kpiToModule.set(fromLower, toLower);
+      if (rel.relationship_type === 'contains' && modulesByCode.has(fromLower) && kpisByCode.has(toLower)) kpiToModule.set(toLower, fromLower);
       if (rel.relationship_type === 'uses' || rel.relationship_type === 'uses_entity') {
-        if (!kpiToEntities.has(fromLower)) {
-          kpiToEntities.set(fromLower, new Set());
-        }
+        if (!kpiToEntities.has(fromLower)) kpiToEntities.set(fromLower, new Set());
         kpiToEntities.get(fromLower)!.add(toLower);
       }
     });
     
     const tree: OntologyNode[] = [];
     
-    // Value Chains as root nodes
     valueChains.forEach(vc => {
-      const vcNode: OntologyNode = {
-        id: vc.id,
-        code: vc.code,
-        name: vc.name,
-        kind: 'value_chain_pattern_definition',
-        description: vc.description,
-        fields: { domain: vc.domain },
-        children: []
-      };
-      
-      // Find modules belonging to this value chain
+      const vcNode: OntologyNode = { id: vc.id, code: vc.code, name: vc.name, kind: 'value_chain_pattern_definition', description: vc.description, fields: { domain: vc.domain }, children: [] };
       modules.forEach(mod => {
         if (moduleToVC.get(mod.code.toLowerCase()) === vc.code.toLowerCase()) {
-          const modNode: OntologyNode = {
-            id: mod.id,
-            code: mod.code,
-            name: mod.name,
-            kind: 'business_process_definition',
-            description: mod.description,
-            fields: { process_type: mod.process_type },
-            children: []
-          };
-          
-          // Find KPIs belonging to this module
+          const modNode: OntologyNode = { id: mod.id, code: mod.code, name: mod.name, kind: 'business_process_definition', description: mod.description, fields: { process_type: mod.process_type }, children: [] };
           kpis.forEach(kpi => {
             if (kpiToModule.get(kpi.code.toLowerCase()) === mod.code.toLowerCase()) {
-              const kpiEntitiesSet = kpiToEntities.get(kpi.code.toLowerCase());
-              const kpiEntities = kpiEntitiesSet ? Array.from(kpiEntitiesSet) : [];
-              const kpiNode: OntologyNode = {
-                id: kpi.id,
-                code: kpi.code,
-                name: kpi.name,
-                kind: 'metric_definition',
-                description: kpi.description,
-                fields: { 
-                  formula: kpi.formula,
-                  math_expression: kpi.math_expression,
-                  unit: kpi.unit,
-                  required_objects: kpi.required_objects,
-                  entities: kpiEntities
-                },
-                children: []
-              };
-              modNode.children!.push(kpiNode);
+              const kpiEntities = kpiToEntities.get(kpi.code.toLowerCase());
+              modNode.children!.push({ id: kpi.id, code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit, required_objects: kpi.required_objects, entities: kpiEntities ? Array.from(kpiEntities) : [] }, children: [] });
             }
           });
-          
           vcNode.children!.push(modNode);
         }
       });
-      
-      // Find KPIs directly under value chain (not in a module)
       kpis.forEach(kpi => {
         const kpiLower = kpi.code.toLowerCase();
         if (kpiToVC.get(kpiLower) === vc.code.toLowerCase() && !kpiToModule.has(kpiLower)) {
-          const kpiEntitiesSet = kpiToEntities.get(kpiLower);
-          const kpiEntities = kpiEntitiesSet ? Array.from(kpiEntitiesSet) : [];
-          const kpiNode: OntologyNode = {
-            id: kpi.id,
-            code: kpi.code,
-            name: kpi.name,
-            kind: 'metric_definition',
-            description: kpi.description,
-            fields: { 
-              formula: kpi.formula,
-              math_expression: kpi.math_expression,
-              unit: kpi.unit,
-              required_objects: kpi.required_objects,
-              entities: kpiEntities
-            },
-            children: []
-          };
-          vcNode.children!.push(kpiNode);
+          const kpiEntities = kpiToEntities.get(kpiLower);
+          vcNode.children!.push({ id: kpi.id, code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit, required_objects: kpi.required_objects, entities: kpiEntities ? Array.from(kpiEntities) : [] }, children: [] });
         }
       });
-      
       tree.push(vcNode);
     });
     
-    // Add orphan modules (not linked to any value chain)
     const orphanModules: OntologyNode[] = [];
     modules.forEach(mod => {
       if (!moduleToVC.has(mod.code.toLowerCase())) {
-        const modNode: OntologyNode = {
-          id: mod.id,
-          code: mod.code,
-          name: mod.name,
-          kind: 'business_process_definition',
-          description: mod.description,
-          fields: { process_type: mod.process_type },
-          children: []
-        };
-        
-        // Find KPIs for this orphan module
+        const modNode: OntologyNode = { id: mod.id, code: mod.code, name: mod.name, kind: 'business_process_definition', description: mod.description, fields: { process_type: mod.process_type }, children: [] };
         kpis.forEach(kpi => {
           if (kpiToModule.get(kpi.code.toLowerCase()) === mod.code.toLowerCase()) {
-            const kpiEntitiesSet = kpiToEntities.get(kpi.code.toLowerCase());
-            const kpiEntities = kpiEntitiesSet ? Array.from(kpiEntitiesSet) : [];
-            modNode.children!.push({
-              id: kpi.id,
-              code: kpi.code,
-              name: kpi.name,
-              kind: 'metric_definition',
-              description: kpi.description,
-              fields: { 
-                formula: kpi.formula,
-                math_expression: kpi.math_expression,
-                unit: kpi.unit,
-                required_objects: kpi.required_objects,
-                entities: kpiEntities
-              },
-              children: []
-            });
+            const kpiEntities = kpiToEntities.get(kpi.code.toLowerCase());
+            modNode.children!.push({ id: kpi.id, code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit, required_objects: kpi.required_objects, entities: kpiEntities ? Array.from(kpiEntities) : [] }, children: [] });
           }
         });
-        
         orphanModules.push(modNode);
       }
     });
+    if (orphanModules.length > 0) tree.push({ code: '_orphan_modules', name: 'Unassigned Modules', kind: 'folder', children: orphanModules });
     
-    if (orphanModules.length > 0) {
-      tree.push({
-        code: '_orphan_modules',
-        name: 'Unassigned Modules',
-        kind: 'folder',
-        children: orphanModules
-      });
-    }
-    
-    // Add orphan KPIs
     const orphanKpis: OntologyNode[] = [];
     kpis.forEach(kpi => {
       const kpiLower = kpi.code.toLowerCase();
       if (!kpiToModule.has(kpiLower) && !kpiToVC.has(kpiLower)) {
-        const kpiEntitiesSet = kpiToEntities.get(kpiLower);
-        const kpiEntities = kpiEntitiesSet ? Array.from(kpiEntitiesSet) : [];
-        orphanKpis.push({
-          id: kpi.id,
-          code: kpi.code,
-          name: kpi.name,
-          kind: 'metric_definition',
-          description: kpi.description,
-          fields: { 
-            formula: kpi.formula,
-            math_expression: kpi.math_expression,
-            unit: kpi.unit,
-            required_objects: kpi.required_objects,
-            entities: kpiEntities
-          },
-          children: []
-        });
+        const kpiEntities = kpiToEntities.get(kpiLower);
+        orphanKpis.push({ id: kpi.id, code: kpi.code, name: kpi.name, kind: 'metric_definition', description: kpi.description, fields: { formula: kpi.formula, math_expression: kpi.math_expression, unit: kpi.unit, required_objects: kpi.required_objects, entities: kpiEntities ? Array.from(kpiEntities) : [] }, children: [] });
       }
     });
-    
-    if (orphanKpis.length > 0) {
-      tree.push({
-        code: '_orphan_kpis',
-        name: 'Unassigned KPIs',
-        kind: 'folder',
-        children: orphanKpis
-      });
-    }
+    if (orphanKpis.length > 0) tree.push({ code: '_orphan_kpis', name: 'Unassigned KPIs', kind: 'folder', children: orphanKpis });
     
     return tree;
   };
@@ -337,60 +175,40 @@ export default function KPITreeView({
   const toggleNode = (code: string) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
-      if (next.has(code)) {
-        next.delete(code);
-      } else {
-        next.add(code);
-      }
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
       return next;
     });
   };
 
   const handleNodeClick = (node: OntologyNode) => {
     setSelectedNode(node);
-    if (node.kind === 'metric_definition' && onKPIViewDetails) {
-      onKPIViewDetails(node.code);
-    }
+    if (node.kind === 'metric_definition' && onKPIViewDetails) onKPIViewDetails(node.code);
   };
 
   const handleCartToggle = (kpiCode: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onKPIToggleCart) {
-      onKPIToggleCart(kpiCode);
-    }
+    onKPIToggleCart?.(kpiCode);
   };
 
   const getIcon = (kind: string) => {
+    const colorClass = KIND_COLORS[kind] || 'theme-text-muted';
     switch (kind) {
-      case 'value_chain_pattern_definition': return <ValueChainIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'business_process_definition': return <ModuleIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'metric_definition': return <KPIIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'entity_definition': return <EntityIcon sx={{ color: KIND_COLORS[kind] }} />;
-      case 'folder': return <ChevronRightIcon />;
-      default: return <ChevronRightIcon />;
+      case 'value_chain_pattern_definition': return <Building2 className={cn("w-4 h-4", colorClass)} />;
+      case 'business_process_definition': return <Layers className={cn("w-4 h-4", colorClass)} />;
+      case 'metric_definition': return <BarChart3 className={cn("w-4 h-4", colorClass)} />;
+      case 'entity_definition': return <Database className={cn("w-4 h-4", colorClass)} />;
+      default: return <ChevronRight className="w-4 h-4 theme-text-muted" />;
     }
   };
 
-  // Filter tree based on search query
   const filterTree = (nodes: OntologyNode[], query: string): OntologyNode[] => {
     if (!query) return nodes;
-    
     const lowerQuery = query.toLowerCase();
-    
     return nodes.reduce<OntologyNode[]>((acc, node) => {
-      const matchesName = node.name?.toLowerCase().includes(lowerQuery);
-      const matchesCode = node.code?.toLowerCase().includes(lowerQuery);
-      const matchesDescription = node.description?.toLowerCase().includes(lowerQuery);
-      
+      const matches = node.name?.toLowerCase().includes(lowerQuery) || node.code?.toLowerCase().includes(lowerQuery) || node.description?.toLowerCase().includes(lowerQuery);
       const filteredChildren = node.children ? filterTree(node.children, query) : [];
-      
-      if (matchesName || matchesCode || matchesDescription || filteredChildren.length > 0) {
-        acc.push({
-          ...node,
-          children: filteredChildren.length > 0 ? filteredChildren : node.children
-        });
-      }
-      
+      if (matches || filteredChildren.length > 0) acc.push({ ...node, children: filteredChildren.length > 0 ? filteredChildren : node.children });
       return acc;
     }, []);
   };
@@ -414,264 +232,156 @@ export default function KPITreeView({
     const isInCart = isKPI && selectedKPIs.includes(node.code);
     
     return (
-      <Box key={node.code}>
-        <ListItem
-          sx={{
-            pl: depth * 2.5,
-            py: 0.5,
-            backgroundColor: isSelected ? 'action.selected' : 'transparent',
-            '&:hover': { backgroundColor: 'action.hover' },
-            cursor: 'pointer',
-            borderLeft: !isFolder ? `3px solid ${KIND_COLORS[node.kind] || '#ccc'}` : 'none',
-          }}
+      <div key={node.code}>
+        <div
+          className={cn(
+            "flex items-center py-1.5 px-2 cursor-pointer transition-colors hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900",
+            isSelected && "bg-alpha-500/10",
+            !isFolder && "border-l-2",
+            !isFolder && KIND_BORDER_COLORS[node.kind]
+          )}
+          style={{ paddingLeft: `${depth * 20 + 8}px` }}
           onClick={() => handleNodeClick(node)}
         >
-          <ListItemIcon sx={{ minWidth: 28 }}>
+          <div className="w-6 flex-shrink-0">
             {hasChildren ? (
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); toggleNode(node.code); }}>
-                {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-              </IconButton>
-            ) : (
-              <Box sx={{ width: 28 }} />
+              <button onClick={(e) => { e.stopPropagation(); toggleNode(node.code); }} className="p-0.5 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded">
+                {isExpanded ? <ChevronDown className="w-4 h-4 theme-text-muted" /> : <ChevronRight className="w-4 h-4 theme-text-muted" />}
+              </button>
+            ) : null}
+          </div>
+          <div className="w-6 flex-shrink-0">{getIcon(node.kind)}</div>
+          <div className="flex-1 min-w-0 flex items-center gap-1">
+            <span className={cn("text-sm truncate", isSelected ? "font-semibold theme-text-title" : "theme-text")}>{node.name}</span>
+            {hasChildren && !isKPI && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] theme-card-bg border theme-border theme-text-muted">{countKPIs(node.children || [])}</span>
             )}
-          </ListItemIcon>
-          <ListItemIcon sx={{ minWidth: 28 }}>
-            {getIcon(node.kind)}
-          </ListItemIcon>
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography variant="body2" fontWeight={isSelected ? 600 : 400} noWrap>
-                  {node.name}
-                </Typography>
-                {hasChildren && !isKPI && (
-                  <Chip 
-                    label={countKPIs(node.children || [])} 
-                    size="small" 
-                    sx={{ fontSize: '0.65rem', height: 16, ml: 0.5 }}
-                  />
-                )}
-              </Box>
-            }
-            secondary={
-              isKPI && node.fields?.formula ? (
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
-                  {node.fields.formula.substring(0, 40)}{node.fields.formula.length > 40 ? '...' : ''}
-                </Typography>
-              ) : null
-            }
-          />
+          </div>
           {isKPI && (
-            <ListItemSecondaryAction>
-              <Tooltip title={isInCart ? "Remove from cart" : "Add to cart"}>
-                <Checkbox
-                  size="small"
-                  checked={isInCart}
-                  onClick={(e) => handleCartToggle(node.code, e)}
-                  icon={<CartIcon fontSize="small" />}
-                  checkedIcon={<CartIcon fontSize="small" color="primary" />}
-                />
-              </Tooltip>
-            </ListItemSecondaryAction>
+            <button
+              onClick={(e) => handleCartToggle(node.code, e)}
+              className={cn("p-1 rounded transition-colors", isInCart ? "text-alpha-500" : "theme-text-muted hover:text-alpha-500")}
+              title={isInCart ? "Remove from cart" : "Add to cart"}
+            >
+              <ShoppingCart className="w-4 h-4" />
+            </button>
           )}
-        </ListItem>
-        {hasChildren && (
-          <Collapse in={isExpanded}>
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
-          </Collapse>
+        </div>
+        {hasChildren && isExpanded && (
+          <div>{node.children!.map(child => renderTreeNode(child, depth + 1))}</div>
         )}
-      </Box>
+      </div>
     );
   };
 
   const renderDetailsPanel = () => {
     if (!selectedNode || selectedNode.kind === 'folder') {
-      return (
-        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-          <Typography>Select a KPI to view details</Typography>
-        </Box>
-      );
+      return <div className="p-4 text-center theme-text-muted">Select a KPI to view details</div>;
     }
-
     const isKPI = selectedNode.kind === 'metric_definition';
     const isInCart = isKPI && selectedKPIs.includes(selectedNode.code);
 
     return (
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-2">
           {getIcon(selectedNode.kind)}
-          <Typography variant="h6" noWrap sx={{ flex: 1 }}>{selectedNode.name}</Typography>
+          <h3 className="font-semibold theme-text-title flex-1 truncate">{selectedNode.name}</h3>
           {isKPI && (
-            <Chip 
-              label={isInCart ? "In Cart" : "Not in Cart"} 
-              color={isInCart ? "primary" : "default"}
-              size="small"
-            />
+            <span className={cn("px-2 py-0.5 rounded-full text-xs", isInCart ? "bg-alpha-500/20 text-alpha-400" : "theme-card-bg border theme-border theme-text-muted")}>
+              {isInCart ? "In Cart" : "Not in Cart"}
+            </span>
           )}
-        </Box>
-        
-        <Divider sx={{ mb: 2 }} />
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Code</Typography>
-            <Typography variant="body2" fontFamily="monospace">{selectedNode.code}</Typography>
-          </Box>
-          
-          <Box>
-            <Typography variant="caption" color="text.secondary">Type</Typography>
-            <Typography variant="body2">
-              {selectedNode.kind === 'value_chain_pattern_definition' ? 'Value Chain' :
-               selectedNode.kind === 'business_process_definition' ? 'Module' :
-               selectedNode.kind === 'metric_definition' ? 'KPI/Metric' : selectedNode.kind}
-            </Typography>
-          </Box>
-          
-          {selectedNode.description && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Description</Typography>
-              <Typography variant="body2">{selectedNode.description}</Typography>
-            </Box>
+        </div>
+        <div className="border-t theme-border" />
+        <div className="space-y-3 text-sm">
+          <div><p className="text-xs theme-text-muted">Code</p><p className="font-mono theme-text">{selectedNode.code}</p></div>
+          <div><p className="text-xs theme-text-muted">Type</p><p className="theme-text">{selectedNode.kind === 'value_chain_pattern_definition' ? 'Value Chain' : selectedNode.kind === 'business_process_definition' ? 'Module' : selectedNode.kind === 'metric_definition' ? 'KPI/Metric' : selectedNode.kind}</p></div>
+          {selectedNode.description && <div><p className="text-xs theme-text-muted">Description</p><p className="theme-text">{selectedNode.description}</p></div>}
+          {selectedNode.fields?.formula && <div><p className="text-xs theme-text-muted">Formula</p><p className="theme-text italic">{selectedNode.fields.formula}</p></div>}
+          {selectedNode.fields?.math_expression && <div><p className="text-xs theme-text-muted">Math Expression</p><p className="font-mono text-xs p-2 rounded-lg theme-card-bg border theme-border">{selectedNode.fields.math_expression}</p></div>}
+          {selectedNode.fields?.unit && <div><p className="text-xs theme-text-muted">Unit</p><p className="theme-text">{selectedNode.fields.unit}</p></div>}
+          {(selectedNode.fields?.required_objects?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-xs theme-text-muted mb-1">Required Entities</p>
+              <div className="flex flex-wrap gap-1">{selectedNode.fields!.required_objects.map((obj: string) => <span key={obj} className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text">{obj}</span>)}</div>
+            </div>
           )}
-          
-          {selectedNode.fields?.formula && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Formula</Typography>
-              <Typography variant="body2" sx={{ fontStyle: 'italic' }}>{selectedNode.fields.formula}</Typography>
-            </Box>
+          {(selectedNode.fields?.entities?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-xs theme-text-muted mb-1">Linked Entities</p>
+              <div className="flex flex-wrap gap-1">{selectedNode.fields!.entities.map((entity: string) => <span key={entity} className="px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">{entity}</span>)}</div>
+            </div>
           )}
-          
-          {selectedNode.fields?.math_expression && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Math Expression</Typography>
-              <Typography variant="body2" fontFamily="monospace" sx={{ bgcolor: 'grey.100', p: 1, borderRadius: 1 }}>
-                {selectedNode.fields.math_expression}
-              </Typography>
-            </Box>
-          )}
-          
-          {selectedNode.fields?.unit && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Unit</Typography>
-              <Typography variant="body2">{selectedNode.fields.unit}</Typography>
-            </Box>
-          )}
-          
-          {selectedNode.fields?.required_objects?.length > 0 && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Required Entities</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                {selectedNode.fields?.required_objects?.map((obj: string) => (
-                  <Chip key={obj} label={obj} size="small" variant="outlined" />
-                ))}
-              </Box>
-            </Box>
-          )}
-          
-          {selectedNode.fields?.entities?.length > 0 && (
-            <Box>
-              <Typography variant="caption" color="text.secondary">Linked Entities</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                {selectedNode.fields?.entities?.map((entity: string) => (
-                  <Chip key={entity} label={entity} size="small" color="secondary" variant="outlined" />
-                ))}
-              </Box>
-            </Box>
-          )}
-        </Box>
-        
+        </div>
         {isKPI && (
-          <Box sx={{ mt: 3, display: 'flex', gap: 1 }}>
-            <Button 
-              variant={isInCart ? "outlined" : "contained"}
-              size="small" 
-              startIcon={<CartIcon />}
-              onClick={() => onKPIToggleCart?.(selectedNode.code)}
-            >
-              {isInCart ? 'Remove from Cart' : 'Add to Cart'}
-            </Button>
-          </Box>
+          <Button variant={isInCart ? "outline" : "primary"} size="sm" onClick={() => onKPIToggleCart?.(selectedNode.code)}>
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            {isInCart ? 'Remove from Cart' : 'Add to Cart'}
+          </Button>
         )}
-      </Box>
+      </div>
     );
   };
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4, height: '100%' }}>
-        <CircularProgress size={24} sx={{ mr: 2 }} />
-        <Typography>Loading KPIs...</Typography>
-      </Box>
+      <div className="flex items-center justify-center p-8 h-full">
+        <RefreshCw className="w-5 h-5 text-alpha-500 animate-spin mr-2" />
+        <span className="theme-text-muted">Loading KPIs...</span>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
+    <div className="flex gap-4 h-full">
       {/* Tree Panel */}
-      <Paper sx={{ flex: 2, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>KPI Hierarchy</Typography>
-          <Tooltip title="Refresh">
-            <IconButton size="small" onClick={fetchOntologyData}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        
-        {/* Search */}
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search KPIs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-              endAdornment: searchQuery && (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchQuery('')}>
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-        </Box>
-        
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Card className="flex-[2] overflow-hidden flex flex-col">
+        <div className="p-3 flex items-center justify-between border-b theme-border">
+          <h3 className="font-semibold theme-text-title">KPI Hierarchy</h3>
+          <button onClick={fetchOntologyData} className="p-1.5 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800" title="Refresh">
+            <RefreshCw className="w-4 h-4 theme-text-muted" />
+          </button>
+        </div>
+        <div className="p-2 border-b theme-border">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 theme-text-muted" />
+            <input
+              type="text"
+              placeholder="Search KPIs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 rounded-lg theme-card-bg border theme-border theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded">
+                <X className="w-4 h-4 theme-text-muted" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
           {filteredTreeData.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <Alert severity="info">
+            <div className="p-4 text-center">
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
                 {searchQuery ? 'No KPIs match your search.' : 'No KPI data found.'}
-              </Alert>
-            </Box>
+              </div>
+            </div>
           ) : (
-            <List dense disablePadding>
-              {filteredTreeData.map(node => renderTreeNode(node))}
-            </List>
+            <div>{filteredTreeData.map(node => renderTreeNode(node))}</div>
           )}
-        </Box>
-        
-        {/* Stats footer */}
-        <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-          <Typography variant="caption" color="text.secondary">
-            {countKPIs(treeData)} KPIs total • {selectedKPIs.length} in cart
-          </Typography>
-        </Box>
-      </Paper>
+        </div>
+        <div className="p-2 border-t theme-border theme-card-bg">
+          <p className="text-xs theme-text-muted">{countKPIs(treeData)} KPIs total • {selectedKPIs.length} in cart</p>
+        </div>
+      </Card>
       
       {/* Details Panel */}
-      <Paper sx={{ flex: 1, minWidth: 280, overflow: 'auto' }}>
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>Details</Typography>
-        </Box>
+      <Card className="flex-1 min-w-[280px] overflow-auto">
+        <div className="p-3 border-b theme-border">
+          <h3 className="font-semibold theme-text-title">Details</h3>
+        </div>
         {renderDetailsPanel()}
-      </Paper>
-    </Box>
+      </Card>
+    </div>
   );
 }

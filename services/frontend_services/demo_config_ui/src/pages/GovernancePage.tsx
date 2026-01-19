@@ -1,92 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Typography,
-  Paper,
-  Box,
-  Tabs,
-  Tab,
-  Grid,
-  Card,
-  CardContent,
-  CardHeader,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  LinearProgress,
-  Chip,
-  Button,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Avatar,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Divider,
-} from '@mui/material';
-import {
-  VerifiedUser as QualityIcon,
-  AccountTree as LineageIcon,
-  Security as AccessIcon,
-  CheckCircle as PassIcon,
-  Warning as WarningIcon,
-  Error as FailIcon,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+  ShieldCheck,
+  GitBranch,
+  Lock,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  RefreshCw,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 import { governanceApi, QualityMetric, User, LineageGraph as ILineageGraph } from '../api/governanceApi';
 import LineageGraph from '../components/LineageGraph';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
+const ROLES = ['Admin', 'Editor', 'Viewer', 'Analyst'];
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
+function TabButton({ active, onClick, icon, children }: { 
+  active: boolean; 
+  onClick: () => void; 
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`governance-tabpanel-${index}`}
-      aria-labelledby={`governance-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2",
+        active 
+          ? "text-alpha-500 border-alpha-500" 
+          : "theme-text-muted border-transparent hover:theme-text"
       )}
-    </div>
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
-const ROLES = ['Admin', 'Editor', 'Viewer', 'Analyst'];
-
 export default function GovernancePage() {
-  const [value, setValue] = useState(0);
+  const [tabValue, setTabValue] = useState(0);
   const [qualityMetrics, setQualityMetrics] = useState<QualityMetric[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [lineageData, setLineageData] = useState<ILineageGraph | null>(null);
   const [loading, setLoading] = useState(false);
-  
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'Viewer' });
 
-  React.useEffect(() => {
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -106,10 +71,6 @@ export default function GovernancePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleChange = (_: React.SyntheticEvent, newValue: number) => {
-    setValue(newValue);
   };
 
   const handleAddUser = async () => {
@@ -138,230 +99,265 @@ export default function GovernancePage() {
   };
 
   const getQualityColor = (value: number) => {
-    if (value >= 98) return 'success';
-    if (value >= 90) return 'warning';
-    return 'error';
+    if (value >= 98) return 'text-green-400';
+    if (value >= 90) return 'text-amber-400';
+    return 'text-red-400';
+  };
+
+  const getQualityBg = (value: number) => {
+    if (value >= 98) return 'bg-green-500';
+    if (value >= 90) return 'bg-amber-500';
+    return 'bg-red-500';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pass': return <PassIcon color="success" />;
-      case 'warning': return <WarningIcon color="warning" />;
-      case 'fail': return <FailIcon color="error" />;
-      default: return <PassIcon />;
+      case 'pass': return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'warning': return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+      case 'fail': return <XCircle className="w-5 h-5 text-red-500" />;
+      default: return <CheckCircle className="w-5 h-5 text-green-500" />;
     }
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Typography variant="h4" gutterBottom>
-        Data Governance
-      </Typography>
-      
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold theme-text-title tracking-wide">Data Governance</h1>
+        <p className="theme-text-muted mt-1">Monitor data quality, lineage, and access control</p>
+      </div>
 
-      <Paper sx={{ width: '100%', mb: 2 }}>
-        <Tabs value={value} onChange={handleChange} aria-label="governance tabs">
-          <Tab icon={<QualityIcon />} label="Data Quality" />
-          <Tab icon={<LineageIcon />} label="Data Lineage" />
-          <Tab icon={<AccessIcon />} label="Access Control" />
-        </Tabs>
-      </Paper>
+      {loading && (
+        <div className="h-1 bg-alpha-faded-200 dark:bg-alpha-faded-800 rounded overflow-hidden">
+          <div className="h-full bg-alpha-500 animate-pulse" style={{ width: '60%' }} />
+        </div>
+      )}
 
-      {/* Data Quality */}
-      <TabPanel value={value} index={0}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Card>
-              <CardHeader title="Data Quality Overview" />
-              <CardContent>
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                  <Grid item xs={12} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                      <Typography variant="h4">96.5%</Typography>
-                      <Typography variant="body2">Overall Score</Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">12</Typography>
-                      <Typography variant="body2" color="text.secondary">Tables Monitored</Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">45k</Typography>
-                      <Typography variant="body2" color="text.secondary">Rows Validated</Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} md={3}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">3</Typography>
-                      <Typography variant="body2" color="text.secondary">Open Issues</Typography>
-                    </Paper>
-                  </Grid>
-                </Grid>
+      {/* Tabs */}
+      <div className="border-b theme-border">
+        <div className="flex">
+          <TabButton active={tabValue === 0} onClick={() => setTabValue(0)} icon={<ShieldCheck className="w-4 h-4" />}>
+            Data Quality
+          </TabButton>
+          <TabButton active={tabValue === 1} onClick={() => setTabValue(1)} icon={<GitBranch className="w-4 h-4" />}>
+            Data Lineage
+          </TabButton>
+          <TabButton active={tabValue === 2} onClick={() => setTabValue(2)} icon={<Lock className="w-4 h-4" />}>
+            Access Control
+          </TabButton>
+        </div>
+      </div>
 
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Table Name</TableCell>
-                        <TableCell align="center">Completeness</TableCell>
-                        <TableCell align="center">Accuracy</TableCell>
-                        <TableCell align="center">Consistency</TableCell>
-                        <TableCell align="center">Timeliness</TableCell>
-                        <TableCell align="center">Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {qualityMetrics.map((row) => (
-                        <TableRow key={row.table}>
-                          <TableCell component="th" scope="row">
-                            {row.table}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <LinearProgress variant="determinate" value={row.completeness} color={getQualityColor(row.completeness)} sx={{ flexGrow: 1 }} />
-                              <Typography variant="body2">{row.completeness}%</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" color={`text.${getQualityColor(row.accuracy)}`}>
-                              {row.accuracy}%
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" color={`text.${getQualityColor(row.consistency)}`}>
-                              {row.consistency}%
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" color={`text.${getQualityColor(row.timeliness)}`}>
-                              {row.timeliness}%
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            {getStatusIcon(row.status)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+      {/* Data Quality Tab */}
+      {tabValue === 0 && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-green-500/10 border-green-500/30">
+              <CardContent className="p-5 text-center">
+                <p className="text-4xl font-bold text-green-400">96.5%</p>
+                <p className="text-sm text-green-400/80">Overall Score</p>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
+            <Card>
+              <CardContent className="p-5 text-center">
+                <p className="text-4xl font-bold theme-text-title">12</p>
+                <p className="text-sm theme-text-muted">Tables Monitored</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5 text-center">
+                <p className="text-4xl font-bold theme-text-title">45k</p>
+                <p className="text-sm theme-text-muted">Rows Validated</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5 text-center">
+                <p className="text-4xl font-bold theme-text-title">3</p>
+                <p className="text-sm theme-text-muted">Open Issues</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Data Lineage */}
-      <TabPanel value={value} index={1}>
+          {/* Quality Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Quality Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b theme-border">
+                      <th className="px-4 py-3 text-left theme-text-muted font-medium">Table Name</th>
+                      <th className="px-4 py-3 text-center theme-text-muted font-medium">Completeness</th>
+                      <th className="px-4 py-3 text-center theme-text-muted font-medium">Accuracy</th>
+                      <th className="px-4 py-3 text-center theme-text-muted font-medium">Consistency</th>
+                      <th className="px-4 py-3 text-center theme-text-muted font-medium">Timeliness</th>
+                      <th className="px-4 py-3 text-center theme-text-muted font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qualityMetrics.map((row) => (
+                      <tr key={row.table} className="border-b theme-border hover:theme-card-bg-hover">
+                        <td className="px-4 py-3 font-medium theme-text">{row.table}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 overflow-hidden">
+                              <div className={cn("h-full transition-all", getQualityBg(row.completeness))} style={{ width: `${row.completeness}%` }} />
+                            </div>
+                            <span className="text-xs theme-text-muted w-10">{row.completeness}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={getQualityColor(row.accuracy)}>{row.accuracy}%</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={getQualityColor(row.consistency)}>{row.consistency}%</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={getQualityColor(row.timeliness)}>{row.timeliness}%</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {getStatusIcon(row.status)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Data Lineage Tab */}
+      {tabValue === 1 && (
         <Card>
-          <CardHeader title="Data Lineage Explorer" />
+          <CardHeader>
+            <CardTitle>Data Lineage Explorer</CardTitle>
+          </CardHeader>
           <CardContent>
             {lineageData ? (
               <LineageGraph data={lineageData} />
             ) : (
-              <Box sx={{ p: 5, textAlign: 'center' }}>
-                <Typography>Loading Lineage Data...</Typography>
-              </Box>
+              <div className="py-16 text-center">
+                <RefreshCw className="w-12 h-12 mx-auto theme-text-muted animate-spin mb-4" />
+                <p className="theme-text-muted">Loading Lineage Data...</p>
+              </div>
             )}
           </CardContent>
         </Card>
-      </TabPanel>
+      )}
 
-      {/* Access Control */}
-      <TabPanel value={value} index={2}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenUserDialog(true)}>
-            Add User
-          </Button>
-        </Box>
-        <Card>
-          <CardHeader title="User Management" />
-          <CardContent>
-            <List>
-              {users.map((user) => (
-                <React.Fragment key={user.id}>
-                  <ListItem
-                    secondaryAction={
-                      <Box>
-                        <Button startIcon={<EditIcon />} size="small">Edit</Button>
-                        <Button 
-                          startIcon={<DeleteIcon />} 
-                          size="small" 
-                          color="error"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          Remove
-                        </Button>
-                      </Box>
-                    }
-                  >
-                    <ListItemIcon>
-                      <Avatar>{user.name[0]}</Avatar>
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          {user.name}
-                          <Chip label={user.role} size="small" color="primary" variant="outlined" />
-                          <Chip 
-                            label={user.status} 
-                            size="small" 
-                            color={user.status === 'Active' ? 'success' : 'default'} 
-                            variant="outlined" 
-                          />
-                        </Box>
-                      }
-                      secondary={user.email}
-                    />
-                  </ListItem>
-                  <Divider component="li" />
-                </React.Fragment>
-              ))}
-            </List>
-          </CardContent>
-        </Card>
-      </TabPanel>
+      {/* Access Control Tab */}
+      {tabValue === 2 && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => setOpenUserDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add User
+            </Button>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y theme-border">
+                {users.map((user) => (
+                  <div key={user.id} className="py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-alpha-500/20 flex items-center justify-center text-alpha-500 font-semibold">
+                        {user.name[0]}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium theme-text-title">{user.name}</span>
+                          <span className="px-2 py-0.5 rounded-full text-xs border border-alpha-500/30 text-alpha-400">
+                            {user.role}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs border",
+                            user.status === 'Active' 
+                              ? "border-green-500/30 text-green-400" 
+                              : "border-gray-500/30 text-gray-400"
+                          )}>
+                            {user.status}
+                          </span>
+                        </div>
+                        <p className="text-sm theme-text-muted">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 transition-colors">
+                        <Edit className="w-4 h-4 theme-text-muted" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Add User Dialog */}
-      <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)}>
-        <DialogTitle>Add New User</DialogTitle>
-        <DialogContent sx={{ minWidth: 400 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              label="Full Name"
-              fullWidth
-              value={newUser.name}
-              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-            />
-            <TextField
-              label="Email Address"
-              fullWidth
-              value={newUser.email}
-              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Role</InputLabel>
-              <Select
-                value={newUser.role}
-                label="Role"
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-              >
-                {ROLES.map((role) => (
-                  <MenuItem key={role} value={role}>{role}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenUserDialog(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddUser}>Add User</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {openUserDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="w-full max-w-md mx-4 rounded-2xl theme-card-bg border theme-border shadow-2xl">
+            <div className="p-6 border-b theme-border flex items-center justify-between">
+              <h2 className="text-xl font-bold theme-text-title">Add New User</h2>
+              <button onClick={() => setOpenUserDialog(false)} className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800">
+                <X className="w-5 h-5 theme-text-muted" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Email Address</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium theme-text-title block mb-2">Role</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                >
+                  {ROLES.map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t theme-border flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setOpenUserDialog(false)}>Cancel</Button>
+              <Button onClick={handleAddUser}>Add User</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

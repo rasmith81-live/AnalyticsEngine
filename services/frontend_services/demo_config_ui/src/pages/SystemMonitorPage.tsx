@@ -1,12 +1,19 @@
-import { Typography, Paper, Box, Grid, Card, CardContent, Chip, CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { useState, useEffect } from 'react';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import PeopleIcon from '@mui/icons-material/People';
-import SpeedIcon from '@mui/icons-material/Speed';
-import DataUsageIcon from '@mui/icons-material/DataUsage';
+import {
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Users,
+  Gauge,
+  Activity,
+  Cpu,
+  TrendingUp,
+  TrendingDown,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { cn } from '../lib/utils';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface ServiceStatus {
@@ -42,6 +49,51 @@ const ALL_SERVICES = [
   { name: 'API Gateway', url: 'http://127.0.0.1:8090/health' },
 ];
 
+function MetricCard({ 
+  label, 
+  value, 
+  unit, 
+  icon, 
+  trend, 
+  trendLabel 
+}: { 
+  label: string; 
+  value: number; 
+  unit?: string; 
+  icon: React.ReactNode;
+  trend?: 'up' | 'down';
+  trendLabel?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wide theme-text-muted mb-1">{label}</p>
+            <p className="text-3xl font-bold theme-text-title">
+              {value}
+              {unit && <span className="text-sm font-normal theme-text-muted ml-1">{unit}</span>}
+            </p>
+          </div>
+          <div className="p-2 rounded-lg bg-alpha-500/20">
+            {icon}
+          </div>
+        </div>
+        {trendLabel && (
+          <div className={cn(
+            "flex items-center gap-1 mt-2 text-xs",
+            trend === 'up' ? "text-green-400" : trend === 'down' ? "text-green-400" : "theme-text-muted"
+          )}>
+            {trend === 'up' && <TrendingUp className="w-3 h-3" />}
+            {trend === 'down' && <TrendingDown className="w-3 h-3" />}
+            <span>{trendLabel}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SystemMonitorPage() {
   const [services, setServices] = useState<ServiceStatus[]>(
     ALL_SERVICES.map(s => ({ ...s, status: 'checking' as const }))
@@ -61,10 +113,7 @@ export default function SystemMonitorPage() {
 
   useEffect(() => {
     if (lastMessage && lastMessage.type === 'dashboard_update') {
-      setMetrics(prev => ({
-        ...prev,
-        ...lastMessage.payload
-      }));
+      setMetrics(prev => ({ ...prev, ...lastMessage.payload }));
     }
   }, [lastMessage]);
 
@@ -112,187 +161,177 @@ export default function SystemMonitorPage() {
 
   const healthyCount = services.filter(s => s.status === 'healthy').length;
   const errorCount = services.filter(s => s.status === 'error').length;
+  const checkingCount = services.filter(s => s.status === 'checking').length;
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            System Monitor
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Real-time monitoring of all Analytics Engine services and system metrics
-          </Typography>
-        </Box>
-        <Chip 
-          icon={isConnected ? <CheckCircleIcon /> : <CircularProgress size={16} />} 
-          label={isConnected ? "Live Stream Connected" : "Connecting Stream..."}
-          color={isConnected ? "success" : "default"}
-          variant="outlined"
-        />
-      </Box>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold theme-text-title tracking-wide">System Monitor</h1>
+          <p className="theme-text-muted mt-1">Real-time monitoring of all Analytics Engine services and system metrics</p>
+        </div>
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-full border text-sm",
+          isConnected 
+            ? "bg-green-500/10 border-green-500/30 text-green-400"
+            : "bg-gray-500/10 border-gray-500/30 theme-text-muted"
+        )}>
+          {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+          {isConnected ? "Live Stream Connected" : "Connecting Stream..."}
+        </div>
+      </div>
 
       {/* System Health Summary */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
-            <CardContent>
-              <Typography variant="h3">{healthyCount}/{services.length}</Typography>
-              <Typography variant="body2">Services Healthy</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: errorCount > 0 ? 'error.light' : 'grey.100' }}>
-            <CardContent>
-              <Typography variant="h3" color={errorCount > 0 ? 'error.contrastText' : 'text.primary'}>
-                {errorCount}
-              </Typography>
-              <Typography variant="body2" color={errorCount > 0 ? 'error.contrastText' : 'text.secondary'}>
-                Services Down
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h3">{services.filter(s => s.status === 'checking').length}</Typography>
-              <Typography variant="body2" color="text.secondary">Checking...</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-green-500/10 border-green-500/30">
+          <CardContent className="p-5">
+            <p className="text-4xl font-bold text-green-400">{healthyCount}/{services.length}</p>
+            <p className="text-sm text-green-400/80">Services Healthy</p>
+          </CardContent>
+        </Card>
+        <Card className={cn(
+          errorCount > 0 ? "bg-red-500/10 border-red-500/30" : "theme-card-bg"
+        )}>
+          <CardContent className="p-5">
+            <p className={cn("text-4xl font-bold", errorCount > 0 ? "text-red-400" : "theme-text-title")}>
+              {errorCount}
+            </p>
+            <p className={cn("text-sm", errorCount > 0 ? "text-red-400/80" : "theme-text-muted")}>
+              Services Down
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-4xl font-bold theme-text-title">{checkingCount}</p>
+            <p className="text-sm theme-text-muted">Checking...</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Real-time System Metrics */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Real-time System Metrics
-        </Typography>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary">Active Users</Typography>
-                    <Typography variant="h4">{metrics.activeUsers}</Typography>
-                  </Box>
-                  <PeopleIcon color="action" sx={{ fontSize: 40 }} />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'success.main' }}>
-                  <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                  <Typography variant="caption">+12% since last hour</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary">TPS</Typography>
-                    <Typography variant="h4">{metrics.transactionsPerSecond}</Typography>
-                  </Box>
-                  <DataUsageIcon color="action" sx={{ fontSize: 40 }} />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <Chip label="High Load" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem' }} />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary">Avg Latency</Typography>
-                    <Typography variant="h4">{metrics.avgLatencyMs}<Typography component="span" variant="caption" sx={{ ml: 0.5 }}>ms</Typography></Typography>
-                  </Box>
-                  <SpeedIcon color="action" sx={{ fontSize: 40 }} />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'success.main' }}>
-                  <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
-                  <Typography variant="caption">Improving</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary">System CPU</Typography>
-                    <Typography variant="h4">{metrics.cpuUsage}%</Typography>
-                  </Box>
-                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                    <CircularProgress variant="determinate" value={metrics.cpuUsage} color={metrics.cpuUsage > 80 ? 'error' : 'primary'} />
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, color: 'text.secondary' }}>
-                  <Typography variant="caption">4 Cores Active</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Paper>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5 theme-info-icon" />
+            Real-time System Metrics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              label="Active Users"
+              value={metrics.activeUsers}
+              icon={<Users className="w-5 h-5 text-alpha-500" />}
+              trend="up"
+              trendLabel="+12% since last hour"
+            />
+            <MetricCard
+              label="TPS"
+              value={metrics.transactionsPerSecond}
+              icon={<Activity className="w-5 h-5 text-alpha-500" />}
+              trendLabel="High Load"
+            />
+            <MetricCard
+              label="Avg Latency"
+              value={metrics.avgLatencyMs}
+              unit="ms"
+              icon={<Gauge className="w-5 h-5 text-alpha-500" />}
+              trend="down"
+              trendLabel="Improving"
+            />
+            <div className="p-5 rounded-xl theme-card-bg border theme-border">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide theme-text-muted mb-1">System CPU</p>
+                  <p className="text-3xl font-bold theme-text-title">{metrics.cpuUsage}%</p>
+                </div>
+                <div className="relative w-12 h-12">
+                  <svg className="w-12 h-12 -rotate-90">
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      className="text-alpha-faded-200 dark:text-alpha-faded-800"
+                    />
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      strokeDasharray={`${metrics.cpuUsage * 1.26} 126`}
+                      className={metrics.cpuUsage > 80 ? "text-red-500" : "text-alpha-500"}
+                    />
+                  </svg>
+                  <Cpu className="w-4 h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 theme-text-muted" />
+                </div>
+              </div>
+              <p className="text-xs theme-text-muted mt-2">4 Cores Active</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Service Status Table */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          All Services Status
-        </Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Service Name</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Endpoint</TableCell>
-                <TableCell>Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {services.map((service) => (
-                <TableRow key={service.name}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {service.status === 'healthy' && <CheckCircleIcon color="success" sx={{ mr: 1 }} />}
-                      {service.status === 'error' && <ErrorIcon color="error" sx={{ mr: 1 }} />}
-                      {service.status === 'checking' && <CircularProgress size={20} sx={{ mr: 1 }} />}
-                      <Typography variant="body2">{service.name}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={service.status === 'healthy' ? 'Healthy' : service.status === 'error' ? 'Error' : 'Checking...'}
-                      color={service.status === 'healthy' ? 'success' : service.status === 'error' ? 'error' : 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption" fontFamily="monospace">{service.url}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    {service.details && (
-                      <Typography variant="caption" color="text.secondary">
-                        {service.details.service || 'OK'}
-                      </Typography>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-    </Box>
+      <Card>
+        <CardHeader>
+          <CardTitle>All Services Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b theme-border">
+                  <th className="px-4 py-3 text-left theme-text-muted font-medium">Service Name</th>
+                  <th className="px-4 py-3 text-left theme-text-muted font-medium">Status</th>
+                  <th className="px-4 py-3 text-left theme-text-muted font-medium">Endpoint</th>
+                  <th className="px-4 py-3 text-left theme-text-muted font-medium">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {services.map((service) => (
+                  <tr key={service.name} className="border-b theme-border hover:theme-card-bg-hover">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {service.status === 'healthy' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                        {service.status === 'error' && <XCircle className="w-4 h-4 text-red-500" />}
+                        {service.status === 'checking' && <RefreshCw className="w-4 h-4 theme-text-muted animate-spin" />}
+                        <span className="theme-text">{service.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium",
+                        service.status === 'healthy' && "bg-green-500/20 text-green-400",
+                        service.status === 'error' && "bg-red-500/20 text-red-400",
+                        service.status === 'checking' && "bg-gray-500/20 theme-text-muted"
+                      )}>
+                        {service.status === 'healthy' ? 'Healthy' : service.status === 'error' ? 'Error' : 'Checking...'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <code className="text-xs theme-text-muted">{service.url}</code>
+                    </td>
+                    <td className="px-4 py-3">
+                      {service.details && (
+                        <span className="text-xs theme-text-muted">
+                          {service.details.service || 'OK'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

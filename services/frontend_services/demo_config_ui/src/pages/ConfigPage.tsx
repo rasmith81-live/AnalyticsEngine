@@ -1,5 +1,5 @@
-import { Typography, Box, Alert, Snackbar, AppBar, Toolbar } from '@mui/material';
 import { useState } from 'react';
+import { CheckCircle, X } from 'lucide-react';
 import KPITreeView from '../components/KPITreeView';
 import KPIDetailPreview from '../components/KPIDetailPreview';
 import KPISampleVisualization from '../components/KPISampleVisualization';
@@ -16,17 +16,14 @@ export default function ConfigPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleKPIToggleCart = (kpiCode: string) => {
-    // Toggle KPI in cart via checkbox
     toggleCart(kpiCode);
   };
 
   const handleKPIViewDetails = (kpiCode: string) => {
-    // Show KPI details in the right panel preview
     setCurrentViewKPI(kpiCode);
   };
 
   const handleAddToCart = (kpiCode: string) => {
-    // Add to cart from detail view button
     addToCart(kpiCode);
   };
 
@@ -41,8 +38,6 @@ export default function ConfigPage() {
   };
 
   const handleSaveConfiguration = () => {
-    // TODO: Implement save to backend via configApi
-    // For now, just save to localStorage
     const config = {
       selectedKPIs,
       savedAt: new Date().toISOString(),
@@ -58,34 +53,21 @@ export default function ConfigPage() {
   };
 
   const handleSaveCustomKPI = (customKPI: Partial<KPI>) => {
-    // TODO: Save to backend via configApi
     console.log('Custom KPI created:', customKPI);
-    // Add to cart
     if (customKPI.code) {
       handleAddToCart(customKPI.code);
     }
   };
 
   return (
-    <Box sx={{ 
-      height: 'calc(100vh - 100px)', 
-      width: '100vw',
-      maxWidth: '100%',
-      display: 'flex', 
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
+    <div className="h-[calc(100vh-100px)] w-full flex flex-col overflow-hidden animate-fade-in">
       {/* Page Header with Cart Badge */}
-      <AppBar position="static" color="default" elevation={0} sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
-        <Toolbar sx={{ minWidth: 0, px: 2 }}>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h5" gutterBottom sx={{ mb: 0 }}>
-              KPI Configuration
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Browse KPIs, view details, and add to your cart
-            </Typography>
-          </Box>
+      <div className="px-4 py-3 border-b theme-border theme-card-bg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold theme-text-title">KPI Configuration</h1>
+            <p className="text-sm theme-text-muted">Browse KPIs, view details, and add to your cart</p>
+          </div>
           <KPICartBadge
             selectedKPIs={selectedKPIs}
             onRemoveKPI={handleRemoveKPI}
@@ -94,47 +76,47 @@ export default function ConfigPage() {
             onViewKPI={setCurrentViewKPI}
             currentViewKPI={currentViewKPI}
           />
-        </Toolbar>
-      </AppBar>
+        </div>
+      </div>
 
       {/* Resizable Split Panel */}
-      <Box sx={{ flex: 1, minHeight: 0, mt: 2, px: 2, overflow: 'hidden' }}>
+      <div className="flex-1 min-h-0 mt-4 px-4 overflow-hidden">
         <ResizableSplitPanel
           defaultLeftWidth={55}
           minLeftWidth={35}
           minRightWidth={25}
           leftPanel={
-            <Box sx={{ height: '100%', overflow: 'hidden' }}>
+            <div className="h-full overflow-hidden">
               <KPITreeView
                 onKPIToggleCart={handleKPIToggleCart}
                 onKPIViewDetails={handleKPIViewDetails}
                 selectedKPIs={selectedKPIs}
                 currentViewKPI={currentViewKPI}
               />
-            </Box>
+            </div>
           }
           rightPanel={
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2, pl: 2, overflow: 'hidden', minWidth: 0 }}>
+            <div className="h-full flex flex-col gap-4 pl-4 overflow-hidden min-w-0">
               {/* Top: KPI Details */}
-              <Box sx={{ flex: 1, minHeight: 0 }}>
+              <div className="flex-1 min-h-0">
                 <KPIDetailPreview
                   kpiCode={currentViewKPI}
                   onAddToCart={handleAddToCart}
                   onDeriveCustomKPI={handleDeriveCustomKPI}
                   isInCart={currentViewKPI ? selectedKPIs.includes(currentViewKPI) : false}
                 />
-              </Box>
+              </div>
               
               {/* Bottom: Sample Visualization */}
               {currentViewKPI && (
-                <Box sx={{ height: 280 }}>
+                <div className="h-[280px]">
                   <KPISampleVisualization kpiCode={currentViewKPI} />
-                </Box>
+                </div>
               )}
-            </Box>
+            </div>
           }
         />
-      </Box>
+      </div>
 
       {/* Custom KPI Derivation Modal */}
       <DeriveCustomKPIModal
@@ -145,16 +127,17 @@ export default function ConfigPage() {
       />
 
       {/* Success Notification */}
-      <Snackbar
-        open={saveSuccess}
-        autoHideDuration={3000}
-        onClose={() => setSaveSuccess(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="success" onClose={() => setSaveSuccess(false)}>
-          Configuration saved successfully!
-        </Alert>
-      </Snackbar>
-    </Box>
+      {saveSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 shadow-lg">
+            <CheckCircle className="w-5 h-5" />
+            <span>Configuration saved successfully!</span>
+            <button onClick={() => setSaveSuccess(false)} className="p-1 hover:bg-green-500/20 rounded">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

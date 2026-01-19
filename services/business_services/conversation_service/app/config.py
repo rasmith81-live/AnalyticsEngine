@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # openai or azure
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     
+    # Anthropic (Multi-Agent System)
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ANTHROPIC_COORDINATOR_MODEL: str = os.getenv("ANTHROPIC_COORDINATOR_MODEL", "claude-opus-4-20250514")
+    ANTHROPIC_SUBAGENT_MODEL: str = os.getenv("ANTHROPIC_SUBAGENT_MODEL", "claude-sonnet-4-20250514")
+    
     # Messaging
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     

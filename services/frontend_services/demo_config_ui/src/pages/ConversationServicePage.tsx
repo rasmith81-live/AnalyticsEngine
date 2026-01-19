@@ -1,36 +1,32 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Box, Typography, Paper, Button, Chip, Stack,
-  Card, CardContent, List, ListItem,
-  CircularProgress, Alert, Tabs, Tab, Tooltip, Badge,
-  LinearProgress, IconButton, Divider, TextField,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow
-} from '@mui/material';
-import {
-  Mic as MicIcon,
-  Psychology as IntentIcon,
-  AccountTree as EntityIcon,
-  Link as RelationshipIcon,
-  Refresh as RefreshIcon,
-  Hub as HubIcon,
-  GraphicEq as WaveformIcon,
-  RecordVoiceOver as SpeakerIcon,
-  Stop as StopIcon,
-  FiberManualRecord as RecordIcon,
-  Delete as ClearIcon,
-  Send as SendIcon,
-  Save as SaveIcon,
-  FolderOpen as LoadIcon,
-  Search as SearchIcon
-} from '@mui/icons-material';
+  Mic,
+  Brain,
+  GitBranch,
+  Link2,
+  RefreshCw,
+  Network,
+  AudioWaveform,
+  Volume2,
+  Square,
+  Circle,
+  Trash2,
+  Send,
+  Save,
+  FolderOpen,
+  Search,
+  X,
+  ChevronRight,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 import { 
   conversationApi, 
   SaveFullConfigurationRequest,
   ClientConfigurationResponse
 } from '../api/conversationApi';
 
-// Types
 interface BusinessIntent {
   name: string;
   confidence: number;
@@ -80,7 +76,6 @@ interface ValueChainModel {
   created_at: string;
 }
 
-// Extend Window interface for SpeechRecognition
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -88,21 +83,41 @@ declare global {
   }
 }
 
-// API Base URL
 const API_BASE = 'http://127.0.0.1:8090/api/v1/conversation';
 
+function TabButton({ active, onClick, children, badge }: { 
+  active: boolean; 
+  onClick: () => void; 
+  children: React.ReactNode;
+  badge?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-4 py-2 text-sm font-medium transition-colors relative",
+        active 
+          ? "text-alpha-500 border-b-2 border-alpha-500" 
+          : "theme-text-muted hover:theme-text"
+      )}
+    >
+      {children}
+      {badge !== undefined && badge > 0 && (
+        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-alpha-500 text-white text-xs flex items-center justify-center">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function ConversationServicePage() {
-  // Audio/Speech Recognition State
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [audioLevel, setAudioLevel] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(true);
-  
-  // Text input fallback
   const [textInput, setTextInput] = useState('');
-  
-  // Session and Intent State
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [allIntents, setAllIntents] = useState<BusinessIntent[]>([]);
   const [generatedModel, setGeneratedModel] = useState<ValueChainModel | null>(null);
@@ -112,8 +127,6 @@ export default function ConversationServicePage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  
-  // Load Configuration Dialog State
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [searchClientName, setSearchClientName] = useState('');
   const [searchDateFrom, setSearchDateFrom] = useState('');
@@ -121,23 +134,20 @@ export default function ConversationServicePage() {
   const [searchResults, setSearchResults] = useState<ClientConfigurationResponse[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Refs
+
   const recognitionRef = useRef<any>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  
+
   const userId = 'demo_user';
 
-  // Keep sessionIdRef in sync with sessionId state
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  // Scroll to bottom of transcript
   const scrollToBottom = () => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -146,7 +156,6 @@ export default function ConversationServicePage() {
     scrollToBottom();
   }, [transcript, currentTranscript]);
 
-  // Check for speech recognition support
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -155,7 +164,6 @@ export default function ConversationServicePage() {
     }
   }, []);
 
-  // Create a new session
   const createSession = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/sessions?user_id=${userId}`, {
@@ -173,25 +181,16 @@ export default function ConversationServicePage() {
     }
   }, [userId]);
 
-  // Initialize session on mount
   useEffect(() => {
     createSession();
   }, [createSession]);
 
-  // Process transcript segment through the conversation service
   const processTranscript = useCallback(async (text: string, segmentId: string) => {
     const currentSessionId = sessionIdRef.current;
-    if (!text.trim()) return;
-
-    // If no session yet, create one first
-    if (!currentSessionId) {
-      console.log('No session ID available, skipping processing');
-      return;
-    }
+    if (!text.trim() || !currentSessionId) return;
 
     setIsProcessing(true);
     try {
-      console.log('Processing transcript:', text, 'Session:', currentSessionId);
       const response = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -199,21 +198,15 @@ export default function ConversationServicePage() {
           session_id: currentSessionId,
           user_id: userId,
           message: text,
-          skip_response: true,  // Skip LLM response generation for faster intent extraction
+          skip_response: true,
         }),
       });
 
-      if (!response.ok) {
-        console.error('API response not ok:', response.status, response.statusText);
-        throw new Error('Failed to process transcript');
-      }
+      if (!response.ok) throw new Error('Failed to process transcript');
 
       const data = await response.json();
-      console.log('API response:', data);
 
-      // Update the transcript segment with intents
       if (data.intents && data.intents.length > 0) {
-        console.log('Extracted intents:', data.intents);
         setTranscript(prev => prev.map(seg => 
           seg.id === segmentId ? { ...seg, intents: data.intents } : seg
         ));
@@ -230,7 +223,6 @@ export default function ConversationServicePage() {
     }
   }, [userId]);
 
-  // Setup audio level monitoring
   const setupAudioMonitoring = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -255,7 +247,6 @@ export default function ConversationServicePage() {
     }
   }, []);
 
-  // Cleanup audio monitoring
   const cleanupAudioMonitoring = useCallback(() => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -266,7 +257,6 @@ export default function ConversationServicePage() {
     setAudioLevel(0);
   }, []);
 
-  // Start listening
   const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
@@ -306,8 +296,6 @@ export default function ConversationServicePage() {
         };
         setTranscript(prev => [...prev, newSegment]);
         setCurrentTranscript('');
-        
-        // Process the final transcript for intent extraction
         processTranscript(finalTranscript, segmentId);
       }
     };
@@ -320,7 +308,6 @@ export default function ConversationServicePage() {
     };
 
     recognitionRef.current.onend = () => {
-      // Restart if still supposed to be listening
       if (isListening && recognitionRef.current) {
         recognitionRef.current.start();
       }
@@ -329,7 +316,6 @@ export default function ConversationServicePage() {
     recognitionRef.current.start();
   }, [isListening, setupAudioMonitoring, processTranscript]);
 
-  // Stop listening
   const stopListening = useCallback(() => {
     setIsListening(false);
     if (recognitionRef.current) {
@@ -339,7 +325,6 @@ export default function ConversationServicePage() {
     cleanupAudioMonitoring();
   }, [cleanupAudioMonitoring]);
 
-  // Toggle listening
   const toggleListening = () => {
     if (isListening) {
       stopListening();
@@ -348,14 +333,12 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Clear transcript
   const clearTranscript = () => {
     setTranscript([]);
     setCurrentTranscript('');
     setAllIntents([]);
   };
 
-  // Manual text submission (fallback for when speech doesn't work)
   const submitTextInput = async () => {
     if (!textInput.trim() || isProcessing) return;
     
@@ -369,12 +352,9 @@ export default function ConversationServicePage() {
     setTranscript(prev => [...prev, newSegment]);
     const inputText = textInput;
     setTextInput('');
-    
-    // Process the text for intent extraction
     await processTranscript(inputText, segmentId);
   };
 
-  // Handle Enter key for text input
   const handleTextKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -382,7 +362,6 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Generate Value Chain Model
   const generateValueChainModel = async () => {
     if (!sessionId || transcript.length === 0) return;
 
@@ -406,7 +385,6 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Save Configuration to Client Configuration Table
   const saveConfiguration = async () => {
     if (!sessionId || (transcript.length === 0 && allIntents.length === 0)) {
       setError('Nothing to save. Start a conversation first.');
@@ -418,10 +396,7 @@ export default function ConversationServicePage() {
     setSaveSuccess(null);
 
     try {
-      // Build the full transcript text
       const fullTranscript = transcript.map(seg => seg.text).join('\n');
-      
-      // Extract unique entities from intents
       const uniqueEntities = [...new Set(allIntents.flatMap(i => i.target_entities || []))];
       const uniqueMetrics = [...new Set(allIntents.flatMap(i => i.requested_metrics || []))];
 
@@ -494,7 +469,6 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Search for saved configurations
   const searchConfigurations = async () => {
     setIsSearching(true);
     setError(null);
@@ -514,7 +488,6 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Load a saved configuration
   const loadConfiguration = async (configId: number) => {
     setIsLoading(true);
     setError(null);
@@ -522,7 +495,6 @@ export default function ConversationServicePage() {
     try {
       const config = await conversationApi.getConfiguration(configId);
       
-      // Populate the UI with loaded data
       if (config.recordings.length > 0) {
         const recording = config.recordings[0];
         if (recording.segments) {
@@ -536,7 +508,6 @@ export default function ConversationServicePage() {
         }
       }
       
-      // Load intents
       if (config.intents.length > 0) {
         const loadedIntents: BusinessIntent[] = config.intents.map((intent: any) => ({
           name: intent.name,
@@ -550,7 +521,6 @@ export default function ConversationServicePage() {
         setAllIntents(loadedIntents);
       }
       
-      // Load value chain model
       if (config.value_chain_models.length > 0) {
         const model = config.value_chain_models[0];
         setGeneratedModel({
@@ -572,578 +542,518 @@ export default function ConversationServicePage() {
     }
   };
 
-  // Get intent color based on confidence
-  const getIntentColor = (confidence: number): 'success' | 'warning' | 'error' => {
-    if (confidence >= 0.8) return 'success';
-    if (confidence >= 0.5) return 'warning';
-    return 'error';
+  const getIntentColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'bg-green-500/20 text-green-400 border-green-500/30';
+    if (confidence >= 0.5) return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    return 'bg-red-500/20 text-red-400 border-red-500/30';
   };
 
-  // Get node type color
   const getNodeTypeColor = (type: string): string => {
     const colors: Record<string, string> = {
-      'Process': '#F79767',
-      'Activity': '#DA7194',
-      'Metric': '#4C8EDA',
-      'Entity': '#6DCE9E',
+      'Process': 'bg-orange-500',
+      'Activity': 'bg-pink-500',
+      'Metric': 'bg-blue-500',
+      'Entity': 'bg-green-500',
     };
-    return colors[type] || '#888';
+    return colors[type] || 'bg-gray-500';
   };
 
-  // Format timestamp
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
+  const uniqueEntities = [...new Set(allIntents.flatMap(i => i.target_entities || []))];
+  const uniqueMetrics = [...new Set(allIntents.flatMap(i => i.requested_metrics || []))];
+
   return (
-    <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+    <div className="h-[calc(100vh-120px)] flex flex-col animate-fade-in">
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box>
-          <Typography variant="h4">
-            Conversation Listener
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Listen to conversations and extract business entities & relationships in real-time
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={createSession}
-            size="small"
-          >
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-3xl font-bold theme-text-title tracking-wide">AI Interview</h1>
+          <p className="theme-text-muted mt-1">Listen to conversations and extract business entities & relationships in real-time</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={createSession}>
+            <RefreshCw className="w-4 h-4 mr-2" />
             New Session
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<HubIcon />}
+          <Button 
+            size="sm" 
             onClick={generateValueChainModel}
             disabled={transcript.length === 0 || isGeneratingModel}
-            size="small"
           >
+            <Network className="w-4 h-4 mr-2" />
             {isGeneratingModel ? 'Generating...' : 'Generate Model'}
           </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+          <Button 
+            variant="secondary" 
+            size="sm"
             onClick={saveConfiguration}
             disabled={isSaving || (transcript.length === 0 && allIntents.length === 0)}
-            size="small"
           >
-            {isSaving ? 'Saving...' : 'Save Configuration'}
+            {isSaving ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
-          <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<LoadIcon />}
-            onClick={() => setLoadDialogOpen(true)}
-            size="small"
-          >
-            Load Configuration
+          <Button variant="outline" size="sm" onClick={() => setLoadDialogOpen(true)}>
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Load
           </Button>
-        </Stack>
-      </Box>
+        </div>
+      </div>
 
+      {/* Alerts */}
       {saveSuccess && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSaveSuccess(null)}>
-          {saveSuccess}
-        </Alert>
+        <div className="mb-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 flex items-center justify-between">
+          <span>{saveSuccess}</span>
+          <button onClick={() => setSaveSuccess(null)}><X className="w-4 h-4" /></button>
+        </div>
       )}
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
+        </div>
       )}
 
-      <Box sx={{ display: 'flex', gap: 2, flex: 1, minHeight: 0 }}>
+      {/* Main Content */}
+      <div className="flex gap-4 flex-1 min-h-0">
         {/* Left Panel - Audio Listener & Transcript */}
-        <Paper sx={{ flex: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Card className="flex-[2] flex flex-col overflow-hidden">
           {/* Audio Controls */}
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', bgcolor: isListening ? 'error.light' : 'grey.100' }}>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <IconButton
+          <div className={cn(
+            "p-4 border-b theme-border",
+            isListening ? "bg-red-500/10" : "theme-card-bg"
+          )}>
+            <div className="flex items-center gap-4">
+              <button
                 onClick={toggleListening}
                 disabled={!speechSupported}
-                sx={{
-                  width: 64,
-                  height: 64,
-                  bgcolor: isListening ? 'error.main' : 'primary.main',
-                  color: 'white',
-                  '&:hover': {
-                    bgcolor: isListening ? 'error.dark' : 'primary.dark',
-                  },
-                  animation: isListening ? 'pulse 1.5s infinite' : 'none',
-                  '@keyframes pulse': {
-                    '0%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
-                    '70%': { boxShadow: '0 0 0 15px rgba(244, 67, 54, 0)' },
-                    '100%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' },
-                  },
-                }}
-              >
-                {isListening ? <StopIcon sx={{ fontSize: 32 }} /> : <MicIcon sx={{ fontSize: 32 }} />}
-              </IconButton>
-              
-              <Box sx={{ flex: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  {isListening && <RecordIcon sx={{ color: 'error.main', fontSize: 16 }} />}
-                  <Typography variant="h6" fontWeight="bold">
-                    {isListening ? 'Listening...' : 'Click to Start Listening'}
-                  </Typography>
-                </Stack>
-                {isListening && (
-                  <Box sx={{ mt: 1 }}>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={audioLevel * 100} 
-                      sx={{ 
-                        height: 8, 
-                        borderRadius: 4,
-                        bgcolor: 'rgba(0,0,0,0.1)',
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: audioLevel > 0.5 ? 'success.main' : 'primary.main',
-                        }
-                      }} 
-                    />
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
-                      <WaveformIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Typography variant="caption" color="text.secondary">
-                        Audio Level
-                      </Typography>
-                    </Stack>
-                  </Box>
+                className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center transition-all",
+                  isListening 
+                    ? "bg-red-500 hover:bg-red-600 animate-pulse" 
+                    : "bg-alpha-500 hover:bg-alpha-600",
+                  "text-white"
                 )}
-              </Box>
+              >
+                {isListening ? <Square className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+              </button>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {isListening && <Circle className="w-3 h-3 text-red-500 animate-pulse" />}
+                  <span className="text-lg font-semibold theme-text-title">
+                    {isListening ? 'Listening...' : 'Click to Start Listening'}
+                  </span>
+                </div>
+                {isListening && (
+                  <div className="mt-2">
+                    <div className="h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full transition-all duration-100",
+                          audioLevel > 0.5 ? "bg-green-500" : "bg-alpha-500"
+                        )}
+                        style={{ width: `${audioLevel * 100}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <AudioWaveform className="w-3 h-3 theme-text-muted" />
+                      <span className="text-xs theme-text-muted">Audio Level</span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button
-                variant="outlined"
-                startIcon={<ClearIcon />}
+                variant="outline"
+                size="sm"
                 onClick={clearTranscript}
                 disabled={transcript.length === 0}
-                size="small"
               >
+                <Trash2 className="w-4 h-4 mr-1" />
                 Clear
               </Button>
-            </Stack>
-          </Box>
+            </div>
+          </div>
 
           {/* Transcript Display */}
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          <div className="flex-1 overflow-y-auto p-4">
             {transcript.length === 0 && !currentTranscript ? (
-              <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
-                <SpeakerIcon sx={{ fontSize: 64, mb: 2, opacity: 0.3 }} />
-                <Typography variant="h6">
-                  Ready to Listen
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}>
+              <div className="text-center py-16">
+                <Volume2 className="w-16 h-16 mx-auto theme-text-muted opacity-30 mb-4" />
+                <h3 className="text-lg font-semibold theme-text-title mb-2">Ready to Listen</h3>
+                <p className="theme-text-muted text-sm max-w-md mx-auto">
                   Click the microphone button to start listening to your conversation.
-                  <br />
                   The system will transcribe speech and extract business intents in real-time.
-                </Typography>
-              </Box>
+                </p>
+              </div>
             ) : (
-              <Stack spacing={2}>
+              <div className="space-y-3">
                 {transcript.map((segment) => (
-                  <Card key={segment.id} variant="outlined">
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Stack direction="row" alignItems="flex-start" spacing={1}>
-                        <SpeakerIcon sx={{ color: 'primary.main', mt: 0.5 }} />
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1">
-                            {segment.text}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatTime(segment.timestamp)}
-                          </Typography>
-                          {segment.intents && segment.intents.length > 0 && (
-                            <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
-                              {segment.intents.map((intent, idx) => (
-                                <Tooltip key={idx} title={intent.description || intent.name}>
-                                  <Chip
-                                    size="small"
-                                    icon={<IntentIcon />}
-                                    label={`${intent.name} (${Math.round(intent.confidence * 100)}%)`}
-                                    color={getIntentColor(intent.confidence)}
-                                    variant="outlined"
-                                  />
-                                </Tooltip>
-                              ))}
-                            </Stack>
-                          )}
-                        </Box>
-                      </Stack>
-                    </CardContent>
-                  </Card>
+                  <div key={segment.id} className="p-3 rounded-xl theme-card-bg border theme-border">
+                    <div className="flex items-start gap-3">
+                      <Volume2 className="w-5 h-5 theme-info-icon mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="theme-text">{segment.text}</p>
+                        <p className="text-xs theme-text-muted mt-1">{formatTime(segment.timestamp)}</p>
+                        {segment.intents && segment.intents.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {segment.intents.map((intent, idx) => (
+                              <span
+                                key={idx}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
+                                  getIntentColor(intent.confidence)
+                                )}
+                                title={intent.description || intent.name}
+                              >
+                                <Brain className="w-3 h-3" />
+                                {intent.name} ({Math.round(intent.confidence * 100)}%)
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))}
                 
-                {/* Current (interim) transcript */}
                 {currentTranscript && (
-                  <Card variant="outlined" sx={{ bgcolor: 'grey.50', borderStyle: 'dashed' }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Stack direction="row" alignItems="flex-start" spacing={1}>
-                        <SpeakerIcon sx={{ color: 'grey.400', mt: 0.5 }} />
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="body1" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-                            {currentTranscript}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Listening...
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </CardContent>
-                  </Card>
+                  <div className="p-3 rounded-xl theme-card-bg border border-dashed theme-border opacity-70">
+                    <div className="flex items-start gap-3">
+                      <Volume2 className="w-5 h-5 theme-text-muted mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="theme-text-muted italic">{currentTranscript}</p>
+                        <p className="text-xs theme-text-muted mt-1">Listening...</p>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 
                 <div ref={transcriptEndRef} />
-              </Stack>
+              </div>
             )}
-          </Box>
+          </div>
 
-          {/* Text Input (fallback for speech) */}
-          <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-              Or type to simulate conversation input:
-            </Typography>
-            <Stack direction="row" spacing={1}>
-              <TextField
-                fullWidth
-                size="small"
+          {/* Text Input */}
+          <div className="p-4 border-t theme-border">
+            <p className="text-xs theme-text-muted mb-2">Or type to simulate conversation input:</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
                 placeholder="Type what you would say in a conversation..."
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={handleTextKeyPress}
                 disabled={isProcessing}
+                className="flex-1 px-4 py-2 rounded-xl theme-card-bg border theme-border
+                  theme-text placeholder:theme-text-muted text-sm
+                  focus:outline-none focus:ring-2 focus:ring-alpha-500"
               />
               <Button
-                variant="contained"
                 onClick={submitTextInput}
                 disabled={!textInput.trim() || isProcessing}
-                startIcon={isProcessing ? <CircularProgress size={16} /> : <SendIcon />}
               >
-                Send
+                {isProcessing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </Button>
-            </Stack>
-          </Box>
+            </div>
+          </div>
 
           {/* Status Bar */}
-          <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {sessionId ? `Session: ${sessionId.substring(0, 8)}...` : 'No session'}
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <Typography variant="caption" color="text.secondary">
-                  Segments: {transcript.length}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Intents: {allIntents.length}
-                </Typography>
+          <div className="px-4 py-2 border-t theme-border theme-card-bg">
+            <div className="flex items-center justify-between text-xs theme-text-muted">
+              <span>{sessionId ? `Session: ${sessionId.substring(0, 8)}...` : 'No session'}</span>
+              <div className="flex items-center gap-4">
+                <span>Segments: {transcript.length}</span>
+                <span>Intents: {allIntents.length}</span>
                 {isProcessing && (
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
-                    <CircularProgress size={12} />
-                    <Typography variant="caption" color="primary">
-                      Processing...
-                    </Typography>
-                  </Stack>
+                  <span className="flex items-center gap-1 text-alpha-400">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Processing...
+                  </span>
                 )}
-              </Stack>
-            </Stack>
-          </Box>
-        </Paper>
+              </div>
+            </div>
+          </div>
+        </Card>
 
         {/* Right Panel - Extracted Data */}
-        <Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tab label={<Badge badgeContent={allIntents.length} color="primary">Intents</Badge>} />
-            <Tab label="Entities" />
-            <Tab label="Model" />
-          </Tabs>
+        <Card className="flex-1 flex flex-col overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b theme-border">
+            <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} badge={allIntents.length}>
+              Intents
+            </TabButton>
+            <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)}>
+              Entities
+            </TabButton>
+            <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)}>
+              Model
+            </TabButton>
+          </div>
 
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-4">
             {/* Intents Tab */}
             {activeTab === 0 && (
-              <Box>
+              <div>
                 {allIntents.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                    <IntentIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-                    <Typography variant="body2">
-                      Business intents will appear here as you speak
-                    </Typography>
-                  </Box>
+                  <div className="text-center py-12">
+                    <Brain className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
+                    <p className="theme-text-muted text-sm">Business intents will appear here as you speak</p>
+                  </div>
                 ) : (
-                  <List dense>
+                  <div className="space-y-2">
                     {allIntents.map((intent, idx) => (
-                      <ListItem key={idx} sx={{ mb: 1, px: 0 }}>
-                        <Card variant="outlined" sx={{ width: '100%' }}>
-                          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Typography variant="subtitle2" fontWeight="bold">
-                                {intent.name}
-                              </Typography>
-                              <Chip
-                                size="small"
-                                label={`${Math.round(intent.confidence * 100)}%`}
-                                color={getIntentColor(intent.confidence)}
-                              />
-                            </Stack>
-                            {intent.description && (
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                {intent.description}
-                              </Typography>
-                            )}
-                            {intent.target_entities && intent.target_entities.length > 0 && (
-                              <Box sx={{ mt: 0.5 }}>
-                                {intent.target_entities.map((e, i) => (
-                                  <Chip key={i} size="small" label={e} sx={{ mr: 0.5, mt: 0.5 }} variant="outlined" />
-                                ))}
-                              </Box>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </ListItem>
+                      <div key={idx} className="p-3 rounded-xl theme-card-bg border theme-border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold theme-text-title text-sm">{intent.name}</span>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs border",
+                            getIntentColor(intent.confidence)
+                          )}>
+                            {Math.round(intent.confidence * 100)}%
+                          </span>
+                        </div>
+                        {intent.description && (
+                          <p className="text-xs theme-text-muted mb-2">{intent.description}</p>
+                        )}
+                        {intent.target_entities && intent.target_entities.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {intent.target_entities.map((e, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
+                                {e}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </List>
+                  </div>
                 )}
-              </Box>
+              </div>
             )}
 
             {/* Entities Tab */}
             {activeTab === 1 && (
-              <Box>
+              <div>
                 {allIntents.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                    <EntityIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-                    <Typography variant="body2">
-                      Extracted entities will appear here
-                    </Typography>
-                  </Box>
+                  <div className="text-center py-12">
+                    <GitBranch className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
+                    <p className="theme-text-muted text-sm">Extracted entities will appear here</p>
+                  </div>
                 ) : (
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                      Entities ({[...new Set(allIntents.flatMap(i => i.target_entities || []))].length})
-                    </Typography>
-                    <Stack spacing={1} sx={{ mb: 2 }}>
-                      {[...new Set(allIntents.flatMap(i => i.target_entities || []))].map((entity, idx) => (
-                        <Card key={idx} variant="outlined">
-                          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <EntityIcon color="primary" fontSize="small" />
-                              <Typography variant="body2">{entity}</Typography>
-                            </Stack>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold theme-text-title text-sm mb-2">
+                        Entities ({uniqueEntities.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {uniqueEntities.map((entity, idx) => (
+                          <div key={idx} className="p-2 rounded-lg theme-card-bg border theme-border flex items-center gap-2">
+                            <GitBranch className="w-4 h-4 theme-info-icon" />
+                            <span className="text-sm theme-text">{entity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     
-                    <Divider sx={{ my: 2 }} />
-                    
-                    <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                      Metrics ({[...new Set(allIntents.flatMap(i => i.requested_metrics || []))].length})
-                    </Typography>
-                    <Stack spacing={1}>
-                      {[...new Set(allIntents.flatMap(i => i.requested_metrics || []))].map((metric, idx) => (
-                        <Card key={`m-${idx}`} variant="outlined">
-                          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <IntentIcon color="secondary" fontSize="small" />
-                              <Typography variant="body2">{metric}</Typography>
-                            </Stack>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
-                  </Box>
+                    <div className="border-t theme-border pt-4">
+                      <h4 className="font-semibold theme-text-title text-sm mb-2">
+                        Metrics ({uniqueMetrics.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {uniqueMetrics.map((metric, idx) => (
+                          <div key={`m-${idx}`} className="p-2 rounded-lg theme-card-bg border theme-border flex items-center gap-2">
+                            <Brain className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm theme-text">{metric}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </Box>
+              </div>
             )}
 
             {/* Model Tab */}
             {activeTab === 2 && (
-              <Box>
+              <div>
                 {!generatedModel ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                    <HubIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-                    <Typography variant="body2">
-                      Click "Generate Model" to create a value chain model from the conversation
-                    </Typography>
-                  </Box>
+                  <div className="text-center py-12">
+                    <Network className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
+                    <p className="theme-text-muted text-sm">Click "Generate Model" to create a value chain model from the conversation</p>
+                  </div>
                 ) : (
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      {generatedModel.name}
-                    </Typography>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold theme-text-title">{generatedModel.name}</h3>
                     
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                      Nodes ({generatedModel.nodes.length})
-                    </Typography>
-                    <Stack spacing={1}>
-                      {generatedModel.nodes.map((node) => (
-                        <Card key={node.id} variant="outlined">
-                          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  bgcolor: getNodeTypeColor(node.type),
-                                }}
-                              />
-                              <Typography variant="body2" fontWeight="bold">
-                                {node.name}
-                              </Typography>
-                              <Chip size="small" label={node.type} />
-                            </Stack>
+                    <div>
+                      <h4 className="text-sm font-medium theme-text-title mb-2">
+                        Nodes ({generatedModel.nodes.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {generatedModel.nodes.map((node) => (
+                          <div key={node.id} className="p-2 rounded-lg theme-card-bg border theme-border">
+                            <div className="flex items-center gap-2">
+                              <div className={cn("w-3 h-3 rounded-full", getNodeTypeColor(node.type))} />
+                              <span className="font-medium theme-text text-sm">{node.name}</span>
+                              <span className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
+                                {node.type}
+                              </span>
+                            </div>
                             {node.description && (
-                              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                {node.description}
-                              </Typography>
+                              <p className="text-xs theme-text-muted mt-1 ml-5">{node.description}</p>
                             )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </Stack>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                    <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                      Relationships ({generatedModel.links.length})
-                    </Typography>
-                    <Stack spacing={1}>
-                      {generatedModel.links.map((link, idx) => {
-                        const sourceNode = generatedModel.nodes.find(n => n.id === link.source_id);
-                        const targetNode = generatedModel.nodes.find(n => n.id === link.target_id);
-                        return (
-                          <Card key={idx} variant="outlined">
-                            <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-                              <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-                                <RelationshipIcon color="action" fontSize="small" />
-                                <Typography variant="body2">
-                                  {sourceNode?.name || link.source_id}
-                                </Typography>
-                                <Chip size="small" label={link.type} color="primary" variant="outlined" />
-                                <Typography variant="body2">
-                                  {targetNode?.name || link.target_id}
-                                </Typography>
-                              </Stack>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
+                    <div>
+                      <h4 className="text-sm font-medium theme-text-title mb-2">
+                        Relationships ({generatedModel.links.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {generatedModel.links.map((link, idx) => {
+                          const sourceNode = generatedModel.nodes.find(n => n.id === link.source_id);
+                          const targetNode = generatedModel.nodes.find(n => n.id === link.target_id);
+                          return (
+                            <div key={idx} className="p-2 rounded-lg theme-card-bg border theme-border">
+                              <div className="flex items-center gap-2 flex-wrap text-sm">
+                                <Link2 className="w-4 h-4 theme-text-muted" />
+                                <span className="theme-text">{sourceNode?.name || link.source_id}</span>
+                                <ChevronRight className="w-4 h-4 theme-text-muted" />
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">
+                                  {link.type}
+                                </span>
+                                <ChevronRight className="w-4 h-4 theme-text-muted" />
+                                <span className="theme-text">{targetNode?.name || link.target_id}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </Box>
+              </div>
             )}
-          </Box>
-        </Paper>
-      </Box>
+          </div>
+        </Card>
+      </div>
 
       {/* Load Configuration Dialog */}
-      <Dialog 
-        open={loadDialogOpen} 
-        onClose={() => setLoadDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Load Saved Configuration</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Search for saved configurations by client name and/or date range.
-            </Typography>
-            
-            <Stack direction="row" spacing={2}>
-              <TextField
-                label="Client Name"
-                value={searchClientName}
-                onChange={(e) => setSearchClientName(e.target.value)}
-                size="small"
-                fullWidth
-                placeholder="Enter client name..."
-              />
-              <TextField
-                label="Date From"
-                type="date"
-                value={searchDateFrom}
-                onChange={(e) => setSearchDateFrom(e.target.value)}
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                label="Date To"
-                type="date"
-                value={searchDateTo}
-                onChange={(e) => setSearchDateTo(e.target.value)}
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-              <Button
-                variant="contained"
-                startIcon={isSearching ? <CircularProgress size={16} /> : <SearchIcon />}
-                onClick={searchConfigurations}
-                disabled={isSearching}
-              >
-                Search
+      {loadDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="w-full max-w-3xl mx-4 rounded-2xl theme-card-bg border theme-border shadow-2xl">
+            <div className="p-6 border-b theme-border">
+              <h2 className="text-xl font-bold theme-text-title">Load Saved Configuration</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm theme-text-muted">
+                Search for saved configurations by client name and/or date range.
+              </p>
+              
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Client name..."
+                  value={searchClientName}
+                  onChange={(e) => setSearchClientName(e.target.value)}
+                  className="flex-1 px-4 py-2 rounded-xl theme-card-bg border theme-border
+                    theme-text placeholder:theme-text-muted text-sm
+                    focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                />
+                <input
+                  type="date"
+                  value={searchDateFrom}
+                  onChange={(e) => setSearchDateFrom(e.target.value)}
+                  className="px-4 py-2 rounded-xl theme-card-bg border theme-border
+                    theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                />
+                <input
+                  type="date"
+                  value={searchDateTo}
+                  onChange={(e) => setSearchDateTo(e.target.value)}
+                  className="px-4 py-2 rounded-xl theme-card-bg border theme-border
+                    theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                />
+                <Button onClick={searchConfigurations} disabled={isSearching}>
+                  {isSearching ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+
+              {searchResults.length > 0 && (
+                <div className="rounded-xl border theme-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="theme-card-bg">
+                      <tr>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Client</th>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Name</th>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Created</th>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Intents</th>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Entities</th>
+                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {searchResults.map((config) => (
+                        <tr key={config.id} className="border-t theme-border hover:theme-card-bg-hover">
+                          <td className="px-4 py-2 theme-text">{config.client_name}</td>
+                          <td className="px-4 py-2 theme-text">{config.name}</td>
+                          <td className="px-4 py-2 theme-text-muted">
+                            {new Date(config.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-2 theme-text-muted">{config.intent_count}</td>
+                          <td className="px-4 py-2 theme-text-muted">{config.entity_count}</td>
+                          <td className="px-4 py-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => loadConfiguration(config.id)}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? 'Loading...' : 'Load'}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {searchResults.length === 0 && !isSearching && (
+                <div className="text-center py-12">
+                  <FolderOpen className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
+                  <p className="theme-text-muted text-sm">No configurations found. Try searching with different criteria.</p>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t theme-border flex justify-end">
+              <Button variant="outline" onClick={() => setLoadDialogOpen(false)}>
+                Cancel
               </Button>
-            </Stack>
-
-            {searchResults.length > 0 && (
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Client Name</TableCell>
-                      <TableCell>Configuration Name</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell>Intents</TableCell>
-                      <TableCell>Entities</TableCell>
-                      <TableCell>Action</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {searchResults.map((config) => (
-                      <TableRow key={config.id} hover>
-                        <TableCell>{config.client_name}</TableCell>
-                        <TableCell>{config.name}</TableCell>
-                        <TableCell>
-                          {new Date(config.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>{config.intent_count}</TableCell>
-                        <TableCell>{config.entity_count}</TableCell>
-                        <TableCell>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => loadConfiguration(config.id)}
-                            disabled={isLoading}
-                          >
-                            {isLoading ? 'Loading...' : 'Load'}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-
-            {searchResults.length === 0 && !isSearching && (
-              <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                <LoadIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
-                <Typography variant="body2">
-                  No configurations found. Try searching with different criteria.
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLoadDialogOpen(false)}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

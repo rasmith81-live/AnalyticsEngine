@@ -1,0 +1,334 @@
+@import "tailwindcss";
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
+/* ##################################################################### */
+/* CSS VARIABLES - LIGHT MODE (DEFAULT) */
+/* ##################################################################### */
+:root {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --background: #ffffff;
+  --card-background: #f2f1f4;
+  --card-background-hover: #e3deed;
+
+  /* Text */
+  --text-primary: #25095d;
+  --text-title: #12042f;
+  --text-nav: #12042f;
+  --text-section: #00998a;
+  --text-feature: #4a11bb;
+  --text-vibrant: #7d44ee;
+  --text-muted: #635c70;
+  --text-button: #ffffff;
+
+  /* Borders & Icons */
+  --border: #b0abba;
+  --border-light: #cac7d1;
+  --divider: #b0abba;
+  --info-icon: #00998a;
+
+  /* Buttons */
+  --button-primary: #4a11bb;
+  --button-primary-hover: #9d73f2;
+  --button-secondary: #312e38;
+  --button-secondary-hover: #635c70;
+
+  /* Gradients */
+  --gradient-primary: #5c16e9;
+  --gradient-secondary: #b0abba;
+
+  /* Sidebar */
+  --sidebar-bg: #f8f7fa;
+  --sidebar-item-hover: #efe8fd;
+  --sidebar-item-active: #ded0fb;
+}
+
+/* ##################################################################### */
+/* CSS VARIABLES - DARK MODE */
+/* ##################################################################### */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --background: #0d0321;
+  --card-background: #171221;
+  --card-background-hover: #25095d;
+
+  /* Text */
+  --text-primary: #ded0fb;
+  --text-title: #ffffff;
+  --text-nav: #bea2f6;
+  --text-section: #00ccb8;
+  --text-feature: #9d73f2;
+  --text-vibrant: #7d44ee;
+  --text-muted: #ab9dc8;
+  --text-button: #ded0fb;
+
+  /* Borders */
+  --border: #312e38;
+  --border-light: #453762;
+  --divider: #c85937;
+  --info-icon: #00998a;
+
+  /* Buttons */
+  --button-primary: #4a11bb;
+  --button-primary-hover: #7d44ee;
+  --button-secondary: #312e38;
+  --button-secondary-hover: #635c70;
+
+  /* Gradients */
+  --gradient-primary: #5c16e9;
+  --gradient-secondary: #4a11bb;
+
+  /* Sidebar */
+  --sidebar-bg: #100d17;
+  --sidebar-item-hover: #171221;
+  --sidebar-item-active: #25095d;
+}
+
+/* System preference fallback */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+/* ##################################################################### */
+/* BASE STYLES */
+/* ##################################################################### */
+* {
+  font-family: 'Montserrat', 'ui-sans-serif', 'system-ui', 'sans-serif';
+}
+
+body {
+  @apply bg-[var(--background)] text-[var(--text-primary)] antialiased;
+  min-height: 100vh;
+}
+
+/* ##################################################################### */
+/* THEME UTILITY CLASSES */
+/* ##################################################################### */
+
+/* Backgrounds */
+.theme-bg {
+  background-color: var(--background);
+}
+
+.theme-card-bg {
+  background-color: var(--card-background);
+}
+
+.theme-card-bg-hover:hover {
+  background-color: var(--card-background-hover);
+}
+
+.theme-sidebar-bg {
+  background-color: var(--sidebar-bg);
+}
+
+/* Text */
+.theme-text {
+  color: var(--text-primary);
+}
+
+.theme-text-title {
+  color: var(--text-title);
+}
+
+.theme-text-nav {
+  color: var(--text-nav);
+}
+
+.theme-text-section {
+  color: var(--text-section);
+}
+
+.theme-text-feature {
+  color: var(--text-feature);
+}
+
+.theme-text-vibrant {
+  color: var(--text-vibrant);
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+}
+
+/* Borders */
+.theme-border {
+  border-color: var(--border);
+}
+
+.theme-border-light {
+  border-color: var(--border-light);
+}
+
+/* ##################################################################### */
+/* COMPONENT STYLES */
+/* ##################################################################### */
+
+/* Hero Title */
+.theme-hero-title {
+  color: var(--text-title);
+  letter-spacing: 0.2rem;
+  font-weight: 500;
+}
+
+.theme-hero-title-accent {
+  color: var(--text-vibrant);
+  font-weight: 500;
+}
+
+/* Section Header */
+.theme-section-header {
+  color: var(--text-section);
+  font-size: 2rem;
+  letter-spacing: 0.15rem;
+  font-weight: 700;
+}
+
+/* Feature Header */
+.theme-feature-header {
+  color: var(--text-feature);
+  font-size: 1.125rem;
+  letter-spacing: 0.1rem;
+  font-weight: 600;
+}
+
+/* Buttons */
+.theme-btn-primary {
+  @apply inline-flex items-center justify-center rounded-full font-medium
+    transition-all duration-300 hover:scale-105 active:scale-95 active:duration-75
+    px-6 h-11;
+  background-color: var(--button-primary);
+  color: var(--text-button);
+}
+
+.theme-btn-primary:hover {
+  background-color: var(--button-primary-hover);
+}
+
+.theme-btn-secondary {
+  @apply inline-flex items-center justify-center rounded-full font-medium
+    transition-all duration-300 hover:scale-105 active:scale-95 active:duration-75
+    px-6 h-11;
+  background-color: var(--button-secondary);
+  color: var(--text-button);
+}
+
+.theme-btn-secondary:hover {
+  background-color: var(--button-secondary-hover);
+}
+
+/* Cards */
+.theme-card {
+  @apply rounded-3xl border transition-all duration-200;
+  background-color: var(--card-background);
+  border-color: var(--border);
+}
+
+.theme-card:hover {
+  background-color: var(--card-background-hover);
+  @apply shadow-2xl;
+}
+
+/* Info Icon */
+.theme-info-icon {
+  color: var(--info-icon);
+}
+
+/* Gradients */
+.theme-gradient-primary {
+  opacity: 0.64;
+  background: linear-gradient(135deg, var(--background), var(--gradient-primary));
+}
+
+.theme-gradient-secondary {
+  opacity: 0.64;
+  background: linear-gradient(0deg, var(--background), var(--gradient-secondary));
+}
+
+/* Sidebar */
+.theme-sidebar-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer;
+  color: var(--text-nav);
+}
+
+.theme-sidebar-item:hover {
+  background-color: var(--sidebar-item-hover);
+}
+
+.theme-sidebar-item.active {
+  background-color: var(--sidebar-item-active);
+  color: var(--text-vibrant);
+}
+
+/* Navigation */
+.theme-nav-link {
+  @apply px-4 py-2 rounded-lg transition-all duration-200;
+  color: var(--text-nav);
+}
+
+.theme-nav-link:hover {
+  background-color: var(--sidebar-item-hover);
+}
+
+.theme-nav-link.active {
+  background-color: var(--sidebar-item-active);
+  color: var(--text-vibrant);
+}
+
+/* ##################################################################### */
+/* SCROLLBAR STYLING */
+/* ##################################################################### */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--card-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ##################################################################### */
+/* ANIMATIONS */
+/* ##################################################################### */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(92, 22, 233, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(92, 22, 233, 0.5); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

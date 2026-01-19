@@ -1,32 +1,19 @@
 import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  IconButton,
-  Collapse,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Divider,
-  Chip,
-  Tooltip,
-  Alert
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
-  Refresh as RefreshIcon,
-  Category as CategoryIcon,
-  Assessment as MetricIcon,
-  Storage as EntityIcon,
-  Business as ValueChainIcon,
-  Settings as ProcessIcon,
-  Person as ActorIcon,
-  Link as RelationshipIcon,
-  Code as CodeIcon
-} from '@mui/icons-material';
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Layers,
+  BarChart3,
+  Database,
+  Building2,
+  Settings,
+  User,
+  Link2,
+  Code,
+} from 'lucide-react';
+import { cn } from '../lib/utils';
+import { Card } from './ui/Card';
 import axios from 'axios';
 
 const BASE_URL = 'http://127.0.0.1:8090/api/v1/metadata';
@@ -52,7 +39,6 @@ interface OntologyModelsViewProps {
   onSnackbar?: (message: string, severity: 'success' | 'error') => void;
 }
 
-// Define the ontology model hierarchy based on ontology_models.py
 const ONTOLOGY_MODELS: OntologyModel[] = [
   {
     kind: 'node_definition',
@@ -189,18 +175,18 @@ const ONTOLOGY_MODELS: OntologyModel[] = [
   },
 ];
 
-const MODEL_ICONS: Record<string, JSX.Element> = {
-  'node_definition': <CategoryIcon />,
-  'entity_definition': <EntityIcon sx={{ color: '#9c27b0' }} />,
-  'process_definition': <ProcessIcon sx={{ color: '#00bcd4' }} />,
-  'metric_definition': <MetricIcon sx={{ color: '#ff9800' }} />,
-  'value_chain_pattern_definition': <ValueChainIcon sx={{ color: '#4caf50' }} />,
-  'business_process_definition': <ProcessIcon sx={{ color: '#2196f3' }} />,
-  'edge_definition': <RelationshipIcon sx={{ color: '#607d8b' }} />,
-  'actor_definition': <ActorIcon sx={{ color: '#e91e63' }} />,
-  'value_set_definition': <CodeIcon sx={{ color: '#795548' }} />,
-  'code_system_definition': <CodeIcon sx={{ color: '#795548' }} />,
-  'constraint_definition': <CodeIcon sx={{ color: '#f44336' }} />,
+const MODEL_ICONS: Record<string, { icon: React.ReactNode; color: string }> = {
+  'node_definition': { icon: <Layers className="w-4 h-4" />, color: 'text-gray-400' },
+  'entity_definition': { icon: <Database className="w-4 h-4" />, color: 'text-purple-500' },
+  'process_definition': { icon: <Settings className="w-4 h-4" />, color: 'text-cyan-500' },
+  'metric_definition': { icon: <BarChart3 className="w-4 h-4" />, color: 'text-amber-500' },
+  'value_chain_pattern_definition': { icon: <Building2 className="w-4 h-4" />, color: 'text-green-500' },
+  'business_process_definition': { icon: <Settings className="w-4 h-4" />, color: 'text-blue-500' },
+  'edge_definition': { icon: <Link2 className="w-4 h-4" />, color: 'text-slate-500' },
+  'actor_definition': { icon: <User className="w-4 h-4" />, color: 'text-pink-500' },
+  'value_set_definition': { icon: <Code className="w-4 h-4" />, color: 'text-amber-700' },
+  'code_system_definition': { icon: <Code className="w-4 h-4" />, color: 'text-amber-700' },
+  'constraint_definition': { icon: <Code className="w-4 h-4" />, color: 'text-red-500' },
 };
 
 export default function OntologyModelsView({ onSnackbar }: OntologyModelsViewProps) {
@@ -209,72 +195,42 @@ export default function OntologyModelsView({ onSnackbar }: OntologyModelsViewPro
   const [instanceCounts, setInstanceCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchInstanceCounts();
-  }, []);
+  useEffect(() => { fetchInstanceCounts(); }, []);
 
   const fetchInstanceCounts = async () => {
     setLoading(true);
     try {
-      const kinds = [
-        'entity_definition',
-        'metric_definition', 
-        'value_chain_pattern_definition',
-        'business_process_definition',
-        'actor_definition',
-        'value_set_definition',
-        'code_system_definition',
-      ];
-      
+      const kinds = ['entity_definition', 'metric_definition', 'value_chain_pattern_definition', 'business_process_definition', 'actor_definition', 'value_set_definition', 'code_system_definition'];
       const counts: Record<string, number> = {};
-      
       await Promise.all(kinds.map(async (kind) => {
         try {
           const response = await axios.get(`${BASE_URL}/definitions/${kind}`, { params: { limit: 1000 } });
           counts[kind] = response.data?.length || 0;
-        } catch {
-          counts[kind] = 0;
-        }
+        } catch { counts[kind] = 0; }
       }));
-      
-      // Get relationship count
       try {
         const relResponse = await axios.get(`${BASE_URL}/relationships`);
         counts['relationship_definition'] = relResponse.data?.length || 0;
-      } catch {
-        counts['relationship_definition'] = 0;
-      }
-      
+      } catch { counts['relationship_definition'] = 0; }
       setInstanceCounts(counts);
     } catch (err) {
       console.error('Failed to fetch instance counts:', err);
       onSnackbar?.('Failed to fetch instance counts', 'error');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const toggleModel = (kind: string) => {
     setExpandedModels(prev => {
       const next = new Set(prev);
-      if (next.has(kind)) {
-        next.delete(kind);
-      } else {
-        next.add(kind);
-      }
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
       return next;
     });
   };
 
-  const handleModelClick = (model: OntologyModel) => {
-    setSelectedModel(model);
-  };
-
-  // Build hierarchy tree
   const buildModelTree = () => {
     const rootModels = ONTOLOGY_MODELS.filter(m => !m.parent);
     const childrenMap = new Map<string, OntologyModel[]>();
-    
     ONTOLOGY_MODELS.forEach(model => {
       if (model.parent) {
         const parentKind = ONTOLOGY_MODELS.find(m => m.name === model.parent)?.kind || model.parent.toLowerCase().replace(/([A-Z])/g, '_$1').slice(1) + '_definition';
@@ -283,8 +239,12 @@ export default function OntologyModelsView({ onSnackbar }: OntologyModelsViewPro
         childrenMap.set(parentKind, children);
       }
     });
-    
     return { rootModels, childrenMap };
+  };
+
+  const getIcon = (kind: string) => {
+    const config = MODEL_ICONS[kind] || { icon: <Layers className="w-4 h-4" />, color: 'theme-text-muted' };
+    return <span className={config.color}>{config.icon}</span>;
   };
 
   const renderModelNode = (model: OntologyModel, depth: number = 0, childrenMap: Map<string, OntologyModel[]>) => {
@@ -295,142 +255,78 @@ export default function OntologyModelsView({ onSnackbar }: OntologyModelsViewPro
     const count = instanceCounts[model.kind];
 
     return (
-      <Box key={model.kind}>
-        <ListItem
-          sx={{
-            pl: depth * 3,
-            backgroundColor: isSelected ? 'action.selected' : 'transparent',
-            '&:hover': { backgroundColor: 'action.hover' },
-            cursor: 'pointer',
-            borderLeft: `3px solid ${isSelected ? '#1976d2' : 'transparent'}`,
-          }}
-          onClick={() => handleModelClick(model)}
+      <div key={model.kind}>
+        <div
+          className={cn(
+            "flex items-center py-2 px-2 cursor-pointer transition-colors hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900",
+            isSelected && "bg-alpha-500/10 border-l-2 border-l-alpha-500"
+          )}
+          style={{ paddingLeft: `${depth * 24 + 8}px` }}
+          onClick={() => setSelectedModel(model)}
         >
-          <ListItemIcon sx={{ minWidth: 32 }}>
+          <div className="w-7 flex-shrink-0">
             {hasChildren ? (
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); toggleModel(model.kind); }}>
-                {isExpanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-              </IconButton>
-            ) : (
-              <Box sx={{ width: 32 }} />
+              <button onClick={(e) => { e.stopPropagation(); toggleModel(model.kind); }} className="p-0.5 hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800 rounded">
+                {isExpanded ? <ChevronDown className="w-4 h-4 theme-text-muted" /> : <ChevronRight className="w-4 h-4 theme-text-muted" />}
+              </button>
+            ) : null}
+          </div>
+          <div className="w-6 flex-shrink-0">{getIcon(model.kind)}</div>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <span className={cn("text-sm truncate", isSelected ? "font-semibold theme-text-title" : "theme-text")}>{model.name}</span>
+            {count !== undefined && count > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">{count}</span>
             )}
-          </ListItemIcon>
-          <ListItemIcon sx={{ minWidth: 32 }}>
-            {MODEL_ICONS[model.kind] || <CategoryIcon />}
-          </ListItemIcon>
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>
-                  {model.name}
-                </Typography>
-                {count !== undefined && count > 0 && (
-                  <Chip 
-                    label={count} 
-                    size="small" 
-                    color="primary"
-                    variant="outlined"
-                    sx={{ fontSize: '0.65rem', height: 18 }}
-                  />
-                )}
-              </Box>
-            }
-            secondary={model.description.substring(0, 50) + (model.description.length > 50 ? '...' : '')}
-          />
-        </ListItem>
-        {hasChildren && (
-          <Collapse in={isExpanded}>
-            {children.map(child => renderModelNode(child, depth + 1, childrenMap))}
-          </Collapse>
+          </div>
+        </div>
+        {hasChildren && isExpanded && (
+          <div>{children.map(child => renderModelNode(child, depth + 1, childrenMap))}</div>
         )}
-      </Box>
+      </div>
     );
   };
 
   const renderDetailsPanel = () => {
     if (!selectedModel) {
-      return (
-        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-          <Typography>Select a model to view its schema</Typography>
-        </Box>
-      );
+      return <div className="p-4 text-center theme-text-muted">Select a model to view its schema</div>;
     }
-
     const count = instanceCounts[selectedModel.kind];
 
     return (
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          {MODEL_ICONS[selectedModel.kind] || <CategoryIcon />}
-          <Typography variant="h6">{selectedModel.name}</Typography>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          {getIcon(selectedModel.kind)}
+          <h3 className="font-semibold theme-text-title flex-1">{selectedModel.name}</h3>
           {count !== undefined && (
-            <Chip label={`${count} instances`} size="small" color="primary" />
+            <span className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400">{count} instances</span>
           )}
-        </Box>
-        
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {selectedModel.description}
-        </Typography>
-        
+        </div>
+        <p className="text-sm theme-text-muted">{selectedModel.description}</p>
         {selectedModel.parent && (
-          <Box sx={{ mb: 2 }}>
-            <Chip 
-              label={`Extends: ${selectedModel.parent}`} 
-              size="small" 
-              variant="outlined"
-              color="secondary"
-            />
-          </Box>
+          <span className="inline-block px-2 py-0.5 rounded-full text-xs border border-purple-500/30 text-purple-400">Extends: {selectedModel.parent}</span>
         )}
-        
-        <Divider sx={{ mb: 2 }} />
-        
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>Fields</Typography>
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {selectedModel.fields.map(field => (
-            <Paper key={field.name} variant="outlined" sx={{ p: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="body2" fontWeight={600} fontFamily="monospace">
-                  {field.name}
-                </Typography>
-                <Chip 
-                  label={field.type} 
-                  size="small" 
-                  sx={{ fontSize: '0.65rem', height: 18 }}
-                />
-                {field.required && (
-                  <Chip 
-                    label="required" 
-                    size="small" 
-                    color="error"
-                    variant="outlined"
-                    sx={{ fontSize: '0.65rem', height: 18 }}
-                  />
-                )}
-              </Box>
-              {field.description && (
-                <Typography variant="caption" color="text.secondary">
-                  {field.description}
-                </Typography>
-              )}
-              {field.default && (
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Default: {field.default}
-                </Typography>
-              )}
-            </Paper>
-          ))}
-        </Box>
-        
-        {selectedModel.parent && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              + Inherits all fields from {selectedModel.parent}
-            </Typography>
-          </Box>
-        )}
-      </Box>
+        <div className="border-t theme-border pt-4">
+          <p className="text-sm font-semibold theme-text-title mb-2">Fields</p>
+          <div className="space-y-2">
+            {selectedModel.fields.map(field => (
+              <div key={field.name} className="p-3 rounded-lg border theme-border theme-card-bg">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono text-sm font-semibold theme-text">{field.name}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] theme-card-bg border theme-border theme-text-muted">{field.type}</span>
+                  {field.required && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 border border-red-500/30">required</span>
+                  )}
+                </div>
+                {field.description && <p className="text-xs theme-text-muted">{field.description}</p>}
+                {field.default && <p className="text-xs theme-text-muted">Default: {field.default}</p>}
+              </div>
+            ))}
+          </div>
+          {selectedModel.parent && (
+            <p className="text-xs theme-text-muted mt-3">+ Inherits all fields from {selectedModel.parent}</p>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -438,43 +334,41 @@ export default function OntologyModelsView({ onSnackbar }: OntologyModelsViewPro
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <Typography>Loading models...</Typography>
-      </Box>
+      <div className="flex items-center justify-center p-8">
+        <RefreshCw className="w-5 h-5 text-alpha-500 animate-spin mr-2" />
+        <span className="theme-text-muted">Loading models...</span>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
+    <div className="flex gap-4 h-full">
       {/* Tree Panel */}
-      <Paper sx={{ flex: 2, overflow: 'auto', maxHeight: 600 }}>
-        <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>Ontology Model Types</Typography>
-          <Tooltip title="Refresh counts">
-            <IconButton size="small" onClick={fetchInstanceCounts}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        
-        {rootModels.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Alert severity="info">No models defined.</Alert>
-          </Box>
-        ) : (
-          <List dense disablePadding>
-            {rootModels.map(model => renderModelNode(model, 0, childrenMap))}
-          </List>
-        )}
-      </Paper>
-      
+      <Card className="flex-[2] overflow-hidden flex flex-col max-h-[600px]">
+        <div className="p-3 flex items-center justify-between border-b theme-border">
+          <h3 className="font-semibold theme-text-title">Ontology Model Types</h3>
+          <button onClick={fetchInstanceCounts} className="p-1.5 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800" title="Refresh counts">
+            <RefreshCw className="w-4 h-4 theme-text-muted" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {rootModels.length === 0 ? (
+            <div className="p-4">
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">No models defined.</div>
+            </div>
+          ) : (
+            <div>{rootModels.map(model => renderModelNode(model, 0, childrenMap))}</div>
+          )}
+        </div>
+      </Card>
+
       {/* Details Panel */}
-      <Paper sx={{ flex: 1, minWidth: 350, maxHeight: 600, overflow: 'auto' }}>
-        <Box sx={{ p: 1, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle1" fontWeight={600}>Model Schema</Typography>
-        </Box>
+      <Card className="flex-1 min-w-[350px] max-h-[600px] overflow-auto">
+        <div className="p-3 border-b theme-border">
+          <h3 className="font-semibold theme-text-title">Model Schema</h3>
+        </div>
         {renderDetailsPanel()}
-      </Paper>
-    </Box>
+      </Card>
+    </div>
   );
 }

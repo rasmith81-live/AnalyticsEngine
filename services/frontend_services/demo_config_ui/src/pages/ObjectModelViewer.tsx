@@ -1,34 +1,16 @@
 import {
-  Box,
-  Paper,
-  Typography,
-  Chip,
-  Stack,
-  CircularProgress,
-  Alert,
-  Breadcrumbs,
-  Link,
-  Grid,
-  Card,
-  CardContent,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-} from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-  AccountTree as AccountTreeIcon,
-  Storage as StorageIcon,
-  Link as LinkIcon,
-  ArrowForward as ArrowForwardIcon,
-  ArrowBack as ArrowBackwardIcon,
-  SwapHoriz as SwapHorizIcon,
-} from '@mui/icons-material';
+  ArrowLeft,
+  GitBranch,
+  Database,
+  Link2,
+  ArrowRight,
+  ArrowLeftRight,
+  RefreshCw,
+} from 'lucide-react';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 import { useObjectModels } from '../hooks/useObjectModelDetails';
 import ObjectModelDiagram from '../components/ObjectModelDiagram';
 
@@ -44,42 +26,32 @@ export default function ObjectModelViewer() {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <RefreshCw className="w-8 h-8 text-alpha-500 animate-spin" />
+      </div>
     );
   }
 
   if (error || !model) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">
+      <div className="p-6 space-y-4">
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
           Failed to load object model. The model may not exist or the metadata service is unavailable.
-        </Alert>
-        <IconButton onClick={() => navigate(-1)} sx={{ mt: 2 }}>
-          <ArrowBackIcon />
-        </IconButton>
-      </Box>
+        </div>
+        <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800">
+          <ArrowLeft className="w-5 h-5 theme-text-muted" />
+        </button>
+      </div>
     );
   }
 
-  // Parse UML class diagram schema definition
   const parseSchema = (schema: string) => {
     const fields: Array<{ name: string; type: string; nullable: boolean }> = [];
-    const relationships: Array<{ 
-      from: string; 
-      to: string; 
-      type: string; 
-      cardinality: string;
-      label: string;
-      direction: 'forward' | 'backward' | 'bidirectional';
-    }> = [];
+    const relationships: Array<{ from: string; to: string; type: string; cardinality: string; label: string; direction: 'forward' | 'backward' | 'bidirectional' }> = [];
 
     if (!schema) return { fields, relationships };
 
     const lines = schema.split('\n');
-    
-    // UML relationship patterns
     const associationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
     const compositionPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(\*--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
     const aggregationPattern = /([A-Za-z0-9_]+)\s+"([^"]+)"\s+(o--)\s+"([^"]+)"\s+([A-Za-z0-9_]+)\s*:\s*(.+?)(?:\s*>)?$/;
@@ -87,18 +59,11 @@ export default function ObjectModelViewer() {
 
     for (const line of lines) {
       const trimmed = line.trim();
-      
-      // Skip comments and empty lines
       if (!trimmed || trimmed.startsWith("'") || trimmed.startsWith('@')) continue;
 
-      // Try to match UML relationships
       let match;
       let relType = 'association';
-      let from = '';
-      let to = '';
-      let fromCard = '';
-      let toCard = '';
-      let label = '';
+      let from = '', to = '', fromCard = '', toCard = '', label = '';
       
       if ((match = trimmed.match(compositionPattern))) {
         [, from, fromCard, , toCard, to, label] = match;
@@ -118,15 +83,7 @@ export default function ObjectModelViewer() {
       if (match && (from === model?.code || to === model?.code)) {
         const direction: 'forward' | 'backward' | 'bidirectional' = 
           relType === 'generalization' ? (from === model?.code ? 'forward' : 'backward') : 'bidirectional';
-        
-        relationships.push({
-          from,
-          to,
-          type: relType,
-          cardinality: fromCard && toCard ? `${fromCard} to ${toCard}` : '',
-          label: label.trim(),
-          direction
-        });
+        relationships.push({ from, to, type: relType, cardinality: fromCard && toCard ? `${fromCard} to ${toCard}` : '', label: label.trim(), direction });
       }
     }
 
@@ -136,288 +93,177 @@ export default function ObjectModelViewer() {
   const { fields, relationships } = parseSchema(model.schema_definition || '');
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div className="space-y-6 animate-fade-in">
       {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-        <Link component={RouterLink} to="/" underline="hover" color="inherit">
-          Home
-        </Link>
-        <Link component={RouterLink} to="/config" underline="hover" color="inherit">
-          Configuration
-        </Link>
-        <Typography color="text.primary">{model.display_name}</Typography>
-      </Breadcrumbs>
+      <nav className="flex items-center gap-2 text-sm">
+        <RouterLink to="/" className="theme-text-muted hover:theme-text">Home</RouterLink>
+        <span className="theme-text-muted">/</span>
+        <RouterLink to="/config" className="theme-text-muted hover:theme-text">Configuration</RouterLink>
+        <span className="theme-text-muted">/</span>
+        <span className="theme-text">{model.display_name}</span>
+      </nav>
 
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <IconButton onClick={() => navigate(-1)} sx={{ mr: 2 }}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="h4" gutterBottom>
-            {model.display_name}
-          </Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-            <Chip label={model.code} size="small" color="primary" />
-            <Chip
-              label={model.table_name || 'No table'}
-              size="small"
-              variant="outlined"
-              icon={<StorageIcon />}
-            />
+      <div className="flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-alpha-faded-100 dark:hover:bg-alpha-faded-800">
+          <ArrowLeft className="w-5 h-5 theme-text-muted" />
+        </button>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold theme-text-title">{model.display_name}</h1>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <span className="px-2 py-1 rounded-full text-xs bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">{model.code}</span>
+            <span className="px-2 py-1 rounded-full text-xs border theme-border theme-text-muted flex items-center gap-1">
+              <Database className="w-3 h-3" />{model.table_name || 'No table'}
+            </span>
             {model.metadata_?.modules && model.metadata_.modules.length > 0 && (
-              <Chip
-                label={`${model.metadata_.modules.length} modules`}
-                size="small"
-                variant="outlined"
-              />
+              <span className="px-2 py-1 rounded-full text-xs border theme-border theme-text-muted">
+                {model.metadata_.modules.length} modules
+              </span>
             )}
-          </Stack>
-        </Box>
-      </Box>
+          </div>
+        </div>
+      </div>
 
       {/* Description */}
       {model.description && (
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="body1" color="text.secondary">
-            {model.description}
-          </Typography>
-        </Paper>
+        <Card>
+          <CardContent className="p-4">
+            <p className="theme-text-muted">{model.description}</p>
+          </CardContent>
+        </Card>
       )}
 
-      <Grid container spacing={3}>
-        {/* UML Diagram */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                <AccountTreeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                UML Class Diagram
-              </Typography>
-              {model.schema_definition ? (
-                <ObjectModelDiagram schemaDefinition={model.schema_definition} />
-              ) : (
-                <Alert severity="info">
-                  No schema definition available for this object model.
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* UML Diagram */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GitBranch className="w-5 h-5 theme-info-icon" />
+            UML Class Diagram
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {model.schema_definition ? (
+            <ObjectModelDiagram schemaDefinition={model.schema_definition} />
+          ) : (
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+              No schema definition available for this object model.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Fields/Attributes */}
-        {fields.length > 0 && (
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Fields & Attributes
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><strong>Field Name</strong></TableCell>
-                        <TableCell><strong>Type</strong></TableCell>
-                        <TableCell><strong>Nullable</strong></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {fields.map((field) => (
-                        <TableRow key={field.name}>
-                          <TableCell>
-                            <code>{field.name}</code>
-                          </TableCell>
-                          <TableCell>
-                            <Chip label={field.type} size="small" variant="outlined" />
-                          </TableCell>
-                          <TableCell>
-                            {field.nullable ? (
-                              <Chip label="Yes" size="small" color="default" />
-                            ) : (
-                              <Chip label="No" size="small" color="primary" />
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
-        {/* Relationships */}
-        {relationships.length > 0 && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  <LinkIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  UML Relationships ({relationships.length})
-                </Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell><strong>From</strong></TableCell>
-                        <TableCell align="center"><strong>Direction</strong></TableCell>
-                        <TableCell><strong>To</strong></TableCell>
-                        <TableCell><strong>Type</strong></TableCell>
-                        <TableCell><strong>Cardinality</strong></TableCell>
-                        <TableCell><strong>Relationship</strong></TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {relationships.map((rel, index) => (
-                        <TableRow key={index} hover>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {rel.from}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            {rel.direction === 'forward' && <ArrowForwardIcon fontSize="small" color="action" />}
-                            {rel.direction === 'backward' && <ArrowBackwardIcon fontSize="small" color="action" />}
-                            {rel.direction === 'bidirectional' && <SwapHorizIcon fontSize="small" color="action" />}
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {rel.to}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={rel.type} 
-                              size="small" 
-                              color={
-                                rel.type === 'composition' ? 'error' :
-                                rel.type === 'aggregation' ? 'warning' :
-                                rel.type === 'generalization' ? 'info' :
-                                'default'
-                              }
-                              variant="outlined" 
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="caption" color="text.secondary" fontFamily="monospace">
-                              {rel.cardinality || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" color="text.secondary">
-                              {rel.label || '-'}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-
-        {/* Module Usage */}
-        {model.metadata_?.modules && model.metadata_.modules.length > 0 && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Used in Modules
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {model.metadata_.modules.map((module: string) => (
-                    <Chip
-                      key={module}
-                      label={module}
-                      size="medium"
-                      variant="outlined"
-                    />
+      {/* Relationships */}
+      {relationships.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 theme-info-icon" />
+              UML Relationships ({relationships.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b theme-border">
+                    <th className="px-3 py-2 text-left theme-text-muted font-medium">From</th>
+                    <th className="px-3 py-2 text-center theme-text-muted font-medium">Direction</th>
+                    <th className="px-3 py-2 text-left theme-text-muted font-medium">To</th>
+                    <th className="px-3 py-2 text-left theme-text-muted font-medium">Type</th>
+                    <th className="px-3 py-2 text-left theme-text-muted font-medium">Cardinality</th>
+                    <th className="px-3 py-2 text-left theme-text-muted font-medium">Relationship</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relationships.map((rel, index) => (
+                    <tr key={index} className="border-b theme-border hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900">
+                      <td className="px-3 py-2 font-medium theme-text">{rel.from}</td>
+                      <td className="px-3 py-2 text-center">
+                        {rel.direction === 'forward' && <ArrowRight className="w-4 h-4 theme-text-muted inline" />}
+                        {rel.direction === 'backward' && <ArrowLeft className="w-4 h-4 theme-text-muted inline" />}
+                        {rel.direction === 'bidirectional' && <ArrowLeftRight className="w-4 h-4 theme-text-muted inline" />}
+                      </td>
+                      <td className="px-3 py-2 font-medium theme-text">{rel.to}</td>
+                      <td className="px-3 py-2">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-xs border",
+                          rel.type === 'composition' && "bg-red-500/20 text-red-400 border-red-500/30",
+                          rel.type === 'aggregation' && "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                          rel.type === 'generalization' && "bg-blue-500/20 text-blue-400 border-blue-500/30",
+                          rel.type === 'association' && "bg-gray-500/20 theme-text-muted border-gray-500/30"
+                        )}>
+                          {rel.type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs theme-text-muted">{rel.cardinality || '-'}</td>
+                      <td className="px-3 py-2 theme-text-muted">{rel.label || '-'}</td>
+                    </tr>
                   ))}
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Technical Details */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Technical Details
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Object Code
-                    </Typography>
-                    <Typography variant="body1">
-                      <code>{model.code}</code>
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Table Name
-                    </Typography>
-                    <Typography variant="body1">
-                      <code>{model.table_name || 'N/A'}</code>
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Fields Count
-                    </Typography>
-                    <Typography variant="h5">{fields.length}</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Relationships
-                    </Typography>
-                    <Typography variant="h5">{relationships.length}</Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Module Usage */}
+      {model.metadata_?.modules && model.metadata_.modules.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Used in Modules</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {model.metadata_.modules.map((module: string) => (
+                <span key={module} className="px-3 py-1 rounded-full text-sm border theme-border theme-text">
+                  {module}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Raw Schema */}
-        {model.schema_definition && (
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Raw Schema Definition
-                </Typography>
-                <Paper
-                  sx={{
-                    p: 2,
-                    bgcolor: 'grey.50',
-                    fontFamily: 'monospace',
-                    fontSize: '0.85rem',
-                    overflowX: 'auto',
-                    maxHeight: '400px',
-                    overflow: 'auto',
-                  }}
-                >
-                  <pre style={{ margin: 0 }}>{model.schema_definition}</pre>
-                </Paper>
-              </CardContent>
-            </Card>
-          </Grid>
-        )}
-      </Grid>
-    </Box>
+      {/* Technical Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Technical Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl theme-card-bg border theme-border">
+              <p className="text-xs theme-text-muted mb-1">Object Code</p>
+              <p className="font-mono theme-text">{model.code}</p>
+            </div>
+            <div className="p-4 rounded-xl theme-card-bg border theme-border">
+              <p className="text-xs theme-text-muted mb-1">Table Name</p>
+              <p className="font-mono theme-text">{model.table_name || 'N/A'}</p>
+            </div>
+            <div className="p-4 rounded-xl theme-card-bg border theme-border">
+              <p className="text-xs theme-text-muted mb-1">Fields Count</p>
+              <p className="text-2xl font-bold theme-text-title">{fields.length}</p>
+            </div>
+            <div className="p-4 rounded-xl theme-card-bg border theme-border">
+              <p className="text-xs theme-text-muted mb-1">Relationships</p>
+              <p className="text-2xl font-bold theme-text-title">{relationships.length}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Raw Schema */}
+      {model.schema_definition && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Raw Schema Definition</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-xl bg-[#1a1a2e] border border-[#2a2a4a] overflow-auto max-h-[400px]">
+              <pre className="text-sm font-mono text-gray-300 whitespace-pre-wrap">{model.schema_definition}</pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

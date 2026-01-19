@@ -3,29 +3,20 @@
  * Shows full KPI profile when selected, like a product detail page
  */
 
-import {
-  Box,
-  Paper,
-  Typography,
-  Chip,
-  Button,
-  Stack,
-  CircularProgress,
-  Alert,
-  Tabs,
-  Tab,
-  Link,
-  Tooltip,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  AccountTree as AccountTreeIcon,
-  Functions as FunctionsIcon,
-  Info as InfoIcon,
-  OpenInNew as OpenInNewIcon,
-} from '@mui/icons-material';
 import { useState } from 'react';
+import {
+  Plus,
+  GitBranch,
+  Calculator,
+  Info,
+  ExternalLink,
+  RefreshCw,
+  AlertTriangle,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Card } from './ui/Card';
+import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 import { useKPIDetail } from '../hooks/useKPIDetails';
 import { useObjectModels } from '../hooks/useObjectModelDetails';
 import ObjectModelDiagram from './ObjectModelDiagram';
@@ -38,400 +29,298 @@ interface KPIDetailPreviewProps {
   isInCart: boolean;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`kpi-tabpanel-${index}`}
-      aria-labelledby={`kpi-tab-${index}`}
-      {...other}
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-1 py-2 text-sm font-medium transition-colors border-b-2",
+        active ? "text-alpha-500 border-alpha-500" : "theme-text-muted border-transparent hover:theme-text"
+      )}
     >
-      {value === index && <Box>{children}</Box>}
-    </div>
+      {children}
+    </button>
   );
 }
 
-// Object Model Diagrams Section Component
 function ObjectModelDiagramsSection({ requiredObjects }: { requiredObjects: string[] }) {
   const { data: objectModels, isLoading, error } = useObjectModels(requiredObjects);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-        <CircularProgress size={24} />
-      </Box>
+      <div className="flex justify-center p-4">
+        <RefreshCw className="w-5 h-5 text-alpha-500 animate-spin" />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="warning">
+      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm">
         Unable to load object model diagrams. The metadata service may be unavailable.
-      </Alert>
+      </div>
     );
   }
 
-  if (!objectModels || objectModels.length === 0) {
-    return null;
-  }
+  if (!objectModels || objectModels.length === 0) return null;
 
-  // Find the first model with a schema definition
   const modelWithSchema = objectModels.find(model => model.schema_definition);
-
   if (!modelWithSchema) {
     return (
-      <Alert severity="info">
+      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
         Object model diagrams are not available for the required objects.
-      </Alert>
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-        Relationship Diagram
-      </Typography>
+    <div>
+      <p className="text-xs theme-text-muted mb-2">Relationship Diagram</p>
       <ObjectModelDiagram
         schemaDefinition={modelWithSchema.schema_definition || ''}
         highlightEntity={selectedModel || undefined}
         onEntityClick={(entityName) => setSelectedModel(entityName)}
       />
       {selectedModel && (
-        <Box sx={{ mt: 1 }}>
-          <Chip
-            label={`Selected: ${selectedModel}`}
-            onDelete={() => setSelectedModel(null)}
-            size="small"
-            color="primary"
-          />
-        </Box>
+        <div className="mt-2">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-alpha-500/20 text-alpha-400">
+            Selected: {selectedModel}
+            <button onClick={() => setSelectedModel(null)} className="ml-1 hover:text-white">×</button>
+          </span>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }
 
-export default function KPIDetailPreview({
-  kpiCode,
-  onAddToCart,
-  onDeriveCustomKPI,
-  isInCart,
-}: KPIDetailPreviewProps) {
+export default function KPIDetailPreview({ kpiCode, onAddToCart, onDeriveCustomKPI, isInCart }: KPIDetailPreviewProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const { data: kpi, isLoading, error } = useKPIDetail(kpiCode || '');
 
   if (!kpiCode) {
     return (
-      <Paper elevation={2} sx={{ p: 4, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <InfoIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Select a KPI to view details
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Click on any KPI in the tree to see its full profile
-          </Typography>
-        </Box>
-      </Paper>
+      <Card className="h-full flex items-center justify-center">
+        <div className="text-center p-8">
+          <Info className="w-16 h-16 mx-auto theme-text-muted opacity-30 mb-4" />
+          <h3 className="text-lg font-semibold theme-text-muted mb-1">Select a KPI to view details</h3>
+          <p className="text-sm theme-text-muted">Click on any KPI in the tree to see its full profile</p>
+        </div>
+      </Card>
     );
   }
 
   if (isLoading) {
     return (
-      <Paper elevation={2} sx={{ p: 4, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Paper>
+      <Card className="h-full flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-alpha-500 animate-spin" />
+      </Card>
     );
   }
 
   if (error || !kpi) {
     return (
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load KPI details</Alert>
-      </Paper>
+      <Card className="p-4">
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+          Failed to load KPI details
+        </div>
+      </Card>
     );
   }
 
   const getDisplayName = (kpi: KPI) => kpi.display_name || kpi.name || kpi.code;
 
   return (
-    <Paper elevation={2} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h5" gutterBottom>
-              {getDisplayName(kpi)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {kpi.code}
-            </Typography>
-          </Box>
-          <Box>
-            {isInCart ? (
-              <Chip label="In Cart" color="success" size="small" />
-            ) : null}
-          </Box>
-        </Box>
+      <div className="p-4 border-b theme-border">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-bold theme-text-title truncate">{getDisplayName(kpi)}</h2>
+            <p className="text-xs theme-text-muted">{kpi.code}</p>
+          </div>
+          {isInCart && (
+            <span className="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400 border border-green-500/30">In Cart</span>
+          )}
+        </div>
 
         {/* Action Buttons */}
-        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => onAddToCart(kpi.code)}
-            disabled={isInCart}
-            fullWidth
-          >
-            {isInCart ? 'Added to Cart' : 'Add to Cart'}
+        <div className="flex gap-2 mt-3">
+          <Button onClick={() => onAddToCart(kpi.code)} disabled={isInCart} className="flex-1">
+            <Plus className="w-4 h-4 mr-1" />
+            {isInCart ? 'Added' : 'Add to Cart'}
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<FunctionsIcon />}
-            onClick={() => onDeriveCustomKPI(kpi.code)}
-            fullWidth
-          >
-            Derive Custom KPI
+          <Button variant="outline" onClick={() => onDeriveCustomKPI(kpi.code)} className="flex-1">
+            <Calculator className="w-4 h-4 mr-1" />
+            Derive Custom
           </Button>
-        </Stack>
-        <Button
-          variant="text"
-          startIcon={<OpenInNewIcon />}
+        </div>
+        <button
           onClick={() => navigate(`/kpi/${kpi.code}`)}
-          fullWidth
-          sx={{ mt: 1 }}
+          className="w-full mt-2 py-2 text-sm text-alpha-500 hover:underline flex items-center justify-center gap-1"
         >
+          <ExternalLink className="w-4 h-4" />
           View Full Details
-        </Button>
-      </Box>
+        </button>
+      </div>
 
       {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)} variant="fullWidth">
-          <Tab label="Overview" />
-          <Tab label="Formula" />
-          <Tab label="Objects" />
-        </Tabs>
-      </Box>
+      <div className="flex border-b theme-border">
+        <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)}>Overview</TabButton>
+        <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)}>Formula</TabButton>
+        <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)}>Objects</TabButton>
+      </div>
 
-      {/* Tab Content - Scrollable */}
-      <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Overview Tab */}
-        <TabPanel value={activeTab} index={0}>
-          <Stack spacing={2}>
-            {/* Description */}
+        {activeTab === 0 && (
+          <div className="space-y-4">
             {kpi.description && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Description
-                </Typography>
-                <Typography variant="body2">{kpi.description}</Typography>
-              </Box>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Description</p>
+                <p className="text-sm theme-text">{kpi.description}</p>
+              </div>
             )}
 
-            {/* Full KPI Definition */}
             {kpi.full_kpi_definition && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Full Definition
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {kpi.full_kpi_definition}
-                  </Typography>
-                </Paper>
-              </Box>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Full Definition</p>
+                <div className="p-3 rounded-lg theme-card-bg border theme-border text-sm theme-text whitespace-pre-wrap">
+                  {kpi.full_kpi_definition}
+                </div>
+              </div>
             )}
 
-            {/* Diagnostic Questions */}
             {kpi.diagnostic_questions && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Diagnostic Questions
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'info.50', borderColor: 'info.main' }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {kpi.diagnostic_questions}
-                  </Typography>
-                </Paper>
-              </Box>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Diagnostic Questions</p>
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-sm text-blue-400 whitespace-pre-wrap">
+                  {kpi.diagnostic_questions}
+                </div>
+              </div>
             )}
 
-            {/* Risk Warnings */}
             {kpi.risk_warnings && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Risk Warnings
-                </Typography>
-                <Alert severity="warning" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {kpi.risk_warnings}
-                  </Typography>
-                </Alert>
-              </Box>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Risk Warnings</p>
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400 flex gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span className="whitespace-pre-wrap">{kpi.risk_warnings}</span>
+                </div>
+              </div>
             )}
 
-            {/* Unit */}
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Unit
-              </Typography>
-              <Chip label={kpi.unit || 'N/A'} size="small" />
-            </Box>
+            <div>
+              <p className="text-xs theme-text-muted mb-1">Unit</p>
+              <span className="px-2 py-1 rounded-full text-xs theme-card-bg border theme-border theme-text">{kpi.unit || 'N/A'}</span>
+            </div>
 
-            {/* Metadata */}
             {kpi.metadata_ && (
               <>
                 {kpi.metadata_.modules && kpi.metadata_.modules.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Modules
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  <div>
+                    <p className="text-xs theme-text-muted mb-1">Modules</p>
+                    <div className="flex flex-wrap gap-1">
                       {kpi.metadata_.modules.map((module) => (
-                        <Chip key={module} label={module} size="small" variant="outlined" />
+                        <span key={module} className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text">{module}</span>
                       ))}
-                    </Box>
-                  </Box>
+                    </div>
+                  </div>
                 )}
 
                 {kpi.metadata_.value_chains && kpi.metadata_.value_chains.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Value Chains
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  <div>
+                    <p className="text-xs theme-text-muted mb-1">Value Chains</p>
+                    <div className="flex flex-wrap gap-1">
                       {kpi.metadata_.value_chains.map((vc) => (
-                        <Chip key={vc} label={vc} size="small" variant="outlined" color="primary" />
+                        <span key={vc} className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">{vc}</span>
                       ))}
-                    </Box>
-                  </Box>
+                    </div>
+                  </div>
                 )}
 
                 {kpi.metadata_.category && (
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Category
-                    </Typography>
-                    <Chip label={kpi.metadata_.category} size="small" color="secondary" />
-                  </Box>
+                  <div>
+                    <p className="text-xs theme-text-muted mb-1">Category</p>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30">{kpi.metadata_.category}</span>
+                  </div>
                 )}
               </>
             )}
 
-            {/* Benchmarks */}
             {kpi.benchmarks && Object.keys(kpi.benchmarks).length > 0 && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Benchmarks
-                </Typography>
-                <Box sx={{ p: 1.5, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Benchmarks</p>
+                <div className="p-3 rounded-lg theme-card-bg border theme-border">
                   {Object.entries(kpi.benchmarks).map(([key, value]) => (
-                    <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography variant="caption">{key}:</Typography>
-                      <Typography variant="caption" fontWeight="bold">
-                        {String(value)}
-                      </Typography>
-                    </Box>
+                    <div key={key} className="flex justify-between text-xs mb-1 last:mb-0">
+                      <span className="theme-text-muted">{key}:</span>
+                      <span className="font-semibold theme-text">{String(value)}</span>
+                    </div>
                   ))}
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
-          </Stack>
-        </TabPanel>
+          </div>
+        )}
 
         {/* Formula Tab */}
-        <TabPanel value={activeTab} index={1}>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Formula
-              </Typography>
-              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+        {activeTab === 1 && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs theme-text-muted mb-1">Formula</p>
+              <div className="p-3 rounded-lg theme-card-bg border theme-border font-mono text-sm theme-text">
                 {kpi.formula}
-              </Paper>
-            </Box>
+              </div>
+            </div>
 
             {kpi.calculation_logic && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Calculation Logic
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {kpi.calculation_logic}
-                </Typography>
-              </Box>
+              <div>
+                <p className="text-xs theme-text-muted mb-1">Calculation Logic</p>
+                <p className="text-sm theme-text whitespace-pre-wrap">{kpi.calculation_logic}</p>
+              </div>
             )}
-          </Stack>
-        </TabPanel>
+          </div>
+        )}
 
         {/* Objects Tab */}
-        <TabPanel value={activeTab} index={2}>
-          <Stack spacing={3}>
-            {/* Required Objects List */}
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Required Objects ({kpi.required_objects?.length || 0})
-              </Typography>
+        {activeTab === 2 && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs theme-text-muted mb-2">Required Objects ({kpi.required_objects?.length || 0})</p>
               {kpi.required_objects && kpi.required_objects.length > 0 ? (
-                <Stack spacing={1}>
+                <div className="space-y-2">
                   {kpi.required_objects.map((obj) => (
-                    <Paper
+                    <div
                       key={obj}
-                      variant="outlined"
-                      sx={{
-                        p: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        '&:hover': { bgcolor: 'action.hover' },
-                      }}
+                      className="p-3 rounded-lg border theme-border flex items-center justify-between hover:bg-alpha-faded-50 dark:hover:bg-alpha-faded-900 transition-colors"
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AccountTreeIcon fontSize="small" color="primary" />
-                        <Typography variant="body2">{obj}</Typography>
-                      </Box>
-                      <Tooltip title="View Object Model">
-                        <Link
-                          component="button"
-                          variant="caption"
-                          onClick={() => {
-                            // TODO: Navigate to object model viewer
-                            console.log('View object model:', obj);
-                          }}
-                        >
-                          View Schema
-                        </Link>
-                      </Tooltip>
-                    </Paper>
+                      <div className="flex items-center gap-2">
+                        <GitBranch className="w-4 h-4 text-alpha-500" />
+                        <span className="text-sm theme-text">{obj}</span>
+                      </div>
+                      <button
+                        onClick={() => console.log('View object model:', obj)}
+                        className="text-xs text-alpha-500 hover:underline"
+                      >
+                        View Schema
+                      </button>
+                    </div>
                   ))}
-                </Stack>
+                </div>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No required objects defined
-                </Typography>
+                <p className="text-sm theme-text-muted">No required objects defined</p>
               )}
-            </Box>
+            </div>
 
-            {/* Object Model Diagrams */}
             {kpi.required_objects && kpi.required_objects.length > 0 && (
               <ObjectModelDiagramsSection requiredObjects={kpi.required_objects} />
             )}
-          </Stack>
-        </TabPanel>
-
-      </Box>
-    </Paper>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
