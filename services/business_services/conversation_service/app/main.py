@@ -32,6 +32,7 @@ from .engine.strategic_recommender import StrategicRecommender, StrategyScore
 from .database import init_db, close_db
 from .client_config_api import router as client_config_router
 from .agents_api import router as agents_router
+from .api.test_routes import router as test_router
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +79,12 @@ async def lifespan(app: FastAPI):
     await close_db()
     logger.info("Database connections closed")
 
+
+def get_messaging_client() -> Optional[MessagingClient]:
+    """Get the global messaging client instance for external service calls."""
+    return messaging_client
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -98,6 +105,9 @@ app.include_router(client_config_router, prefix=settings.API_V1_STR)
 
 # Include multi-agent design API router
 app.include_router(agents_router, prefix=settings.API_V1_STR)
+
+# Include agent test routes
+app.include_router(test_router)
 
 # In-memory session stores
 active_sessions: Dict[str, List[Dict[str, str]]] = {} # Stores chat history for LLM context

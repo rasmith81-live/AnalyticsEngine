@@ -124,31 +124,6 @@ class ReadBase(Generic[T]):
         """Create read models from entities."""
         return [cls(entity) for entity in entities]
 
-class MarketData(BaseModel):
-    __tablename__ = 'market_data'
-
-    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
-    price: Mapped[float] = mapped_column(Float, nullable=False)
-    volume: Mapped[int] = mapped_column(Integer, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-    __table_args__ = (Index('ix_market_data_timestamp', 'timestamp'),)
-
-
-class NewsArticle(BaseModel):
-    __tablename__ = 'news_articles'
-
-    source: Mapped[str] = mapped_column(String(255), nullable=False)
-    title: Mapped[str] = mapped_column(Text, nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    related_tickers: Mapped[List[str]] = mapped_column(ARRAY(String), nullable=True)
-    article_type: Mapped[str] = mapped_column(String(255), nullable=True)
-    sentiment: Mapped[float] = mapped_column(Float, nullable=True)
-
-    __table_args__ = (Index('ix_news_articles_published_at', 'published_at'),)
-
-
 class SecureArtifact(BaseModel):
     """Secure artifact storage model."""
     __tablename__ = 'secure_artifacts'

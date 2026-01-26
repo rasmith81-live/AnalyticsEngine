@@ -8,7 +8,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { Paper, Typography, Box } from '@mui/material';
+import { Card } from '../ui/Card';
 
 interface ResourceSchedulerProps {
   timelineWeeks: number;
@@ -61,11 +61,11 @@ export default function ResourceScheduler({ timelineWeeks }: ResourceSchedulerPr
   const data = generateData();
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
+    <Card className="p-4">
+      <h3 className="text-base font-semibold theme-text-title mb-3">
         Resource Allocation Plan
-      </Typography>
-      <Box sx={{ height: 300, width: '100%' }}>
+      </h3>
+      <div className="h-72 w-full">
         <ResponsiveContainer>
           <BarChart
             data={data}
@@ -76,21 +76,47 @@ export default function ResourceScheduler({ timelineWeeks }: ResourceSchedulerPr
               bottom: 5,
             }}
           >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="week" />
-            <YAxis label={{ value: 'FTE Allocation', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="Project Manager" stackId="a" fill="#8884d8" />
-            <Bar dataKey="Solution Architect" stackId="a" fill="#82ca9d" />
-            <Bar dataKey="Data Engineer" stackId="a" fill="#ffc658" />
-            <Bar dataKey="Business Analyst" stackId="a" fill="#ff7300" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #374151)" />
+            <XAxis 
+              dataKey="week" 
+              tick={{ fill: 'var(--color-text-muted, #9ca3af)', fontSize: 12 }}
+              axisLine={{ stroke: 'var(--color-border, #374151)' }}
+            />
+            <YAxis 
+              label={{ 
+                value: 'FTE Allocation', 
+                angle: -90, 
+                position: 'insideLeft',
+                fill: 'var(--color-text-muted, #9ca3af)',
+                fontSize: 12
+              }}
+              tick={{ fill: 'var(--color-text-muted, #9ca3af)', fontSize: 12 }}
+              axisLine={{ stroke: 'var(--color-border, #374151)' }}
+            />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: 'var(--color-card-bg, #1f2937)',
+                border: '1px solid var(--color-border, #374151)',
+                borderRadius: '8px',
+                color: 'var(--color-text, #e5e7eb)'
+              }}
+            />
+            <Legend 
+              wrapperStyle={{ 
+                color: 'var(--color-text-muted, #9ca3af)',
+                fontSize: 12
+              }}
+            />
+            <Bar dataKey="Project Manager" stackId="a" fill="#8b5cf6" />
+            <Bar dataKey="Solution Architect" stackId="a" fill="#22c55e" />
+            <Bar dataKey="Data Engineer" stackId="a" fill="#f59e0b" />
+            <Bar dataKey="Business Analyst" stackId="a" fill="#f97316" />
           </BarChart>
         </ResponsiveContainer>
-      </Box>
-      <Typography variant="caption" color="text.secondary">
+      </div>
+      <p className="text-xs theme-text-muted mt-2">
         Estimated resource requirements per week (FTE) based on project scope.
-      </Typography>
-    </Paper>
+      </p>
+    </Card>
   );
 }

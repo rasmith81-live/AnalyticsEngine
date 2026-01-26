@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
@@ -356,6 +357,92 @@ async def list_sessions(
 
 
 # =============================================================================
+# WebSocket Helpers
+# =============================================================================
+
+async def _send_agent_activities_from_artifacts(
+    websocket: WebSocket, 
+    session_id: str, 
+    artifacts: Dict[str, Any]
+) -> None:
+    """Extract and send agent activities from session artifacts."""
+    timestamp = datetime.utcnow().isoformat()
+    
+    # Check for delegations
+    if "delegations" in artifacts:
+        for i, delegation in enumerate(artifacts["delegations"]):
+            await websocket.send_json({
+                "type": "agent_activity",
+                "activity": {
+                    "id": f"act_del_{session_id}_{i}",
+                    "type": "delegation",
+                    "source": "coordinator",
+                    "target": delegation.get("agent") or delegation.get("target", "unknown"),
+                    "details": delegation.get("task"),
+                    "timestamp": timestamp
+                }
+            })
+    
+    # Check for peer consultations
+    if "peer_consultations" in artifacts:
+        for i, consultation in enumerate(artifacts["peer_consultations"]):
+            await websocket.send_json({
+                "type": "agent_activity",
+                "activity": {
+                    "id": f"act_peer_{session_id}_{i}",
+                    "type": "peer_consultation",
+                    "source": consultation.get("from", "unknown"),
+                    "target": consultation.get("to", "unknown"),
+                    "details": consultation.get("question"),
+                    "timestamp": timestamp
+                }
+            })
+    
+    # Check for tool calls
+    if "tool_calls" in artifacts:
+        for i, tool in enumerate(artifacts["tool_calls"]):
+            activity_type = "mcp_tool" if tool.get("is_mcp") else "tool_call"
+            await websocket.send_json({
+                "type": "agent_activity",
+                "activity": {
+                    "id": f"act_tool_{session_id}_{i}",
+                    "type": activity_type,
+                    "source": tool.get("agent", "unknown"),
+                    "tool": tool.get("name"),
+                    "details": tool.get("result"),
+                    "timestamp": timestamp
+                }
+            })
+    
+    # Check for agents consulted (from synthesis)
+    if "agents_consulted" in artifacts:
+        for i, agent in enumerate(artifacts["agents_consulted"]):
+            await websocket.send_json({
+                "type": "agent_activity",
+                "activity": {
+                    "id": f"act_consult_{session_id}_{i}",
+                    "type": "delegation",
+                    "source": "coordinator",
+                    "target": agent,
+                    "timestamp": timestamp
+                }
+            })
+    
+    # Check for synthesis indicator
+    if "synthesis" in artifacts or "key_insights" in artifacts:
+        await websocket.send_json({
+            "type": "agent_activity",
+            "activity": {
+                "id": f"act_synth_{session_id}",
+                "type": "synthesis",
+                "source": "coordinator",
+                "details": "Synthesizing agent results",
+                "timestamp": timestamp
+            }
+        })
+
+
+# =============================================================================
 # WebSocket Endpoint
 # =============================================================================
 
@@ -406,19 +493,102 @@ async def websocket_design_session(
                 content = data
             
             if message_type == "message":
+                from .agents.base_agent import StreamEvent, StreamEventType
+                
                 # Stream response from coordinator
                 await websocket.send_json({
                     "type": "processing",
                     "message": "Processing your message..."
                 })
                 
+                # Send initial activity for user message
+                await websocket.send_json({
+                    "type": "agent_activity",
+                    "activity": {
+                        "id": f"act_{session_id}_{datetime.utcnow().timestamp()}",
+                        "type": "delegation",
+                        "source": "user",
+                        "target": "coordinator",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                })
+                
                 full_response = []
-                async for chunk in orchestrator.stream_message(session_id, content):
-                    full_response.append(chunk)
-                    await websocket.send_json({
-                        "type": "chunk",
-                        "content": chunk
-                    })
+                activity_counter = 0
+                async for event in orchestrator.stream_message(session_id, content):
+                    if isinstance(event, StreamEvent):
+                        if event.event_type == StreamEventType.TEXT:
+                            # Text chunk - send as before
+                            if event.content:
+                                full_response.append(event.content)
+                                await websocket.send_json({
+                                    "type": "chunk",
+                                    "content": event.content
+                                })
+                        elif event.event_type == StreamEventType.DELEGATION:
+                            # Real-time delegation activity
+                            activity_counter += 1
+                            await websocket.send_json({
+                                "type": "agent_activity",
+                                "activity": {
+                                    "id": f"act_del_{session_id}_{activity_counter}",
+                                    "type": "delegation",
+                                    "source": event.source or "coordinator",
+                                    "target": event.target or "unknown",
+                                    "details": event.details,
+                                    "timestamp": event.timestamp.isoformat()
+                                }
+                            })
+                        elif event.event_type == StreamEventType.PEER_CONSULTATION:
+                            # Real-time peer consultation
+                            activity_counter += 1
+                            await websocket.send_json({
+                                "type": "agent_activity",
+                                "activity": {
+                                    "id": f"act_peer_{session_id}_{activity_counter}",
+                                    "type": "peer_consultation",
+                                    "source": event.source or "unknown",
+                                    "target": event.target or "unknown",
+                                    "details": event.details,
+                                    "timestamp": event.timestamp.isoformat()
+                                }
+                            })
+                        elif event.event_type == StreamEventType.TOOL_CALL:
+                            # Real-time tool call activity
+                            activity_counter += 1
+                            await websocket.send_json({
+                                "type": "agent_activity",
+                                "activity": {
+                                    "id": f"act_tool_{session_id}_{activity_counter}",
+                                    "type": "tool_call",
+                                    "source": event.source or "unknown",
+                                    "tool_name": event.tool_name,
+                                    "details": event.details,
+                                    "timestamp": event.timestamp.isoformat()
+                                }
+                            })
+                    else:
+                        # Legacy string handling (fallback)
+                        full_response.append(str(event))
+                        await websocket.send_json({
+                            "type": "chunk",
+                            "content": str(event)
+                        })
+                
+                # Fetch artifacts after processing for design progress
+                try:
+                    artifacts_result = await orchestrator.get_session_artifacts(session_id)
+                    if "artifacts" in artifacts_result:
+                        artifacts = artifacts_result["artifacts"]
+                        
+                        # Send design progress if available
+                        if "design_progress" in artifacts:
+                            await websocket.send_json({
+                                "type": "design_progress",
+                                "progress": artifacts["design_progress"]
+                            })
+                except Exception as e:
+                    logger.debug(f"Could not fetch artifacts for design progress: {e}")
                 
                 # Send completion
                 await websocket.send_json({

@@ -1,5 +1,5 @@
-import { Paper, Typography, Box } from '@mui/material';
 import { useMemo } from 'react';
+import { Card } from '../ui/Card';
 
 interface Task {
   id: string;
@@ -32,20 +32,20 @@ export default function ProjectGanttChart({ timelineWeeks }: ProjectGanttChartPr
 
   const getColor = (type: Task['type']) => {
     switch (type) {
-      case 'planning': return '#8884d8';
-      case 'implementation': return '#82ca9d';
-      case 'qa': return '#ffc658';
-      case 'deployment': return '#ff7300';
-      default: return '#ccc';
+      case 'planning': return '#8b5cf6'; // violet-500
+      case 'implementation': return '#22c55e'; // green-500
+      case 'qa': return '#f59e0b'; // amber-500
+      case 'deployment': return '#f97316'; // orange-500
+      default: return '#6b7280';
     }
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
+    <Card className="p-4">
+      <h3 className="text-base font-semibold theme-text-title mb-3">
         Project Implementation Timeline
-      </Typography>
-      <Box sx={{ width: '100%', overflowX: 'auto' }}>
+      </h3>
+      <div className="w-full overflow-x-auto">
         <svg width="100%" height={200} viewBox={`0 0 ${Math.max(timelineWeeks * 50, 600)} 200`}>
           {/* Header */}
           <g transform="translate(150, 0)">
@@ -56,7 +56,8 @@ export default function ProjectGanttChart({ timelineWeeks }: ProjectGanttChartPr
                 y={20}
                 textAnchor="middle"
                 fontSize="12"
-                fill="#666"
+                className="fill-current"
+                style={{ fill: 'var(--color-text-muted, #9ca3af)' }}
               >
                 W{i + 1}
               </text>
@@ -72,8 +73,10 @@ export default function ProjectGanttChart({ timelineWeeks }: ProjectGanttChartPr
                 y1={0}
                 x2={i * 50}
                 y2={150}
-                stroke="#eee"
+                stroke="currentColor"
                 strokeWidth="1"
+                className="text-alpha-faded-200 dark:text-alpha-faded-700"
+                style={{ stroke: 'var(--color-border, #374151)' }}
               />
             ))}
           </g>
@@ -89,7 +92,7 @@ export default function ProjectGanttChart({ timelineWeeks }: ProjectGanttChartPr
                   textAnchor="end"
                   fontSize="12"
                   fontWeight="500"
-                  fill="#333"
+                  style={{ fill: 'var(--color-text, #e5e7eb)' }}
                 >
                   {task.name}
                 </text>
@@ -108,10 +111,10 @@ export default function ProjectGanttChart({ timelineWeeks }: ProjectGanttChartPr
             ))}
           </g>
         </svg>
-      </Box>
-      <Typography variant="caption" color="text.secondary">
+      </div>
+      <p className="text-xs theme-text-muted mt-2">
         Estimated timeline based on selected KPIs and complexity.
-      </Typography>
-    </Paper>
+      </p>
+    </Card>
   );
 }

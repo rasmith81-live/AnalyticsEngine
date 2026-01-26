@@ -121,13 +121,13 @@ app.add_middleware(
 )
 app.add_middleware(
     AuthorizationMiddleware,
-    exclude_paths=["/health", "/metrics", "/docs", "/redoc", "/openapi.json"],
-    exclude_prefixes=["/auth/", "/api/v1/"]
+    exclude_paths=["/health", "/health/services", "/metrics", "/docs", "/redoc", "/openapi.json"],
+    exclude_prefixes=["/auth/", "/api/v1/", "/api/health/"]
 )
 app.add_middleware(
     AuthenticationMiddleware,
-    exclude_paths=["/health", "/metrics", "/docs", "/redoc", "/openapi.json"],
-    exclude_prefixes=["/auth/", "/api/v1/"]
+    exclude_paths=["/health", "/health/services", "/metrics", "/docs", "/redoc", "/openapi.json"],
+    exclude_prefixes=["/auth/", "/api/v1/", "/api/health/"]
 )
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -157,6 +157,37 @@ async def health_check(detailed: bool = False):
         "service": "api_gateway",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+@app.get("/health/services")
+async def health_services():
+    """
+    Check health of all downstream services.
+    Returns health status for each registered service.
+    """
+    import httpx
+    
+    services = await service_registry.get_all_services()
+    results = []
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for service in services:
+            try:
+                url = f"{service.url}{service.health_endpoint}"
+                response = await client.get(url)
+                status = "healthy" if response.status_code == 200 else "error"
+                details = response.json() if response.status_code == 200 else None
+            except Exception as e:
+                status = "error"
+                details = {"error": str(e)}
+            
+            results.append({
+                "name": service.name,
+                "url": service.url,
+                "status": status,
+                "details": details
+            })
+    
+    return {"services": results, "timestamp": datetime.utcnow().isoformat()}
 
 @app.get("/services")
 async def list_services():

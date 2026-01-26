@@ -19,6 +19,7 @@ from opentelemetry.trace.status import Status, StatusCode
 
 from .models import SubscriptionStatus, MessageDelivery, MessageMetadata, MessagePriority
 from .telemetry import trace_method, add_span_attributes, extract_trace_context, inject_trace_context, traced_span
+from .metrics import track_service_consume
 
 logger = logging.getLogger(__name__)
 
@@ -937,6 +938,20 @@ class SubscriptionManager:
                                 self.total_messages_delivered += 1
                                 subscription.message_count += 1
                                 subscription.last_activity = datetime.now(timezone.utc)
+                                
+                                # Track service-to-service consumption for lineage
+                                source_service = message.get("source_service") or message.get("event_data", {}).get("source_service", "unknown")
+                                event_type = message.get("event_type", "unknown")
+                                channel = message.get("channel", "unknown")
+                                delivery_latency = (datetime.now(timezone.utc) - start_time).total_seconds()
+                                track_service_consume(
+                                    source_service=source_service,
+                                    target_service=subscription.service_name,
+                                    event_type=event_type,
+                                    channel=channel,
+                                    message_size=len(str(message)),
+                                    latency_seconds=delivery_latency
+                                )
                                 
                                 webhook_span.set_attribute("message.auto_acknowledged", True)
                                 webhook_span.set_attribute("metrics.total_delivered", self.total_messages_delivered)

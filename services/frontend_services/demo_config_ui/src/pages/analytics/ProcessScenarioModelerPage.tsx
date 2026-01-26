@@ -15,7 +15,6 @@ import {
   ArrowRight,
   RefreshCw,
   Download,
-  ChevronRight,
   Check,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -62,18 +61,6 @@ const mockScenarios: Scenario[] = [
   ], selected: false },
 ];
 
-interface SimulationResult {
-  scenario: string;
-  cycleTime: number;
-  throughput: number;
-  utilization: number;
-  cost: number;
-}
-
-const mockResults: SimulationResult[] = [
-  { scenario: 'Baseline', cycleTime: 4.2, throughput: 45, utilization: 70, cost: 12 },
-  { scenario: '+20% Capacity', cycleTime: 3.6, throughput: 55, utilization: 78, cost: 11 },
-];
 
 function ProcessNode({ step, isSelected, onClick }: { step: ProcessStep; isSelected: boolean; onClick: () => void }) {
   const nodeStyles = {

@@ -33,7 +33,7 @@ from .models import (
     HealthResponse, MetricsResponse, ErrorResponse, PublishCommandRequest, CommandReceipt
 )
 from .config import get_settings
-from .metrics import metrics, update_system_metrics, update_redis_connection_metrics, export_metrics_to_observability, track_endpoint_execution, track_redis_operation, track_message_processing, track_message_publish, update_channel_metrics, update_subscription_metrics, update_dlq_metrics
+from .metrics import metrics, update_system_metrics, update_redis_connection_metrics, export_metrics_to_observability, track_endpoint_execution, track_redis_operation, track_message_processing, track_message_publish, update_channel_metrics, update_subscription_metrics, update_dlq_metrics, get_service_traffic_summary, track_http_traffic
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 from .telemetry import initialize_telemetry, instrument_fastapi, extract_correlation_id, extract_correlation_id_from_headers, inject_trace_context, add_span_attributes, trace_method, trace_redis_operation, trace_message_processing, traced_span
@@ -1187,6 +1187,32 @@ async def get_performance_stats(
     except Exception as e:
         logger.error(f"Failed to get performance stats: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Failed to get performance stats: {str(e)}")
+
+
+@app.get("/messaging/traffic/summary")
+@track_endpoint_execution
+async def get_traffic_summary():
+    """
+    Get service-to-service traffic summary for SCADA visualization.
+    
+    Returns real-time traffic data including:
+    - Message traffic between services
+    - HTTP traffic between services
+    - Traffic volume and latency metrics
+    """
+    try:
+        traffic_data = get_service_traffic_summary()
+        
+        return {
+            "nodes": traffic_data.get("nodes", []),
+            "links": traffic_data.get("links", []),
+            "timestamp": datetime.utcnow().isoformat(),
+            "source": "messaging_service_prometheus"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get traffic summary: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to get traffic summary: {str(e)}")
 
 
 if __name__ == "__main__":

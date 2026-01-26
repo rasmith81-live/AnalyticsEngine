@@ -11,6 +11,7 @@ Strategy Coordinator to design business value chain models:
 5. TesterAgent: Validation and quality assurance
 6. DocumenterAgent: Documentation generation
 7. DeploymentSpecialistAgent: Azure deployment and infrastructure
+8. LibrarianCuratorAgent: Ontology management, KPI curation, catalog search
 """
 
 from __future__ import annotations
@@ -159,7 +160,7 @@ Focus on creating domain models that accurately reflect the business, with clear
 class ArchitectAgent(BaseAgent):
     """Architect Agent for value chain structure and entity design."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.ARCHITECT,
             model="claude-sonnet-4-20250514",
@@ -167,7 +168,7 @@ class ArchitectAgent(BaseAgent):
             temperature=0.3,
             tools=self._get_architect_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_architect_tools(self) -> List[ToolDefinition]:
         """Define tools available to the architect."""
@@ -942,7 +943,7 @@ Adapt your expertise to match the client's industry and provide actionable, spec
 class BusinessAnalystAgent(BaseAgent):
     """Business Analyst Agent for industry expertise and KPI identification."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.BUSINESS_ANALYST,
             model="claude-sonnet-4-20250514",
@@ -950,7 +951,7 @@ class BusinessAnalystAgent(BaseAgent):
             temperature=0.5,
             tools=self._get_analyst_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_analyst_tools(self) -> List[ToolDefinition]:
         """Define tools available to the analyst."""
@@ -1372,7 +1373,7 @@ Generate clean, efficient, and well-documented code that follows best practices.
 class DeveloperAgent(BaseAgent):
     """Developer Agent for code and schema generation."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DEVELOPER,
             model="claude-sonnet-4-20250514",
@@ -1380,7 +1381,7 @@ class DeveloperAgent(BaseAgent):
             temperature=0.2,
             tools=self._get_developer_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_developer_tools(self) -> List[ToolDefinition]:
         """Define tools available to the developer."""
@@ -1793,7 +1794,7 @@ Ensure all artifacts meet quality standards before deployment.
 class TesterAgent(BaseAgent):
     """Tester Agent for validation and quality assurance."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.TESTER,
             model="claude-sonnet-4-20250514",
@@ -1801,7 +1802,7 @@ class TesterAgent(BaseAgent):
             temperature=0.2,
             tools=self._get_tester_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_tester_tools(self) -> List[ToolDefinition]:
         """Define tools available to the tester."""
@@ -2154,7 +2155,7 @@ Create documentation that is clear, comprehensive, and useful for the target aud
 class DocumenterAgent(BaseAgent):
     """Documenter Agent for documentation generation."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DOCUMENTER,
             model="claude-sonnet-4-20250514",
@@ -2162,7 +2163,7 @@ class DocumenterAgent(BaseAgent):
             temperature=0.4,
             tools=self._get_documenter_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_documenter_tools(self) -> List[ToolDefinition]:
         """Define tools available to the documenter."""
@@ -2461,36 +2462,36 @@ Your role is to design KPIs that are optimized for the Analytics Engine's set-ba
 For complex KPIs like retention, churn, or cohort analysis, use this pattern:
 
 ```json
-{
+{{
     "calculation_type": "set_based",
-    "set_based_definition": {
+    "set_based_definition": {{
         "base_entity": "customers",
         "key_column": "customer_id",
         "period_parameters": ["PeriodStart", "PeriodEnd"],
         "steps": [
-            {
+            {{
                 "step_name": "start_set",
                 "operation": "SELECT",
                 "description": "Customers active at period start",
                 "filter": "status = 'active' AND snapshot_date = @PeriodStart"
-            },
-            {
+            }},
+            {{
                 "step_name": "end_set",
                 "operation": "SELECT",
                 "description": "Customers active at period end",
                 "filter": "status = 'active' AND snapshot_date = @PeriodEnd"
-            },
-            {
+            }},
+            {{
                 "step_name": "retained_set",
                 "operation": "INTERSECT",
                 "description": "Customers in both start and end",
                 "left_set": "start_set",
                 "right_set": "end_set"
-            }
+            }}
         ],
         "final_formula": "CASE WHEN COUNT(start_set) > 0 THEN (COUNT(retained_set) / COUNT(start_set)) * 100 ELSE 0 END"
-    }
-}
+    }}
+}}
 ```
 
 ## Output Format
@@ -2513,7 +2514,7 @@ Design KPIs that are efficient, accurate, and optimized for real-time calculatio
 class DataAnalystAgent(BaseAgent):
     """Data Analyst Agent for set-based KPI design and calculation optimization."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DATA_ANALYST,
             model="claude-sonnet-4-20250514",
@@ -2521,7 +2522,7 @@ class DataAnalystAgent(BaseAgent):
             temperature=0.3,
             tools=self._get_data_analyst_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_data_analyst_tools(self) -> List[ToolDefinition]:
         """Define tools available to the data analyst."""
@@ -3037,15 +3038,15 @@ Generate production-ready, secure, and scalable Azure deployments.
 class DeploymentSpecialistAgent(BaseAgent):
     """Deployment Specialist Agent for Azure infrastructure and deployment."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DEPLOYMENT_SPECIALIST,
             model="claude-sonnet-4-20250514",
-            max_tokens=8192,
-            temperature=0.2,
+            max_tokens=4096,
+            temperature=0.3,
             tools=self._get_deployment_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_deployment_tools(self) -> List[ToolDefinition]:
         """Define tools available to the deployment specialist."""
@@ -4128,15 +4129,15 @@ Focus on creating actionable, well-defined work items that enable the developmen
 class ProjectManagerAgent(BaseAgent):
     """Project Manager Agent for Agile planning and work breakdown."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.PROJECT_MANAGER,
             model="claude-sonnet-4-20250514",
-            max_tokens=8192,
+            max_tokens=4096,
             temperature=0.4,
             tools=self._get_pm_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_pm_tools(self) -> List[ToolDefinition]:
         """Define tools available to the project manager."""
@@ -6767,3 +6768,758 @@ that require clarification from the interviewee."""
         context.artifacts["collaboration_requests"].append(request)
         
         return {"success": True, "request": request}
+
+
+# =============================================================================
+# LIBRARIAN CURATOR AGENT
+# =============================================================================
+
+LIBRARIAN_CURATOR_SYSTEM_PROMPT = """You are the Librarian Curator Agent, the guardian and steward of the ontology catalog.
+
+## Your Role
+You manage all ontology components: Value Chains, Modules, Entities, KPIs, and Attributes.
+During interviews, you search existing definitions to suggest reuse or adaptation.
+You maintain quality, consistency, and completeness of all definitions.
+
+## Core Responsibilities
+
+### 1. Catalog Search & Reuse
+- When requirements are described, search existing definitions first
+- Identify value chains, modules, KPIs that can be reused as-is
+- Suggest modifications to existing definitions when close matches exist
+- Prevent duplicate definitions by promoting reuse
+
+### 2. Gap Analysis
+- Identify missing definitions needed for new requirements
+- Detect incomplete or inconsistent definitions
+- Flag definitions that need refinement or clarification
+- Track coverage across industry patterns
+
+### 3. KPI Design & Calculation Logic
+- Design new KPI definitions with proper metadata
+- Define set-based calculation formulas for the calculation engine
+- Specify required entities and attributes for each KPI
+- Ensure calculation logic follows established patterns
+
+### 4. Ontology Maintenance
+- Curate definitions for consistency and quality
+- Merge duplicate or overlapping definitions
+- Refine descriptions and metadata
+- Maintain relationships between components
+
+### 5. Knowledge Graph Management
+- Create and update entities in the knowledge graph
+- Establish relationships between ontology components
+- Track lineage and dependencies
+- Support traceability queries
+
+## Ontology Hierarchy
+
+```
+Value Chain
+  └── Module (functional area)
+        └── KPI (metric definition)
+              └── Entity (data object)
+                    └── Attribute (data field)
+```
+
+## Search Strategy
+
+When a user describes a need:
+1. **Extract key terms**: Industry, process, metric type
+2. **Search value chains**: Find matching industry patterns
+3. **Search modules**: Find functional area matches
+4. **Search KPIs**: Find specific metric matches
+5. **Evaluate fit**: Exact match, adaptable, or new needed
+
+## KPI Calculation Patterns
+
+Support set-based calculations:
+- **Aggregations**: SUM, COUNT, AVG, MIN, MAX
+- **Ratios**: numerator / denominator
+- **Comparisons**: period-over-period, target vs actual
+- **Filters**: WHERE conditions on dimensions
+- **Time windows**: Rolling periods, YTD, MTD
+
+## Tools Available
+- search_catalog: Search existing definitions by criteria
+- get_definition_details: Get full details of a definition
+- suggest_reuse: Suggest existing definitions for reuse
+- identify_gaps: Identify missing definitions
+- create_kpi_definition: Create new KPI definition
+- create_entity_definition: Create new entity definition
+- define_calculation: Define set-based calculation logic
+- update_definition: Update existing definition
+- merge_definitions: Merge duplicate definitions
+- validate_ontology: Validate ontology consistency
+- request_data_analyst_review: Request Data Analyst to review calculation logic
+
+## Output Format
+All responses should include:
+- Search results with relevance scores
+- Reuse recommendations with fit assessment
+- Gap analysis with priority
+- Definition proposals with full metadata
+"""
+
+
+class LibrarianCuratorAgent(BaseAgent):
+    """
+    Librarian Curator Agent for ontology management and curation.
+    
+    Responsibilities:
+    - Search and recommend existing definitions for reuse
+    - Identify gaps in ontology coverage
+    - Design KPI definitions with calculation logic
+    - Maintain quality and consistency of all definitions
+    - Manage the knowledge graph of ontology components
+    """
+    
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
+        config = AgentConfig(
+            role=AgentRole.LIBRARIAN_CURATOR,
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            temperature=0.3,
+            tools=self._get_librarian_tools()
+        )
+        super().__init__(config, api_key, mcp_manager)
+    
+    def _get_system_prompt(self) -> str:
+        return LIBRARIAN_CURATOR_SYSTEM_PROMPT
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _get_librarian_tools(self) -> List[ToolDefinition]:
+        return [
+            ToolDefinition(
+                name="search_catalog",
+                description="Search existing ontology definitions by criteria",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "search_type": {
+                            "type": "string",
+                            "enum": ["value_chain", "module", "kpi", "entity", "attribute", "all"],
+                            "description": "Type of definition to search"
+                        },
+                        "query": {"type": "string", "description": "Search query text"},
+                        "industry": {"type": "string", "description": "Industry filter"},
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Tags to filter by"
+                        },
+                        "limit": {"type": "integer", "description": "Max results to return", "default": 10}
+                    },
+                    "required": ["search_type", "query"]
+                }
+            ),
+            ToolDefinition(
+                name="get_definition_details",
+                description="Get full details of a specific definition",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "definition_type": {
+                            "type": "string",
+                            "enum": ["value_chain", "module", "kpi", "entity", "attribute"],
+                            "description": "Type of definition"
+                        },
+                        "definition_id": {"type": "string", "description": "Definition ID or code"},
+                        "include_relationships": {"type": "boolean", "description": "Include related definitions", "default": True},
+                        "include_lineage": {"type": "boolean", "description": "Include lineage information", "default": False}
+                    },
+                    "required": ["definition_type", "definition_id"]
+                }
+            ),
+            ToolDefinition(
+                name="suggest_reuse",
+                description="Suggest existing definitions that could be reused or adapted",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "requirement_description": {"type": "string", "description": "Description of the requirement"},
+                        "requirement_type": {
+                            "type": "string",
+                            "enum": ["value_chain", "module", "kpi", "entity"],
+                            "description": "Type of definition needed"
+                        },
+                        "industry_context": {"type": "string", "description": "Industry context"},
+                        "key_terms": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Key terms extracted from requirement"
+                        }
+                    },
+                    "required": ["requirement_description", "requirement_type"]
+                }
+            ),
+            ToolDefinition(
+                name="identify_gaps",
+                description="Identify gaps in ontology coverage for a given context",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "context_description": {"type": "string", "description": "Business context description"},
+                        "existing_definitions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "IDs of definitions already selected"
+                        },
+                        "gap_types": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": ["missing_kpi", "missing_entity", "missing_attribute", "incomplete_calculation", "missing_relationship"]
+                            },
+                            "description": "Types of gaps to check for"
+                        }
+                    },
+                    "required": ["context_description"]
+                }
+            ),
+            ToolDefinition(
+                name="create_kpi_definition",
+                description="Create a new KPI definition with calculation logic",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "kpi_code": {"type": "string", "description": "Unique KPI code"},
+                        "kpi_name": {"type": "string", "description": "KPI display name"},
+                        "description": {"type": "string", "description": "KPI description"},
+                        "module_code": {"type": "string", "description": "Parent module code"},
+                        "category": {
+                            "type": "string",
+                            "enum": ["efficiency", "quality", "cost", "time", "customer", "financial", "operational"],
+                            "description": "KPI category"
+                        },
+                        "unit_of_measure": {"type": "string", "description": "Unit of measure"},
+                        "aggregation_type": {
+                            "type": "string",
+                            "enum": ["sum", "avg", "count", "min", "max", "ratio", "weighted_avg"],
+                            "description": "Aggregation method"
+                        },
+                        "required_entities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Entity codes required for calculation"
+                        },
+                        "calculation_formula": {"type": "string", "description": "Calculation formula in set notation"},
+                        "time_dimension": {
+                            "type": "string",
+                            "enum": ["daily", "weekly", "monthly", "quarterly", "yearly", "rolling"],
+                            "description": "Time granularity"
+                        },
+                        "target_direction": {
+                            "type": "string",
+                            "enum": ["higher_is_better", "lower_is_better", "target_value"],
+                            "description": "Target direction"
+                        },
+                        "industry_tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Industry applicability tags"
+                        }
+                    },
+                    "required": ["kpi_code", "kpi_name", "description", "module_code", "aggregation_type"]
+                }
+            ),
+            ToolDefinition(
+                name="create_entity_definition",
+                description="Create a new entity definition",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "entity_code": {"type": "string", "description": "Unique entity code"},
+                        "entity_name": {"type": "string", "description": "Entity display name"},
+                        "description": {"type": "string", "description": "Entity description"},
+                        "entity_type": {
+                            "type": "string",
+                            "enum": ["transactional", "master", "reference", "derived"],
+                            "description": "Entity type"
+                        },
+                        "attributes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "data_type": {"type": "string"},
+                                    "description": {"type": "string"},
+                                    "is_key": {"type": "boolean"},
+                                    "is_required": {"type": "boolean"}
+                                }
+                            },
+                            "description": "Entity attributes"
+                        },
+                        "relationships": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "target_entity": {"type": "string"},
+                                    "relationship_type": {"type": "string"},
+                                    "cardinality": {"type": "string"}
+                                }
+                            },
+                            "description": "Relationships to other entities"
+                        }
+                    },
+                    "required": ["entity_code", "entity_name", "description", "entity_type"]
+                }
+            ),
+            ToolDefinition(
+                name="define_calculation",
+                description="Define set-based calculation logic for a KPI",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "kpi_code": {"type": "string", "description": "KPI code to define calculation for"},
+                        "calculation_type": {
+                            "type": "string",
+                            "enum": ["simple_aggregate", "ratio", "comparison", "complex"],
+                            "description": "Type of calculation"
+                        },
+                        "source_entities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Source entity codes"
+                        },
+                        "measures": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "entity": {"type": "string"},
+                                    "attribute": {"type": "string"},
+                                    "aggregation": {"type": "string"}
+                                }
+                            },
+                            "description": "Measures to calculate"
+                        },
+                        "filters": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "entity": {"type": "string"},
+                                    "attribute": {"type": "string"},
+                                    "operator": {"type": "string"},
+                                    "value": {"type": "string"}
+                                }
+                            },
+                            "description": "Filter conditions"
+                        },
+                        "formula": {"type": "string", "description": "Final formula combining measures"},
+                        "sql_template": {"type": "string", "description": "SQL template for calculation"}
+                    },
+                    "required": ["kpi_code", "calculation_type", "source_entities"]
+                }
+            ),
+            ToolDefinition(
+                name="update_definition",
+                description="Update an existing definition",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "definition_type": {
+                            "type": "string",
+                            "enum": ["value_chain", "module", "kpi", "entity", "attribute"],
+                            "description": "Type of definition"
+                        },
+                        "definition_id": {"type": "string", "description": "Definition ID to update"},
+                        "updates": {
+                            "type": "object",
+                            "description": "Fields to update with new values"
+                        },
+                        "reason": {"type": "string", "description": "Reason for update"}
+                    },
+                    "required": ["definition_type", "definition_id", "updates", "reason"]
+                }
+            ),
+            ToolDefinition(
+                name="merge_definitions",
+                description="Merge duplicate or overlapping definitions",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "definition_type": {
+                            "type": "string",
+                            "enum": ["kpi", "entity"],
+                            "description": "Type of definitions to merge"
+                        },
+                        "source_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "IDs of definitions to merge"
+                        },
+                        "target_id": {"type": "string", "description": "ID to merge into (or new ID)"},
+                        "merge_strategy": {
+                            "type": "string",
+                            "enum": ["keep_target", "combine_all", "manual"],
+                            "description": "How to handle conflicts"
+                        }
+                    },
+                    "required": ["definition_type", "source_ids", "target_id"]
+                }
+            ),
+            ToolDefinition(
+                name="validate_ontology",
+                description="Validate ontology consistency and completeness",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "scope": {
+                            "type": "string",
+                            "enum": ["full", "value_chain", "module", "kpi_set"],
+                            "description": "Scope of validation"
+                        },
+                        "scope_id": {"type": "string", "description": "ID of specific scope to validate"},
+                        "validation_types": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": ["completeness", "consistency", "relationships", "calculations", "naming"]
+                            },
+                            "description": "Types of validation to perform"
+                        }
+                    },
+                    "required": ["scope"]
+                }
+            ),
+            ToolDefinition(
+                name="request_data_analyst_review",
+                description="Request Data Analyst to review calculation logic",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "kpi_codes": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "KPI codes to review"
+                        },
+                        "review_focus": {
+                            "type": "string",
+                            "enum": ["calculation_accuracy", "performance", "completeness", "set_logic"],
+                            "description": "Focus area for review"
+                        },
+                        "context": {"type": "string", "description": "Additional context for review"}
+                    },
+                    "required": ["kpi_codes", "review_focus"]
+                }
+            )
+        ]
+    
+    def _register_tools(self) -> None:
+        self._tool_handlers = {
+            "search_catalog": self._search_catalog,
+            "get_definition_details": self._get_definition_details,
+            "suggest_reuse": self._suggest_reuse,
+            "identify_gaps": self._identify_gaps,
+            "create_kpi_definition": self._create_kpi_definition,
+            "create_entity_definition": self._create_entity_definition,
+            "define_calculation": self._define_calculation,
+            "update_definition": self._update_definition,
+            "merge_definitions": self._merge_definitions,
+            "validate_ontology": self._validate_ontology,
+            "request_data_analyst_review": self._request_data_analyst_review
+        }
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:150]}...")
+        if "catalog_searches" in context.artifacts:
+            parts.append(f"Catalog Searches: {len(context.artifacts['catalog_searches'])}")
+        if "kpi_definitions" in context.artifacts:
+            parts.append(f"KPI Definitions: {len(context.artifacts['kpi_definitions'])}")
+        if "entity_definitions" in context.artifacts:
+            parts.append(f"Entity Definitions: {len(context.artifacts['entity_definitions'])}")
+        if "reuse_suggestions" in context.artifacts:
+            parts.append(f"Reuse Suggestions: {len(context.artifacts['reuse_suggestions'])}")
+        return "\n".join(parts) if parts else "No ontology context provided."
+    
+    async def _search_catalog(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        search = {
+            "id": f"SEARCH-{str(uuid.uuid4())[:8].upper()}",
+            "search_type": tool_input.get("search_type", "all"),
+            "query": tool_input.get("query", ""),
+            "industry": tool_input.get("industry"),
+            "tags": tool_input.get("tags", []),
+            "limit": tool_input.get("limit", 10),
+            "results": [],
+            "total_found": 0,
+            "searched_at": datetime.utcnow().isoformat()
+        }
+        
+        if "catalog_searches" not in context.artifacts:
+            context.artifacts["catalog_searches"] = []
+        context.artifacts["catalog_searches"].append(search)
+        
+        return {"success": True, "search": search}
+    
+    async def _get_definition_details(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        details = {
+            "id": f"DEF-{str(uuid.uuid4())[:8].upper()}",
+            "definition_type": tool_input.get("definition_type", ""),
+            "definition_id": tool_input.get("definition_id", ""),
+            "include_relationships": tool_input.get("include_relationships", True),
+            "include_lineage": tool_input.get("include_lineage", False),
+            "definition": None,
+            "relationships": [],
+            "lineage": None,
+            "retrieved_at": datetime.utcnow().isoformat()
+        }
+        
+        return {"success": True, "details": details}
+    
+    async def _suggest_reuse(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        suggestion = {
+            "id": f"REUSE-{str(uuid.uuid4())[:8].upper()}",
+            "requirement_description": tool_input.get("requirement_description", ""),
+            "requirement_type": tool_input.get("requirement_type", ""),
+            "industry_context": tool_input.get("industry_context"),
+            "key_terms": tool_input.get("key_terms", []),
+            "suggestions": [],
+            "fit_assessments": [],
+            "suggested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "reuse_suggestions" not in context.artifacts:
+            context.artifacts["reuse_suggestions"] = []
+        context.artifacts["reuse_suggestions"].append(suggestion)
+        
+        return {"success": True, "suggestion": suggestion}
+    
+    async def _identify_gaps(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        gap_analysis = {
+            "id": f"GAP-{str(uuid.uuid4())[:8].upper()}",
+            "context_description": tool_input.get("context_description", ""),
+            "existing_definitions": tool_input.get("existing_definitions", []),
+            "gap_types": tool_input.get("gap_types", []),
+            "gaps_found": [],
+            "priority_gaps": [],
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        if "gap_analyses" not in context.artifacts:
+            context.artifacts["gap_analyses"] = []
+        context.artifacts["gap_analyses"].append(gap_analysis)
+        
+        return {"success": True, "gap_analysis": gap_analysis}
+    
+    async def _create_kpi_definition(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        kpi_def = {
+            "id": f"KPI-DEF-{str(uuid.uuid4())[:8].upper()}",
+            "kpi_code": tool_input.get("kpi_code", ""),
+            "kpi_name": tool_input.get("kpi_name", ""),
+            "description": tool_input.get("description", ""),
+            "module_code": tool_input.get("module_code", ""),
+            "category": tool_input.get("category", "operational"),
+            "unit_of_measure": tool_input.get("unit_of_measure", ""),
+            "aggregation_type": tool_input.get("aggregation_type", "sum"),
+            "required_entities": tool_input.get("required_entities", []),
+            "calculation_formula": tool_input.get("calculation_formula", ""),
+            "time_dimension": tool_input.get("time_dimension", "monthly"),
+            "target_direction": tool_input.get("target_direction", "higher_is_better"),
+            "industry_tags": tool_input.get("industry_tags", []),
+            "status": "draft",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "kpi_definitions" not in context.artifacts:
+            context.artifacts["kpi_definitions"] = []
+        context.artifacts["kpi_definitions"].append(kpi_def)
+        
+        return {"success": True, "kpi_definition": kpi_def}
+    
+    async def _create_entity_definition(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        entity_def = {
+            "id": f"ENT-DEF-{str(uuid.uuid4())[:8].upper()}",
+            "entity_code": tool_input.get("entity_code", ""),
+            "entity_name": tool_input.get("entity_name", ""),
+            "description": tool_input.get("description", ""),
+            "entity_type": tool_input.get("entity_type", "transactional"),
+            "attributes": tool_input.get("attributes", []),
+            "relationships": tool_input.get("relationships", []),
+            "status": "draft",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "entity_definitions" not in context.artifacts:
+            context.artifacts["entity_definitions"] = []
+        context.artifacts["entity_definitions"].append(entity_def)
+        
+        return {"success": True, "entity_definition": entity_def}
+    
+    async def _define_calculation(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        calculation = {
+            "id": f"CALC-{str(uuid.uuid4())[:8].upper()}",
+            "kpi_code": tool_input.get("kpi_code", ""),
+            "calculation_type": tool_input.get("calculation_type", "simple_aggregate"),
+            "source_entities": tool_input.get("source_entities", []),
+            "measures": tool_input.get("measures", []),
+            "filters": tool_input.get("filters", []),
+            "formula": tool_input.get("formula", ""),
+            "sql_template": tool_input.get("sql_template", ""),
+            "validated": False,
+            "defined_at": datetime.utcnow().isoformat()
+        }
+        
+        if "calculations" not in context.artifacts:
+            context.artifacts["calculations"] = []
+        context.artifacts["calculations"].append(calculation)
+        
+        return {"success": True, "calculation": calculation}
+    
+    async def _update_definition(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        update = {
+            "id": f"UPD-{str(uuid.uuid4())[:8].upper()}",
+            "definition_type": tool_input.get("definition_type", ""),
+            "definition_id": tool_input.get("definition_id", ""),
+            "updates": tool_input.get("updates", {}),
+            "reason": tool_input.get("reason", ""),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        if "definition_updates" not in context.artifacts:
+            context.artifacts["definition_updates"] = []
+        context.artifacts["definition_updates"].append(update)
+        
+        return {"success": True, "update": update}
+    
+    async def _merge_definitions(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        merge = {
+            "id": f"MERGE-{str(uuid.uuid4())[:8].upper()}",
+            "definition_type": tool_input.get("definition_type", ""),
+            "source_ids": tool_input.get("source_ids", []),
+            "target_id": tool_input.get("target_id", ""),
+            "merge_strategy": tool_input.get("merge_strategy", "keep_target"),
+            "status": "pending",
+            "merged_at": datetime.utcnow().isoformat()
+        }
+        
+        if "definition_merges" not in context.artifacts:
+            context.artifacts["definition_merges"] = []
+        context.artifacts["definition_merges"].append(merge)
+        
+        return {"success": True, "merge": merge}
+    
+    async def _validate_ontology(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        validation = {
+            "id": f"VAL-{str(uuid.uuid4())[:8].upper()}",
+            "scope": tool_input.get("scope", "full"),
+            "scope_id": tool_input.get("scope_id"),
+            "validation_types": tool_input.get("validation_types", ["completeness", "consistency"]),
+            "issues": [],
+            "warnings": [],
+            "passed": True,
+            "validated_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ontology_validations" not in context.artifacts:
+            context.artifacts["ontology_validations"] = []
+        context.artifacts["ontology_validations"].append(validation)
+        
+        return {"success": True, "validation": validation}
+    
+    async def _request_data_analyst_review(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        import uuid
+        from datetime import datetime
+        
+        request = {
+            "id": f"DA-REV-{str(uuid.uuid4())[:8].upper()}",
+            "kpi_codes": tool_input.get("kpi_codes", []),
+            "review_focus": tool_input.get("review_focus", "calculation_accuracy"),
+            "context": tool_input.get("context", ""),
+            "status": "pending_data_analyst",
+            "collaboration_type": "librarian_curator_to_data_analyst",
+            "requested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(request)
+        
+        return {"success": True, "request": request, "next_step": "Data Analyst will review calculation logic"}

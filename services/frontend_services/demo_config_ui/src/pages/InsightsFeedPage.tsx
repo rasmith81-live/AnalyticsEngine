@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Lightbulb,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Shield,
   Zap,
@@ -16,10 +15,9 @@ import {
   BarChart3,
   Target,
   DollarSign,
-  Users,
   RefreshCw,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 

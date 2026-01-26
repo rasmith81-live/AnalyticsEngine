@@ -29,8 +29,6 @@ from .retention_manager import RetentionManager
 from .messaging_client import MessagingClient
 from .telemetry_consumers import TelemetryEventConsumer
 from .command_consumers import CommandConsumer
-from .news_consumer import NewsConsumer
-from .market_data_consumer import MarketDataConsumer
 from .simulation_data_consumer import SimulationDataConsumer
 from .kpi_result_consumer import KPIResultConsumer
 from .query_request_handler import QueryRequestHandler
@@ -39,6 +37,8 @@ from .stream_publisher import StreamPublisher
 from .query_builder import QueryBuilder
 from .secure_storage_manager import SecureStorageManager
 from .api.migration_utilities_api import router as migration_utilities_router
+from .mcp.postgres_mcp_server import create_postgres_mcp_router
+from .mcp.knowledge_graph_mcp_server import create_knowledge_graph_mcp_router
 from .models import (
     QueryRequest, QueryResponse, AdHocQueryRequest, CommandRequest, CommandResponse,
     MigrationRequest, MigrationResponse, HypertableRequest, HypertableResponse,
@@ -63,8 +63,6 @@ retention_manager = None
 messaging_client = None
 telemetry_consumer = None
 command_consumer = None
-news_consumer = None
-market_data_consumer = None
 simulation_data_consumer = None
 kpi_result_consumer = None
 query_request_handler = None
@@ -81,7 +79,7 @@ system_metrics_task = None
 @trace_method(name="main.lifespan")
 async def lifespan(app: FastAPI):
     """Manage application lifespan events."""
-    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, news_consumer, market_data_consumer, subscriber_manager, stream_publisher, secure_storage_manager, metrics_export_task, system_metrics_task
+    global database_manager, retention_manager, messaging_client, telemetry_consumer, command_consumer, subscriber_manager, stream_publisher, secure_storage_manager, metrics_export_task, system_metrics_task, simulation_data_consumer, kpi_result_consumer, query_request_handler
     
     # Startup
     start_time = datetime.utcnow()
@@ -123,8 +121,8 @@ async def lifespan(app: FastAPI):
         if settings.enable_distributed_tracing and database_manager.async_engine:
             instrument_sqlalchemy(database_manager.async_engine)
         
-        # Initialize secure storage manager
-        secure_storage_manager = SecureStorageManager(database_manager.session_factory)
+        # Initialize secure storage manager with sync engine to avoid greenlet context issues
+        secure_storage_manager = SecureStorageManager(database_manager.sync_engine)
 
         # Initialize messaging client for Redis pub/sub
         messaging_client = MessagingClient(
@@ -156,20 +154,6 @@ async def lifespan(app: FastAPI):
         )
         await command_consumer.start()
 
-        # Initialize and start news consumer
-        news_consumer = NewsConsumer(
-            database_manager=database_manager,
-            messaging_client=messaging_client
-        )
-        await news_consumer.start()
-
-        # Initialize and start market data consumer
-        market_data_consumer = MarketDataConsumer(
-            database_manager=database_manager,
-            messaging_client=messaging_client
-        )
-        await market_data_consumer.start()
-        
         # Initialize and start simulation data consumer
         simulation_data_consumer = SimulationDataConsumer(
             database_manager=database_manager,
@@ -206,6 +190,16 @@ async def lifespan(app: FastAPI):
         )
         await stream_publisher.start()
         logger.info("Stream publisher initialized and started")
+        
+        # Initialize and include PostgreSQL MCP router
+        mcp_router = create_postgres_mcp_router(database_manager)
+        app.include_router(mcp_router)
+        logger.info("PostgreSQL MCP server initialized and router included")
+        
+        # Initialize and include Knowledge Graph MCP router
+        kg_mcp_router = create_knowledge_graph_mcp_router(database_manager, messaging_client)
+        app.include_router(kg_mcp_router)
+        logger.info("Knowledge Graph MCP server initialized and router included")
         
         # Start background tasks for metrics
         if settings.enable_prometheus_metrics:
@@ -312,14 +306,6 @@ async def lifespan(app: FastAPI):
         if command_consumer:
             await command_consumer.stop()
 
-        # Stop news consumer
-        if news_consumer:
-            await news_consumer.stop()
-
-        # Stop market data consumer
-        if market_data_consumer:
-            await market_data_consumer.stop()
-        
         # Stop stream publisher
         if stream_publisher:
             await stream_publisher.stop()
@@ -438,6 +424,9 @@ app.mount("/metrics", metrics_app)
 
 # Include migration utilities router
 app.include_router(migration_utilities_router)
+
+# MCP router will be included after database_manager is initialized (see lifespan)
+# Placeholder - actual inclusion happens dynamically
 
 def get_database_manager() -> DatabaseManager:
     """Dependency to get database manager instance."""
@@ -1412,14 +1401,13 @@ async def stream_heartbeat(
 # ============================================================================
 
 @app.post("/secure/artifacts", response_model=SecureArtifactResponse)
-@trace_method(name="database_service.store_artifact", kind="SERVER")
 async def store_secure_artifact(
     request: SecureArtifactRequest,
     ssm: SecureStorageManager = Depends(get_secure_storage_manager)
 ):
     """Store or update a sensitive artifact securely."""
     try:
-        artifact = await ssm.store_artifact(
+        artifact = ssm.store_artifact(
             key=request.key,
             value=request.value,
             description=request.description,
@@ -1431,14 +1419,13 @@ async def store_secure_artifact(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/secure/artifacts/{key}", response_model=SecureArtifactValueResponse)
-@trace_method(name="database_service.get_artifact", kind="SERVER")
 async def get_secure_artifact(
     key: str,
     ssm: SecureStorageManager = Depends(get_secure_storage_manager)
 ):
     """Retrieve a secure artifact by key (includes decrypted value)."""
     try:
-        artifact = await ssm.get_artifact(key)
+        artifact = ssm.get_artifact(key)
         if not artifact:
             raise HTTPException(status_code=404, detail="Artifact not found")
         return artifact
@@ -1451,27 +1438,25 @@ async def get_secure_artifact(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/secure/artifacts", response_model=List[SecureArtifactResponse])
-@trace_method(name="database_service.list_artifacts", kind="SERVER")
 async def list_secure_artifacts(
     category: Optional[str] = None,
     ssm: SecureStorageManager = Depends(get_secure_storage_manager)
 ):
     """List secure artifacts (metadata only)."""
     try:
-        return await ssm.list_artifacts(category=category)
+        return ssm.list_artifacts(category=category)
     except Exception as e:
         logger.error(f"Failed to list artifacts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/secure/artifacts/{key}")
-@trace_method(name="database_service.delete_artifact", kind="SERVER")
 async def delete_secure_artifact(
     key: str,
     ssm: SecureStorageManager = Depends(get_secure_storage_manager)
 ):
     """Delete a secure artifact."""
     try:
-        deleted = await ssm.delete_artifact(key)
+        deleted = ssm.delete_artifact(key)
         if not deleted:
             raise HTTPException(status_code=404, detail="Artifact not found")
         return {"success": True, "message": f"Artifact {key} deleted"}
@@ -1482,14 +1467,13 @@ async def delete_secure_artifact(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/secure/rotate-keys")
-@trace_method(name="database_service.rotate_keys", kind="SERVER")
 async def rotate_encryption_keys(
     new_secret_key: str,
     ssm: SecureStorageManager = Depends(get_secure_storage_manager)
 ):
     """Re-encrypt all artifacts with a new key."""
     try:
-        count = await ssm.rotate_keys(new_secret_key)
+        count = ssm.rotate_keys(new_secret_key)
         return {"success": True, "rotated_count": count, "message": "Encryption keys rotated successfully"}
     except Exception as e:
         logger.error(f"Failed to rotate keys: {e}")

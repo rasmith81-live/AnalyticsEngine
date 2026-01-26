@@ -12,7 +12,6 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import {
   AreaChart,

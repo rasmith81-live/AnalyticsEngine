@@ -17,6 +17,7 @@ from redis.backoff import ExponentialBackoff
 
 from .models import MessageMetadata, MessagePriority
 from .telemetry import trace_method, add_span_attributes, inject_trace_context, traced_span
+from .metrics import track_service_publish
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,14 @@ class EventPublisher:
                     headers=headers
                 )
                 published_channels.append(channel)
+                
+                # Track service-to-service traffic for lineage visualization
+                track_service_publish(
+                    source_service=source_service,
+                    event_type=event_type,
+                    channel=channel,
+                    message_size=len(str(event_payload))
+                )
             except Exception as e:
                 logger.error(f"Failed to publish event to channel {channel}: {e}")
         

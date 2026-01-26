@@ -100,14 +100,139 @@ When the client responds, delegate to the **Business Strategist Agent** for Port
 - Complex requests that span multiple domains
 - Independent tasks that can run concurrently
 
-## Response Approach
+## Conversational Interview Flow
 
-1. **Detect Style**: Analyze the interviewee's communication style (executive, technical, analyst)
-2. **Acknowledge** the client's input briefly
-3. **Analyze** what type of work is needed
-4. **Delegate** to appropriate agent(s)
-5. **Synthesize** results into a cohesive response
-6. **Format for Audience**: Present findings matching the interviewee's communication style
+**CRITICAL PRINCIPLE: Keep the conversation productive. Never let the interviewee wait in silence.**
+
+You are conducting a strategic design interview. Your goal is to gather enough information to design a complete analytics solution that measures strategy fulfillment.
+
+### Strategic Design Objectives
+
+A complete design requires understanding these dimensions:
+
+| Dimension | What You Need | How to Measure Completeness |
+|-----------|---------------|----------------------------|
+| **Strategic Goals** | What outcomes define success? | Can articulate 3-5 measurable objectives |
+| **Value Chain** | How does the business create value? | Can map primary activities and support processes |
+| **Key Entities** | What are the core business objects? | Can identify entities and their relationships |
+| **KPIs** | What metrics indicate progress? | Each strategic goal has 2-3 leading/lagging indicators |
+| **Data Sources** | Where does measurement data come from? | Can identify systems and data availability |
+| **Stakeholders** | Who needs what information? | Can map personas to their reporting needs |
+
+### When to Ask Follow-Up Questions
+
+**Ask questions ONLY when you identify a strategic gap** - information missing that prevents you from designing how to measure strategy fulfillment.
+
+**Valid reasons to ask:**
+- Cannot define a measurable objective for a stated goal
+- Missing entity relationships needed for KPI calculations
+- Unclear what "success" looks like for a business process
+- Data source for a critical metric is unknown
+- Stakeholder needs are ambiguous
+
+**Do NOT ask questions when:**
+- You have enough information to proceed with design
+- The interviewee has already answered (don't re-ask)
+- It's a nice-to-have detail, not essential for the design
+- You're just filling silence
+
+### Response Pattern
+
+1. **Acknowledge** what they shared
+2. **Share progress or insight** - what you've designed, what specialists found
+3. **If a strategic gap exists** - ask ONE targeted question to fill it
+4. **If no gap** - summarize current design state or present findings
+
+### Communication Anti-Patterns (AVOID THESE)
+
+**NEVER say these repetitive phrases:**
+- "Let me coordinate with our specialists..."
+- "Let me bring in our experts..."
+- "I'll consult with the team..."
+- "Let me delegate this to..."
+- Any variation announcing that you're about to use tools
+
+**Why:** The interviewee can see agent activity in the UI. They don't need verbal narration of your internal process. It's redundant and wastes their time.
+
+**Instead:** Just do the work silently and respond with results or insights. If processing takes time, the UI shows "Agents are processing..." - you don't need to announce it.
+
+### Design Completeness Criteria
+
+The design is **sufficiently complete** when you can answer YES to all:
+
+1. **Strategic Clarity**: Can you articulate the business's strategic objectives in measurable terms?
+2. **Value Chain Coverage**: Have you mapped the primary value-creating activities?
+3. **Entity Model**: Are core business entities and their relationships defined?
+4. **KPI Alignment**: Does each strategic objective have at least one KPI that indicates progress?
+5. **Data Feasibility**: Do you know where the data for critical KPIs will come from?
+6. **Stakeholder Fit**: Can you describe what each stakeholder persona needs to see?
+
+**Signal completion by:**
+- Summarizing the designed solution
+- Presenting the value chain structure
+- Listing proposed KPIs aligned to objectives
+- Offering to generate artifacts (schemas, dashboards)
+
+### Re-Delegation Strategy
+
+When sub-agents return results AND you've gathered new information:
+
+1. **Evaluate against completeness criteria**: Does the response fill a strategic gap?
+2. **Identify remaining gaps**: What's still missing for a complete design?
+3. **Re-delegate if needed**: Send refined tasks with additional context
+4. **Synthesize**: Combine results into coherent design progress
+
+**Re-delegation triggers:**
+- New constraints that invalidate previous assumptions
+- Scale or complexity differs from initial understanding
+- New stakeholders or processes were identified
+- Specialist response incomplete for the specific context
+
+### Simple vs Complex Requests
+
+**Simple (no delegation needed):**
+- "What questions do you need me to answer?" → List questions based on current gaps
+- "Can you clarify what you meant by X?" → Clarify directly
+- "Yes, that's correct" → Acknowledge and continue design work
+
+**Complex (delegate as needed):**
+- Business model discussion → Delegate to business_strategist
+- Technical requirements → Delegate to architect
+- KPI needs → **Follow KPI Workflow below**
+
+### KPI Delegation Workflow
+
+**For any KPI-related needs, follow this sequence:**
+
+```
+1. SEARCH INVENTORY (delegate_to_librarian_curator, search_type="search_existing")
+   └─ Check if matching KPIs exist in the ontology catalog
+   
+2. IF NOT FOUND → RESEARCH WEB (delegate_to_librarian_curator, search_type="research_web")
+   └─ LibrarianCurator searches for industry-standard KPI definitions
+   └─ Returns candidate definitions with sources
+   
+3. DESIGN NEW KPI (delegate_to_librarian_curator, search_type="design_new")
+   └─ LibrarianCurator collaborates with Data Analyst
+   └─ Data Analyst designs calculation logic and entity mappings
+   └─ LibrarianCurator validates against ontology and adds to catalog
+```
+
+**Or use full_workflow to execute all steps automatically:**
+```
+delegate_to_librarian_curator(
+    task="Find or create KPIs for [requirement]",
+    search_type="full_workflow",
+    industry="[industry]",
+    kpi_requirements={{...}}
+)
+```
+
+**IMPORTANT:** Do NOT delegate KPI design directly to data_analyst. 
+Always go through librarian_curator first to ensure:
+- Reuse of existing definitions (avoid duplication)
+- Industry-standard definitions are considered
+- Proper ontology catalog management
 
 ## Adaptive Communication Style
 
@@ -177,10 +302,23 @@ class StrategyCoordinator(BaseAgent):
     Orchestrates the multi-agent system for business value chain design.
     """
     
+    # Design categories that need to be addressed for a complete solution
+    DESIGN_CATEGORIES = {
+        "business_model": "Business model and strategic positioning",
+        "value_chain": "Value chain structure and processes",
+        "entities": "Core business entities and relationships",
+        "kpis": "Key Performance Indicators and metrics",
+        "data_architecture": "Data architecture and storage design",
+        "integrations": "System integrations and data flows",
+        "governance": "Data governance and quality rules",
+        "analytics_use_cases": "Analytics use cases and dashboards",
+    }
+    
     def __init__(
         self, 
         api_key: Optional[str] = None,
-        sub_agents: Optional[Dict[str, BaseAgent]] = None
+        sub_agents: Optional[Dict[str, BaseAgent]] = None,
+        mcp_manager: Optional[Any] = None
     ):
         """
         Initialize the Strategy Coordinator.
@@ -188,6 +326,7 @@ class StrategyCoordinator(BaseAgent):
         Args:
             api_key: Anthropic API key
             sub_agents: Dictionary of sub-agents to coordinate
+            mcp_manager: Optional MCP client manager for external tools
         """
         config = AgentConfig(
             role=AgentRole.COORDINATOR,
@@ -196,16 +335,20 @@ class StrategyCoordinator(BaseAgent):
             temperature=0.7,
             tools=self._get_coordinator_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
         self.sub_agents = sub_agents or {}
         self._pending_tasks: Dict[str, asyncio.Task] = {}
+        # Design progress tracking
+        self._design_progress: Dict[str, Dict[str, Any]] = {}
+        self._pending_delegations: List[Dict[str, Any]] = []
+        self._addressed_questions: List[Dict[str, Any]] = []
     
     def _get_coordinator_tools(self) -> List[ToolDefinition]:
         """Define tools available to the coordinator."""
         return [
             ToolDefinition(
                 name="delegate_to_architect",
-                description="Delegate a task to the Architect Agent for value chain structure design",
+                description="[PRIMARY TOOL - USE FIRST] Delegate to Architect Agent for value chain/entity design. ALWAYS use delegation tools before responding.",
                 parameters={
                     "type": "object",
                     "properties": {
@@ -223,7 +366,7 @@ class StrategyCoordinator(BaseAgent):
             ),
             ToolDefinition(
                 name="delegate_to_analyst",
-                description="Delegate a task to the Business Analyst Agent for industry expertise and KPI identification",
+                description="[PRIMARY TOOL - USE FIRST] Delegate to Business Analyst for KPIs, industry analysis, requirements. ALWAYS use this for business questions.",
                 parameters={
                     "type": "object",
                     "properties": {
@@ -530,6 +673,33 @@ class StrategyCoordinator(BaseAgent):
                 }
             ),
             ToolDefinition(
+                name="delegate_to_librarian_curator",
+                description="[USE FIRST FOR KPIs] Delegate to the Librarian Curator Agent to search existing KPI inventory, research web for KPI definitions, and coordinate new KPI creation with Data Analyst",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "task": {
+                            "type": "string",
+                            "description": "Description of the KPI search/curation task"
+                        },
+                        "search_type": {
+                            "type": "string",
+                            "enum": ["search_existing", "research_web", "design_new", "full_workflow"],
+                            "description": "Type of KPI curation: search_existing (check inventory), research_web (find definitions online), design_new (create with Data Analyst), full_workflow (all steps)"
+                        },
+                        "kpi_requirements": {
+                            "type": "object",
+                            "description": "Requirements for the KPI (industry, business area, metrics needed)"
+                        },
+                        "industry": {
+                            "type": "string",
+                            "description": "Industry context for KPI search/research"
+                        }
+                    },
+                    "required": ["task"]
+                }
+            ),
+            ToolDefinition(
                 name="synthesize_results",
                 description="Synthesize results from multiple sub-agents into a cohesive output",
                 parameters={
@@ -611,10 +781,10 @@ class StrategyCoordinator(BaseAgent):
                     "required": ["question_type"]
                 }
             ),
-            # Adaptive Communication Style Tools
+            # Adaptive Communication Style Tools (SECONDARY - use AFTER delegation)
             ToolDefinition(
                 name="detect_communication_style",
-                description="Analyze interviewee's utterance to detect their communication style, role, and preferences",
+                description="[SECONDARY TOOL - use only AFTER calling a delegate_to_* tool] Optionally analyze communication style for response formatting",
                 parameters={
                     "type": "object",
                     "properties": {
@@ -758,6 +928,96 @@ class StrategyCoordinator(BaseAgent):
                     },
                     "required": ["task"]
                 }
+            ),
+            # SYNTHESIS TRIGGER - Call this when ready to respond to interviewee
+            ToolDefinition(
+                name="finalize_response",
+                description="[REQUIRED - CALL THIS LAST] Signal that you have gathered enough information and are ready to respond to the interviewee. Call this AFTER delegating to sub-agents but BEFORE producing your final text response. This tells the system you are done gathering information.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "key_insights": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of 3-5 key insights gathered from sub-agents"
+                        },
+                        "agents_consulted": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Names of sub-agents that contributed to this response"
+                        },
+                        "response_type": {
+                            "type": "string",
+                            "enum": ["answer", "clarification_needed", "recommendation", "analysis", "progress_update"],
+                            "description": "Type of response you will provide. Use 'progress_update' when more information is still being gathered."
+                        },
+                        "follow_up_questions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional follow-up questions to ask the interviewee"
+                        },
+                        "design_areas_addressed": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Design areas that have been addressed (e.g., 'business_model', 'kpis', 'entities')"
+                        },
+                        "design_areas_pending": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Design areas still being researched or needing more information"
+                        },
+                        "sufficient_for_response": {
+                            "type": "boolean",
+                            "description": "Whether there is enough information to provide a complete response to the interviewee"
+                        }
+                    },
+                    "required": ["key_insights", "agents_consulted", "response_type"]
+                }
+            ),
+            # Design Progress Tracking
+            ToolDefinition(
+                name="track_design_progress",
+                description="Track the progress of design work across different categories. Call this after receiving sub-agent results to update the design status.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "enum": ["business_model", "value_chain", "entities", "kpis", "data_architecture", "integrations", "governance", "analytics_use_cases"],
+                            "description": "The design category being updated"
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": ["not_started", "in_progress", "partially_complete", "complete"],
+                            "description": "Current status of this design area"
+                        },
+                        "findings": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Key findings or decisions made for this category"
+                        },
+                        "outstanding_questions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Questions that still need to be answered"
+                        },
+                        "contributing_agents": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Agents that contributed to this category"
+                        }
+                    },
+                    "required": ["category", "status"]
+                }
+            ),
+            ToolDefinition(
+                name="get_design_progress_summary",
+                description="Get a summary of design progress across all categories. Use this to understand what has been addressed and what is outstanding before responding to the interviewee.",
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
             )
         ]
     
@@ -779,6 +1039,7 @@ class StrategyCoordinator(BaseAgent):
         self.register_tool("delegate_to_ui_designer", self._delegate_to_ui_designer)
         self.register_tool("delegate_to_business_strategist", self._delegate_to_business_strategist)
         self.register_tool("delegate_to_operations_manager", self._delegate_to_operations_manager)
+        self.register_tool("delegate_to_librarian_curator", self._delegate_to_librarian_curator)
         self.register_tool("synthesize_results", self._synthesize_results)
         self.register_tool("generate_probing_questions", self._generate_probing_questions)
         # Adaptive Communication Style handlers
@@ -791,6 +1052,10 @@ class StrategyCoordinator(BaseAgent):
         self.register_tool("detect_detail_request", self._detect_detail_request)
         self.register_tool("format_at_detail_level", self._format_at_detail_level)
         self.register_tool("delegate_to_process_scenario_modeler", self._delegate_to_process_scenario_modeler)
+        self.register_tool("finalize_response", self._finalize_response)
+        # Design progress tracking handlers
+        self.register_tool("track_design_progress", self._track_design_progress)
+        self.register_tool("get_design_progress_summary", self._get_design_progress_summary)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -834,6 +1099,8 @@ class StrategyCoordinator(BaseAgent):
         additional_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Delegate a task to a sub-agent."""
+        from datetime import datetime
+        
         if agent_key not in self.sub_agents:
             return {
                 "success": False,
@@ -841,6 +1108,15 @@ class StrategyCoordinator(BaseAgent):
             }
         
         agent = self.sub_agents[agent_key]
+        
+        # Track this delegation in context artifacts for activity feed
+        if "delegations" not in context.artifacts:
+            context.artifacts["delegations"] = []
+        context.artifacts["delegations"].append({
+            "agent": agent_key,
+            "task": task[:200],  # Truncate for display
+            "timestamp": datetime.utcnow().isoformat()
+        })
         
         # Build task message with additional context
         task_message = task
@@ -1145,6 +1421,31 @@ class StrategyCoordinator(BaseAgent):
         }
         return await self._delegate_to_agent(
             "process_scenario_modeler",
+            tool_input.get("task", ""),
+            context,
+            additional
+        )
+    
+    async def _delegate_to_librarian_curator(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Delegate to Librarian Curator Agent for KPI search, research, and curation.
+        
+        Workflow:
+        1. search_existing: Check KPI inventory for matching definitions
+        2. research_web: Search web for industry-standard KPI definitions
+        3. design_new: Collaborate with Data Analyst to design new KPI
+        4. full_workflow: Execute all steps in sequence
+        """
+        additional = {
+            "search_type": tool_input.get("search_type", "full_workflow"),
+            "kpi_requirements": tool_input.get("kpi_requirements", {}),
+            "industry": tool_input.get("industry", "")
+        }
+        return await self._delegate_to_agent(
+            "librarian_curator",
             tool_input.get("task", ""),
             context,
             additional
@@ -1788,3 +2089,250 @@ class StrategyCoordinator(BaseAgent):
         """Format at level 4 - full comprehensive detail."""
         # Return full content
         return content
+    
+    async def _finalize_response(
+        self, 
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """
+        Signal that the coordinator has gathered enough information and is ready
+        to synthesize a response for the interviewee.
+        
+        This tool serves as an explicit trigger to stop delegating and start responding.
+        Includes progress tracking to inform interviewee of what's been addressed and what's outstanding.
+        """
+        key_insights = tool_input.get("key_insights", [])
+        agents_consulted = tool_input.get("agents_consulted", [])
+        response_type = tool_input.get("response_type", "answer")
+        follow_up_questions = tool_input.get("follow_up_questions", [])
+        design_areas_addressed = tool_input.get("design_areas_addressed", [])
+        design_areas_pending = tool_input.get("design_areas_pending", [])
+        sufficient_for_response = tool_input.get("sufficient_for_response", True)
+        
+        # Update design progress tracking based on addressed areas
+        for area in design_areas_addressed:
+            if area in self.DESIGN_CATEGORIES:
+                if area not in self._design_progress:
+                    self._design_progress[area] = {"status": "complete", "findings": [], "outstanding": []}
+                self._design_progress[area]["status"] = "complete"
+        
+        for area in design_areas_pending:
+            if area in self.DESIGN_CATEGORIES:
+                if area not in self._design_progress:
+                    self._design_progress[area] = {"status": "in_progress", "findings": [], "outstanding": []}
+                if self._design_progress[area]["status"] != "complete":
+                    self._design_progress[area]["status"] = "in_progress"
+        
+        # Build progress summary for the interviewee
+        progress_summary = self._build_progress_summary_for_interviewee()
+        
+        # Store in context metadata for reference
+        context.metadata["last_synthesis"] = {
+            "key_insights": key_insights,
+            "agents_consulted": agents_consulted,
+            "response_type": response_type,
+            "follow_up_questions": follow_up_questions,
+            "design_areas_addressed": design_areas_addressed,
+            "design_areas_pending": design_areas_pending,
+            "sufficient_for_response": sufficient_for_response,
+            "progress_summary": progress_summary
+        }
+        
+        # Store cumulative progress in context artifacts
+        if "design_progress" not in context.artifacts:
+            context.artifacts["design_progress"] = {}
+        context.artifacts["design_progress"] = self._design_progress.copy()
+        
+        # Store agents_consulted and key_insights in artifacts for activity feed
+        context.artifacts["agents_consulted"] = agents_consulted
+        context.artifacts["key_insights"] = key_insights
+        if sufficient_for_response:
+            context.artifacts["synthesis"] = True
+        
+        logger.info(f"Coordinator finalizing response - consulted: {agents_consulted}, insights: {len(key_insights)}, sufficient: {sufficient_for_response}")
+        
+        # Build appropriate instruction based on sufficiency
+        if sufficient_for_response:
+            instruction = "You have signaled you are ready to respond. Now produce your final text response to the interviewee, incorporating the key insights gathered from sub-agents."
+        else:
+            instruction = f"""You have indicated that more information is still being gathered. 
+Produce a PROGRESS UPDATE for the interviewee that includes:
+1. What design areas have been addressed so far and key findings
+2. What design areas are still being researched
+3. Any outstanding questions that need clarification
+
+Progress Summary:
+{progress_summary}
+
+Frame this as an interim update, letting them know the team is actively working on their request."""
+        
+        return {
+            "success": True,
+            "ready_to_respond": True,
+            "sufficient_for_response": sufficient_for_response,
+            "synthesis_summary": {
+                "key_insights": key_insights,
+                "agents_consulted": agents_consulted,
+                "response_type": response_type,
+                "follow_up_questions": follow_up_questions,
+                "design_areas_addressed": design_areas_addressed,
+                "design_areas_pending": design_areas_pending
+            },
+            "progress_summary": progress_summary,
+            "instruction": instruction
+        }
+    
+    def _build_progress_summary_for_interviewee(self) -> Dict[str, Any]:
+        """Build a human-readable progress summary for the interviewee."""
+        addressed = []
+        in_progress = []
+        not_started = []
+        outstanding_questions = []
+        
+        for category, description in self.DESIGN_CATEGORIES.items():
+            if category in self._design_progress:
+                progress = self._design_progress[category]
+                status = progress.get("status", "not_started")
+                findings = progress.get("findings", [])
+                outstanding = progress.get("outstanding", [])
+                
+                entry = {
+                    "category": category,
+                    "description": description,
+                    "findings": findings
+                }
+                
+                if status == "complete":
+                    addressed.append(entry)
+                elif status in ["in_progress", "partially_complete"]:
+                    entry["outstanding"] = outstanding
+                    in_progress.append(entry)
+                    outstanding_questions.extend(outstanding)
+                else:
+                    not_started.append(entry)
+            else:
+                not_started.append({
+                    "category": category,
+                    "description": description,
+                    "findings": []
+                })
+        
+        return {
+            "addressed": addressed,
+            "in_progress": in_progress,
+            "not_started": not_started,
+            "outstanding_questions": outstanding_questions,
+            "completion_percentage": (len(addressed) / len(self.DESIGN_CATEGORIES)) * 100 if self.DESIGN_CATEGORIES else 0
+        }
+    
+    async def _track_design_progress(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Track progress on a specific design category."""
+        category = tool_input.get("category", "")
+        status = tool_input.get("status", "not_started")
+        findings = tool_input.get("findings", [])
+        outstanding_questions = tool_input.get("outstanding_questions", [])
+        contributing_agents = tool_input.get("contributing_agents", [])
+        
+        if category not in self.DESIGN_CATEGORIES:
+            return {
+                "success": False,
+                "error": f"Invalid category '{category}'. Valid categories: {list(self.DESIGN_CATEGORIES.keys())}"
+            }
+        
+        # Initialize or update progress for this category
+        if category not in self._design_progress:
+            self._design_progress[category] = {
+                "status": status,
+                "findings": [],
+                "outstanding": [],
+                "contributing_agents": []
+            }
+        
+        # Ensure all required keys exist (for backward compatibility)
+        if "contributing_agents" not in self._design_progress[category]:
+            self._design_progress[category]["contributing_agents"] = []
+        if "findings" not in self._design_progress[category]:
+            self._design_progress[category]["findings"] = []
+        if "outstanding" not in self._design_progress[category]:
+            self._design_progress[category]["outstanding"] = []
+        
+        # Update the progress
+        self._design_progress[category]["status"] = status
+        self._design_progress[category]["findings"].extend(findings)
+        self._design_progress[category]["outstanding"] = outstanding_questions
+        self._design_progress[category]["contributing_agents"].extend(contributing_agents)
+        
+        # Remove duplicates
+        self._design_progress[category]["findings"] = list(set(self._design_progress[category]["findings"]))
+        self._design_progress[category]["contributing_agents"] = list(set(self._design_progress[category]["contributing_agents"]))
+        
+        logger.info(f"Design progress updated: {category} -> {status}, {len(findings)} findings")
+        
+        return {
+            "success": True,
+            "category": category,
+            "description": self.DESIGN_CATEGORIES[category],
+            "current_status": status,
+            "total_findings": len(self._design_progress[category]["findings"]),
+            "outstanding_count": len(outstanding_questions)
+        }
+    
+    async def _get_design_progress_summary(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Get a summary of design progress across all categories."""
+        summary = self._build_progress_summary_for_interviewee()
+        
+        # Add formatted text version for easy inclusion in response
+        formatted_lines = []
+        
+        if summary["addressed"]:
+            formatted_lines.append("## ✅ Design Areas Addressed")
+            for item in summary["addressed"]:
+                formatted_lines.append(f"- **{item['description']}**")
+                for finding in item.get("findings", [])[:3]:  # Limit to 3 findings per category
+                    formatted_lines.append(f"  - {finding}")
+        
+        if summary["in_progress"]:
+            formatted_lines.append("\n## 🔄 Currently Being Researched")
+            for item in summary["in_progress"]:
+                formatted_lines.append(f"- **{item['description']}**")
+                for q in item.get("outstanding", [])[:2]:  # Limit to 2 questions
+                    formatted_lines.append(f"  - Outstanding: {q}")
+        
+        if summary["not_started"] and len(summary["not_started"]) < len(self.DESIGN_CATEGORIES):
+            formatted_lines.append("\n## ⏳ Planned for Later")
+            for item in summary["not_started"][:3]:  # Limit to 3
+                formatted_lines.append(f"- {item['description']}")
+        
+        summary["formatted_text"] = "\n".join(formatted_lines)
+        summary["overall_status"] = self._determine_overall_status(summary)
+        
+        return {
+            "success": True,
+            "summary": summary
+        }
+    
+    def _determine_overall_status(self, summary: Dict[str, Any]) -> str:
+        """Determine overall design status based on progress."""
+        addressed_count = len(summary.get("addressed", []))
+        in_progress_count = len(summary.get("in_progress", []))
+        total = len(self.DESIGN_CATEGORIES)
+        
+        if addressed_count == total:
+            return "complete"
+        elif addressed_count >= total * 0.7:
+            return "mostly_complete"
+        elif addressed_count + in_progress_count >= total * 0.5:
+            return "progressing_well"
+        elif in_progress_count > 0 or addressed_count > 0:
+            return "early_stage"
+        else:
+            return "not_started"

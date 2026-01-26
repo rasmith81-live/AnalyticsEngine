@@ -27,13 +27,6 @@ interface KPIImpact {
   direction: 'positive' | 'negative';
 }
 
-interface CascadeEffect {
-  from: string;
-  to: string;
-  impact: number;
-  type: 'direct' | 'indirect';
-}
-
 const quickQuestions = [
   'Price +10%',
   'Capacity +20%',
@@ -49,14 +42,6 @@ const mockImpacts: KPIImpact[] = [
   { kpi: 'Market Share', impact: -2, confidence: 75, direction: 'negative' },
 ];
 
-const mockCascadeEffects: CascadeEffect[] = [
-  { from: 'Price', to: 'Revenue', impact: 8, type: 'direct' },
-  { from: 'Revenue', to: 'Profit', impact: 12, type: 'direct' },
-  { from: 'Price', to: 'Churn', impact: 3, type: 'direct' },
-  { from: 'Churn', to: 'Customer LTV', impact: -5, type: 'indirect' },
-  { from: 'Customer LTV', to: 'Long-term Revenue', impact: -2, type: 'indirect' },
-  { from: 'Price', to: 'Market Share', impact: -2, type: 'direct' },
-];
 
 function ImpactCard({ impact }: { impact: KPIImpact }) {
   const isPositive = (impact.direction === 'positive' && impact.impact > 0) || 

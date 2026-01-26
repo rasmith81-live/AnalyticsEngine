@@ -1,0 +1,92 @@
+{
+  "summary": {
+    "test_run_id": "COMM-TEST-20260124-135820",
+    "total_scenarios": 6,
+    "successful_scenarios": 4,
+    "failed_scenarios": 2,
+    "success_rate": 66.66666666666666,
+    "patterns_detected": {
+      "delegation": 4,
+      "peer_communication": 0,
+      "mcp_usage": 4,
+      "external_service": 0,
+      "synthesis": 0
+    },
+    "avg_response_time_ms": 46124.14366666667,
+    "session_id": "80cf1e16-3365-4614-b333-03068a9c91da"
+  },
+  "results": [
+    {
+      "scenario_name": "KPI_Design_With_Peer_Collaboration",
+      "success": false,
+      "delegation_detected": false,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": false,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 0,
+      "error": "",
+      "response_length": 0
+    },
+    {
+      "scenario_name": "Technical_Architecture_With_MCP",
+      "success": false,
+      "delegation_detected": false,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": false,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 0,
+      "error": "",
+      "response_length": 0
+    },
+    {
+      "scenario_name": "Competitive_Analysis_With_Web_Search",
+      "success": true,
+      "delegation_detected": true,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": true,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 276262.677,
+      "error": null,
+      "response_length": 406
+    },
+    {
+      "scenario_name": "ML_Model_Registration_External_Service",
+      "success": true,
+      "delegation_detected": true,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": true,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 184.75900000000001,
+      "error": null,
+      "response_length": 406
+    },
+    {
+      "scenario_name": "Multi_Agent_Collaboration",
+      "success": true,
+      "delegation_detected": true,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": true,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 144.734,
+      "error": null,
+      "response_length": 406
+    },
+    {
+      "scenario_name": "Ontology_Curation_With_Librarian",
+      "success": true,
+      "delegation_detected": true,
+      "peer_communication_detected": false,
+      "mcp_usage_detected": true,
+      "external_service_detected": false,
+      "synthesis_detected": false,
+      "duration_ms": 152.692,
+      "error": null,
+      "response_length": 406
+    }
+  ]
+}
