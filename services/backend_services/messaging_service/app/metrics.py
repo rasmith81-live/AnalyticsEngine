@@ -76,6 +76,41 @@ class MessagingServiceMetrics:
             'Total messages consumed',
             ['channel', 'consumer']
         )
+        
+        # Service-to-service traffic metrics (for lineage tracking)
+        self.service_messages_published = Counter(
+            'service_messages_published_total',
+            'Messages published by source service',
+            ['source_service', 'event_type', 'channel']
+        )
+        self.service_messages_consumed = Counter(
+            'service_messages_consumed_total',
+            'Messages consumed by target service',
+            ['source_service', 'target_service', 'event_type', 'channel']
+        )
+        self.service_traffic_bytes = Counter(
+            'service_traffic_bytes_total',
+            'Total bytes transferred between services',
+            ['source_service', 'target_service']
+        )
+        self.service_message_latency = Histogram(
+            'service_message_latency_seconds',
+            'Message delivery latency between services',
+            ['source_service', 'target_service'],
+            buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]
+        )
+        
+        # HTTP traffic metrics (for UI and API gateway traffic)
+        self.http_traffic_total = Counter(
+            'http_traffic_total',
+            'HTTP requests between services',
+            ['source', 'target', 'method', 'endpoint']
+        )
+        self.http_traffic_bytes = Counter(
+            'http_traffic_bytes_total',
+            'HTTP traffic bytes between services',
+            ['source', 'target', 'direction']
+        )
         self.message_size_bytes = Histogram(
             'message_size_bytes', 
             'Message size in bytes',
@@ -305,6 +340,128 @@ def track_message_publish(func: F) -> F:
         return await func(*args, **kwargs)
     
     return cast(F, wrapper)
+
+
+def track_service_publish(source_service: str, event_type: str, channel: str, message_size: int = 0):
+    """Track a message published by a specific service."""
+    try:
+        metrics.service_messages_published.labels(
+            source_service=source_service,
+            event_type=event_type,
+            channel=channel
+        ).inc()
+        logger.debug(f"Tracked publish: {source_service} -> {channel} ({event_type})")
+    except Exception as e:
+        logger.debug(f"Error tracking service publish: {e}")
+
+
+def track_service_consume(source_service: str, target_service: str, event_type: str, channel: str, message_size: int = 0, latency_seconds: float = 0):
+    """Track a message consumed by a specific service from another service."""
+    try:
+        metrics.service_messages_consumed.labels(
+            source_service=source_service,
+            target_service=target_service,
+            event_type=event_type,
+            channel=channel
+        ).inc()
+        
+        if message_size > 0:
+            metrics.service_traffic_bytes.labels(
+                source_service=source_service,
+                target_service=target_service
+            ).inc(message_size)
+        
+        if latency_seconds > 0:
+            metrics.service_message_latency.labels(
+                source_service=source_service,
+                target_service=target_service
+            ).observe(latency_seconds)
+        
+        logger.debug(f"Tracked consume: {source_service} -> {target_service} ({event_type})")
+    except Exception as e:
+        logger.debug(f"Error tracking service consume: {e}")
+
+
+def track_http_traffic(source: str, target: str, method: str, endpoint: str, request_bytes: int = 0, response_bytes: int = 0):
+    """Track HTTP traffic between services."""
+    try:
+        metrics.http_traffic_total.labels(
+            source=source,
+            target=target,
+            method=method,
+            endpoint=endpoint
+        ).inc()
+        
+        if request_bytes > 0:
+            metrics.http_traffic_bytes.labels(
+                source=source,
+                target=target,
+                direction='request'
+            ).inc(request_bytes)
+        
+        if response_bytes > 0:
+            metrics.http_traffic_bytes.labels(
+                source=source,
+                target=target,
+                direction='response'
+            ).inc(response_bytes)
+        
+        logger.debug(f"Tracked HTTP: {source} -> {target} {method} {endpoint}")
+    except Exception as e:
+        logger.debug(f"Error tracking HTTP traffic: {e}")
+
+
+def get_service_traffic_summary() -> Dict[str, Any]:
+    """Get a summary of service-to-service traffic for visualization."""
+    try:
+        from prometheus_client import REGISTRY
+        
+        traffic_data = {
+            "links": [],
+            "nodes": set()
+        }
+        
+        # Collect service message traffic
+        for metric in REGISTRY.collect():
+            if metric.name == 'service_messages_consumed_total':
+                for sample in metric.samples:
+                    if sample.name == 'service_messages_consumed_total':
+                        source = sample.labels.get('source_service', 'unknown')
+                        target = sample.labels.get('target_service', 'unknown')
+                        value = sample.value
+                        
+                        if value > 0:
+                            traffic_data["nodes"].add(source)
+                            traffic_data["nodes"].add(target)
+                            traffic_data["links"].append({
+                                "source": source,
+                                "target": target,
+                                "value": int(value),
+                                "type": "message"
+                            })
+            
+            elif metric.name == 'http_traffic_total':
+                for sample in metric.samples:
+                    if sample.name == 'http_traffic_total':
+                        source = sample.labels.get('source', 'unknown')
+                        target = sample.labels.get('target', 'unknown')
+                        value = sample.value
+                        
+                        if value > 0:
+                            traffic_data["nodes"].add(source)
+                            traffic_data["nodes"].add(target)
+                            traffic_data["links"].append({
+                                "source": source,
+                                "target": target,
+                                "value": int(value),
+                                "type": "http"
+                            })
+        
+        traffic_data["nodes"] = list(traffic_data["nodes"])
+        return traffic_data
+    except Exception as e:
+        logger.error(f"Error getting service traffic summary: {e}")
+        return {"links": [], "nodes": []}
 
 
 def update_system_metrics():

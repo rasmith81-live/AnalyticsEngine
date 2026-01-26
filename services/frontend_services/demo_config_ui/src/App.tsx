@@ -31,6 +31,7 @@ import OntologyManagerPage from './pages/OntologyManagerPage';
 import SimulationPage from './pages/SimulationPage';
 import MLDashboardPage from './pages/MLDashboardPage';
 import SystemMonitorPage from './pages/SystemMonitorPage';
+import ServiceTrafficPage from './pages/ServiceTrafficPage';
 import ConversationServicePage from './pages/ConversationServicePage';
 import AnalyticsDemoPage from './pages/AnalyticsDemoPage';
 import MappingPage from './pages/MappingPage';
@@ -94,6 +95,7 @@ function App() {
                   <Route path="/deployment/governance" element={<GovernancePage />} />
                   <Route path="/deployment/admin" element={<AdminPage />} />
                   <Route path="/deployment/monitor" element={<SystemMonitorPage />} />
+                  <Route path="/deployment/traffic" element={<ServiceTrafficPage />} />
                   <Route path="/deployment/sql" element={<SQLPage />} />
                   
                   {/* Proposal Center */}

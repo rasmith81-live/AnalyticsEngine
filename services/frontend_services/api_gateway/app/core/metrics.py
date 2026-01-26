@@ -385,3 +385,43 @@ async def decrement_active_requests(method: str, endpoint: str):
         -1.0,
         {"method": method, "endpoint": endpoint, "action": "decrement"}
     )
+
+
+async def record_http_traffic(source: str, target: str, method: str, endpoint: str, request_bytes: int = 0, response_bytes: int = 0):
+    """
+    Record HTTP traffic between services for SCADA visualization.
+    
+    Args:
+        source: Source service (e.g., 'demo_config_ui')
+        target: Target service (e.g., 'api_gateway')
+        method: HTTP method
+        endpoint: Endpoint path
+        request_bytes: Request size in bytes
+        response_bytes: Response size in bytes
+    """
+    try:
+        client = await get_messaging_client()
+        
+        # Record traffic count
+        await client.record_metric(
+            "http_traffic_total",
+            1.0,
+            {"source": source, "target": target, "method": method, "endpoint": endpoint}
+        )
+        
+        # Record traffic bytes
+        if request_bytes > 0:
+            await client.record_metric(
+                "http_traffic_bytes_total",
+                float(request_bytes),
+                {"source": source, "target": target, "direction": "request"}
+            )
+        
+        if response_bytes > 0:
+            await client.record_metric(
+                "http_traffic_bytes_total",
+                float(response_bytes),
+                {"source": source, "target": target, "direction": "response"}
+            )
+    except Exception as e:
+        logger.debug(f"Failed to record HTTP traffic: {str(e)}")

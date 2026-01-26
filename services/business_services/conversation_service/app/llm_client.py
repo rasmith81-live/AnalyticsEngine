@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional
 import anthropic
 from .config import settings
 from .models import BusinessIntent, CompanyValueChainModel, ValueChainNode, ValueChainLink
+from .secrets_manager import get_anthropic_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,27 @@ class LLMClient:
     and should be preferred for complex design tasks.
     """
     
-    def __init__(self):
+    def __init__(self, api_key: Optional[str] = None):
         self.provider = settings.LLM_PROVIDER
+        self._api_key = api_key
+        self.client = None
+        self.model = None
+        self._initialized = False
+    
+    async def _ensure_initialized(self):
+        """Lazy initialization - fetch API key from secure storage if needed."""
+        if self._initialized:
+            return
         
-        # Use Anthropic Claude as primary
-        if settings.ANTHROPIC_API_KEY:
-            self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # Get API key from secure storage or use provided key
+        api_key = self._api_key or await get_anthropic_api_key()
+        
+        # Also check settings as fallback
+        if not api_key:
+            api_key = settings.ANTHROPIC_API_KEY
+        
+        if api_key:
+            self.client = anthropic.Anthropic(api_key=api_key)
             self.model = settings.ANTHROPIC_SUBAGENT_MODEL or "claude-sonnet-4-20250514"
             self.provider = "anthropic"
             logger.info(f"LLMClient initialized with Anthropic Claude: {self.model}")
@@ -54,11 +70,15 @@ class LLMClient:
             else:
                 self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
             logger.info(f"LLMClient initialized with OpenAI: {self.model}")
+        
+        self._initialized = True
 
     async def generate_value_chain(self, context: List[Dict[str, str]]) -> CompanyValueChainModel:
         """
         Generate a Company Value Chain Model from the conversation history.
         """
+        await self._ensure_initialized()
+        
         system_prompt = """
         You are an expert Enterprise Architect.
         Analyze the conversation history to construct a Company Value Chain Model.
@@ -111,7 +131,8 @@ class LLMClient:
             else:
                 # Legacy OpenAI API
                 messages = [{"role": "system", "content": system_prompt}]
-                messages.extend(context)
+                # Filter out empty content messages
+                messages.extend([m for m in context if m.get('content', '').strip()])
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
@@ -206,6 +227,8 @@ class LLMClient:
             for msg in recent_context
         ])
 
+        await self._ensure_initialized()
+        
         try:
             if self.provider == "anthropic":
                 # Use Anthropic Claude API
@@ -219,7 +242,8 @@ class LLMClient:
             else:
                 # Legacy OpenAI API
                 messages = [{"role": "system", "content": system_prompt}]
-                messages.extend(recent_context)
+                # Filter out empty content messages
+                messages.extend([m for m in recent_context if m.get('content', '').strip()])
                 messages.append({"role": "user", "content": text})
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -269,6 +293,8 @@ class LLMClient:
         if intents:
             intent_summary = f"\n\nIdentified Intents: " + ", ".join([f"{i.name} ({i.confidence})" for i in intents])
 
+        await self._ensure_initialized()
+        
         try:
             if self.provider == "anthropic":
                 # Use Anthropic Claude API
@@ -282,7 +308,8 @@ class LLMClient:
             else:
                 # Legacy OpenAI API
                 messages = [{"role": "system", "content": system_prompt}]
-                messages.extend(recent_context)
+                # Filter out empty content messages
+                messages.extend([m for m in recent_context if m.get('content', '').strip()])
                 if intents:
                     messages.append({"role": "system", "content": f"Identified Intents: {', '.join([f'{i.name} ({i.confidence})' for i in intents])}"})
                 messages.append({"role": "user", "content": text})

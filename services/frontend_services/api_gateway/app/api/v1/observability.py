@@ -1,10 +1,49 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
+import httpx
 
 from ...clients.messaging import MessagingClient
 from ..dependencies import get_messaging_client
 
 router = APIRouter()
+
+OBSERVABILITY_SERVICE_URL = "http://observability_service:8000"
+
+
+@router.get("/health/{service}/history")
+async def get_service_health_history(service: str, limit: int = 50):
+    """Proxy health history requests to observability service."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(
+                f"{OBSERVABILITY_SERVICE_URL}/health/services/{service}/history",
+                params={"limit": limit}
+            )
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stats/realtime")
+async def get_realtime_stats():
+    """Proxy real-time stats requests to observability service."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(f"{OBSERVABILITY_SERVICE_URL}/stats/realtime")
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stats/traffic")
+async def get_service_traffic():
+    """Proxy service traffic data requests to observability service."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(f"{OBSERVABILITY_SERVICE_URL}/stats/traffic")
+            return response.json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/telemetry")
 async def send_telemetry(

@@ -9,24 +9,34 @@ from datetime import datetime
 import hashlib
 
 from sqlalchemy import select, delete, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, sessionmaker
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from app.config import get_settings
 from app.base_models import SecureArtifact
-from app.telemetry import trace_method, add_span_attributes
 
 logger = logging.getLogger(__name__)
 
 class SecureStorageManager:
-    """Manages secure storage of sensitive artifacts using encryption-at-rest."""
+    """
+    Manages secure storage of sensitive artifacts using encryption-at-rest.
+    
+    Uses synchronous database operations to avoid greenlet context issues
+    that occur with async SQLAlchemy instrumentation.
+    """
 
-    def __init__(self, session_factory):
-        self.session_factory = session_factory
+    def __init__(self, sync_engine):
+        """
+        Initialize SecureStorageManager.
+        
+        Args:
+            sync_engine: A synchronous SQLAlchemy Engine for database operations.
+        """
         self.settings = get_settings()
         self._fernet = self._get_fernet_instance()
+        self.session_factory = sessionmaker(bind=sync_engine, expire_on_commit=False)
 
     def _get_fernet_instance(self) -> Fernet:
         """
@@ -52,44 +62,49 @@ class SecureStorageManager:
         """Decrypt a string value."""
         return self._fernet.decrypt(encrypted_value.encode()).decode()
 
-    @trace_method(name="secure_storage.store_artifact")
-    async def store_artifact(self, key: str, value: str, description: Optional[str] = None, category: str = "general") -> SecureArtifact:
-        """Store or update a secure artifact."""
-        async with self.session_factory() as session:
-            async with session.begin():
-                # Check if exists
-                stmt = select(SecureArtifact).where(SecureArtifact.key == key)
-                result = await session.execute(stmt)
-                existing = result.scalar_one_or_none()
-
-                encrypted_val = self._encrypt(value)
-
-                if existing:
-                    existing.encrypted_value = encrypted_val
-                    existing.description = description
-                    existing.category = category
-                    # Updated_at is handled by mixin
-                    artifact = existing
-                    logger.info(f"Updated secure artifact: {key}")
-                else:
-                    artifact = SecureArtifact(
-                        key=key,
-                        encrypted_value=encrypted_val,
-                        description=description,
-                        category=category
-                    )
-                    session.add(artifact)
-                    logger.info(f"Created secure artifact: {key}")
-                
-                await session.commit()
-                return artifact
-
-    @trace_method(name="secure_storage.get_artifact")
-    async def get_artifact(self, key: str) -> Optional[Dict[str, Any]]:
-        """Retrieve and decrypt a secure artifact."""
-        async with self.session_factory() as session:
+    def store_artifact(self, key: str, value: str, description: Optional[str] = None, category: str = "general") -> Dict[str, Any]:
+        """Store or update a secure artifact (synchronous)."""
+        with self.session_factory() as session:
+            # Check if exists
             stmt = select(SecureArtifact).where(SecureArtifact.key == key)
-            result = await session.execute(stmt)
+            result = session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            encrypted_val = self._encrypt(value)
+
+            if existing:
+                existing.encrypted_value = encrypted_val
+                existing.description = description
+                existing.category = category
+                artifact = existing
+                logger.info(f"Updated secure artifact: {key}")
+            else:
+                artifact = SecureArtifact(
+                    key=key,
+                    encrypted_value=encrypted_val,
+                    description=description,
+                    category=category
+                )
+                session.add(artifact)
+                logger.info(f"Created secure artifact: {key}")
+            
+            session.flush()
+            # Extract values before session closes
+            result_dict = {
+                "key": artifact.key,
+                "description": artifact.description,
+                "category": artifact.category,
+                "created_at": artifact.created_at,
+                "updated_at": artifact.updated_at
+            }
+            session.commit()
+            return result_dict
+
+    def get_artifact(self, key: str) -> Optional[Dict[str, Any]]:
+        """Retrieve and decrypt a secure artifact (synchronous)."""
+        with self.session_factory() as session:
+            stmt = select(SecureArtifact).where(SecureArtifact.key == key)
+            result = session.execute(stmt)
             artifact = result.scalar_one_or_none()
 
             if not artifact:
@@ -109,15 +124,14 @@ class SecureStorageManager:
                 logger.error(f"Failed to decrypt artifact {key}: {e}")
                 raise ValueError("Decryption failed")
 
-    @trace_method(name="secure_storage.list_artifacts")
-    async def list_artifacts(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """List artifacts (metadata only, no values)."""
-        async with self.session_factory() as session:
+    def list_artifacts(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List artifacts (metadata only, no values) (synchronous)."""
+        with self.session_factory() as session:
             stmt = select(SecureArtifact)
             if category:
                 stmt = stmt.where(SecureArtifact.category == category)
             
-            result = await session.execute(stmt)
+            result = session.execute(stmt)
             artifacts = result.scalars().all()
 
             return [{
@@ -128,24 +142,20 @@ class SecureStorageManager:
                 "updated_at": a.updated_at
             } for a in artifacts]
 
-    @trace_method(name="secure_storage.delete_artifact")
-    async def delete_artifact(self, key: str) -> bool:
-        """Delete a secure artifact."""
-        async with self.session_factory() as session:
-            async with session.begin():
-                stmt = delete(SecureArtifact).where(SecureArtifact.key == key)
-                result = await session.execute(stmt)
-                await session.commit()
-                return result.rowcount > 0
+    def delete_artifact(self, key: str) -> bool:
+        """Delete a secure artifact (synchronous)."""
+        with self.session_factory() as session:
+            stmt = delete(SecureArtifact).where(SecureArtifact.key == key)
+            result = session.execute(stmt)
+            session.commit()
+            return result.rowcount > 0
 
-    @trace_method(name="secure_storage.rotate_keys")
-    async def rotate_keys(self, new_secret_key: str) -> int:
+    def rotate_keys(self, new_secret_key: str) -> int:
         """
-        Re-encrypt all artifacts with a new key.
+        Re-encrypt all artifacts with a new key (synchronous).
         NOTE: This updates the application setting in memory for the duration of the rotation,
         but persistent config update is out of scope here.
         """
-        # 1. Initialize new fernet
         old_fernet = self._fernet
         
         # Derive new key
@@ -156,25 +166,22 @@ class SecureStorageManager:
         new_fernet = Fernet(key)
 
         rotated_count = 0
-        async with self.session_factory() as session:
-            async with session.begin():
-                # Fetch all artifacts
-                result = await session.execute(select(SecureArtifact))
-                artifacts = result.scalars().all()
+        with self.session_factory() as session:
+            # Fetch all artifacts
+            result = session.execute(select(SecureArtifact))
+            artifacts = result.scalars().all()
 
-                for artifact in artifacts:
-                    try:
-                        # Decrypt with old
-                        decrypted = old_fernet.decrypt(artifact.encrypted_value.encode()).decode()
-                        # Encrypt with new
-                        artifact.encrypted_value = new_fernet.encrypt(decrypted.encode()).decode()
-                        rotated_count += 1
-                    except Exception as e:
-                        logger.error(f"Failed to rotate key for artifact {artifact.key}: {e}")
-                        # Continue or abort? For now, log and continue, but this might leave partial state
-                        # Ideally this should be an all-or-nothing transaction
-                
-                await session.commit()
+            for artifact in artifacts:
+                try:
+                    # Decrypt with old
+                    decrypted = old_fernet.decrypt(artifact.encrypted_value.encode()).decode()
+                    # Encrypt with new
+                    artifact.encrypted_value = new_fernet.encrypt(decrypted.encode()).decode()
+                    rotated_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to rotate key for artifact {artifact.key}: {e}")
+            
+            session.commit()
         
         # Update current instance
         self.settings.secret_key = new_secret_key

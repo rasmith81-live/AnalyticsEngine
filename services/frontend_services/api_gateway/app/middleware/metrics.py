@@ -19,7 +19,8 @@ from app.core.metrics import (
     increment_active_requests,
     decrement_active_requests,
     set_circuit_state,
-    set_rate_limit_remaining
+    set_rate_limit_remaining,
+    record_http_traffic
 )
 
 logger = get_logger(__name__)
@@ -89,6 +90,19 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             if "content-length" in response.headers:
                 response_size = int(response.headers.get("content-length", 0))
             await record_response_size(method, endpoint, response_size)
+            
+            # Track HTTP traffic from UI to API Gateway for SCADA visualization
+            # Determine source based on Origin/Referer header
+            origin = request.headers.get("origin", "") or request.headers.get("referer", "")
+            source = "demo_config_ui" if "localhost:3000" in origin or "demo_config" in origin else "external_client"
+            await record_http_traffic(
+                source=source,
+                target="api_gateway",
+                method=method,
+                endpoint=endpoint,
+                request_bytes=request_size,
+                response_bytes=response_size
+            )
             
             return response
             

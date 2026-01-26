@@ -26,7 +26,8 @@ from .sub_agents import (
     TesterAgent,
     DocumenterAgent,
     DeploymentSpecialistAgent,
-    ProjectManagerAgent
+    ProjectManagerAgent,
+    LibrarianCuratorAgent
 )
 from .business_agents import (
     SalesManagerAgent,
@@ -39,19 +40,13 @@ from .business_agents import (
     OperationsManagerAgent
 )
 
-# Import settings for API key
-import os
+# Import MCP client manager
+from ..mcp.mcp_client_manager import MCPClientManager, MCPConfig
+
+# Import secrets manager for secure API key retrieval
+from ..secrets_manager import get_anthropic_api_key as get_anthropic_api_key_async
 
 logger = logging.getLogger(__name__)
-
-
-def get_anthropic_api_key() -> str:
-    """Get the Anthropic API key from environment or settings."""
-    try:
-        from ..config import settings
-        return settings.ANTHROPIC_API_KEY
-    except ImportError:
-        return os.getenv("ANTHROPIC_API_KEY", "")
 
 
 class OrchestratorConfig(BaseModel):
@@ -62,6 +57,8 @@ class OrchestratorConfig(BaseModel):
     session_timeout_seconds: float = 3600.0  # 1 hour
     enable_streaming: bool = True
     auto_finalize: bool = False
+    enable_mcp: bool = True  # Enable MCP tool integration
+    mcp_config: Optional[MCPConfig] = None  # Custom MCP configuration
 
 
 class DesignSession(BaseModel):
@@ -98,6 +95,7 @@ class AgentOrchestrator:
         self._sessions: Dict[str, DesignSession] = {}
         self._coordinator: Optional[StrategyCoordinator] = None
         self._sub_agents: Dict[str, Any] = {}
+        self._mcp_manager: Optional[MCPClientManager] = None
         self._initialized = False
     
     async def initialize(self) -> None:
@@ -107,31 +105,46 @@ class AgentOrchestrator:
         
         logger.info("Initializing Agent Orchestrator...")
         
-        # Get API key from config or environment
-        api_key = self.config.api_key or get_anthropic_api_key()
+        # Get API key from secure storage (with env fallback)
+        api_key = self.config.api_key or await get_anthropic_api_key_async()
         
-        # Initialize coordinator
-        self._coordinator = StrategyCoordinator(api_key=api_key)
+        if not api_key:
+            logger.warning("ANTHROPIC_API_KEY not found in secure storage or environment")
+        
+        # Initialize MCP client manager if enabled
+        if self.config.enable_mcp:
+            try:
+                mcp_config = self.config.mcp_config or MCPConfig.from_env()
+                self._mcp_manager = MCPClientManager(mcp_config)
+                await self._mcp_manager.initialize()
+                logger.info(f"MCP Client Manager initialized with {len(self._mcp_manager.list_all_tools())} tools")
+            except Exception as e:
+                logger.warning(f"Failed to initialize MCP Client Manager: {e}. Agents will run without MCP tools.")
+                self._mcp_manager = None
+        
+        # Initialize coordinator (with MCP manager)
+        self._coordinator = StrategyCoordinator(api_key=api_key, mcp_manager=self._mcp_manager)
         await self._coordinator.initialize()
         
-        # Initialize sub-agents
+        # Initialize sub-agents (with MCP manager)
         self._sub_agents = {
-            "architect": ArchitectAgent(api_key=api_key),
-            "business_analyst": BusinessAnalystAgent(api_key=api_key),
-            "data_analyst": DataAnalystAgent(api_key=api_key),
-            "developer": DeveloperAgent(api_key=api_key),
-            "tester": TesterAgent(api_key=api_key),
-            "documenter": DocumenterAgent(api_key=api_key),
-            "deployment_specialist": DeploymentSpecialistAgent(api_key=api_key),
-            "project_manager": ProjectManagerAgent(api_key=api_key),
-            "sales_manager": SalesManagerAgent(api_key=api_key),
-            "accountant": AccountantAgent(api_key=api_key),
-            "data_governance_specialist": DataGovernanceSpecialistAgent(api_key=api_key),
-            "data_scientist": DataScientistAgent(api_key=api_key),
-            "marketing_manager": MarketingManagerAgent(api_key=api_key),
-            "ui_designer": UIDesignerAgent(api_key=api_key),
-            "business_strategist": BusinessStrategistAgent(api_key=api_key),
-            "operations_manager": OperationsManagerAgent(api_key=api_key)
+            "architect": ArchitectAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "business_analyst": BusinessAnalystAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "data_analyst": DataAnalystAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "developer": DeveloperAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "tester": TesterAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "documenter": DocumenterAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "deployment_specialist": DeploymentSpecialistAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "project_manager": ProjectManagerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "sales_manager": SalesManagerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "accountant": AccountantAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "data_governance_specialist": DataGovernanceSpecialistAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "data_scientist": DataScientistAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "marketing_manager": MarketingManagerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "ui_designer": UIDesignerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "business_strategist": BusinessStrategistAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "operations_manager": OperationsManagerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "librarian_curator": LibrarianCuratorAgent(api_key=api_key, mcp_manager=self._mcp_manager)
         }
         
         # Initialize each sub-agent
@@ -140,8 +153,98 @@ class AgentOrchestrator:
             self._coordinator.set_sub_agent(name, agent)
             logger.info(f"Initialized sub-agent: {name}")
         
+        # Wire up peer-to-peer connections between sub-agents
+        self._setup_peer_connections()
+        
+        # Configure messaging client for agents that need external service access
+        self._setup_external_service_messaging()
+        
         self._initialized = True
         logger.info("Agent Orchestrator initialized successfully")
+    
+    def _setup_peer_connections(self) -> None:
+        """
+        Set up peer-to-peer connections between sub-agents.
+        
+        This allows agents to consult each other directly without going
+        through the coordinator, enabling more natural collaboration.
+        """
+        # Define peer connection groups - agents that should be able to talk to each other
+        peer_groups = {
+            # Strategic/Business group
+            "business_strategist": ["business_analyst", "competitive_analyst", "operations_manager", "architect"],
+            "business_analyst": ["business_strategist", "data_analyst", "architect", "operations_manager"],
+            "operations_manager": ["business_strategist", "business_analyst", "data_analyst", "project_manager"],
+            
+            # Technical/Architecture group
+            "architect": ["developer", "data_analyst", "deployment_specialist", "business_analyst"],
+            "developer": ["architect", "tester", "deployment_specialist", "data_scientist"],
+            "data_analyst": ["architect", "data_scientist", "business_analyst", "developer"],
+            "data_scientist": ["data_analyst", "developer", "architect", "business_strategist"],
+            
+            # Operations/Support group
+            "deployment_specialist": ["developer", "architect", "tester", "project_manager"],
+            "tester": ["developer", "architect", "documenter", "deployment_specialist"],
+            "documenter": ["architect", "developer", "tester", "project_manager"],
+            "project_manager": ["operations_manager", "developer", "tester", "deployment_specialist"],
+            
+            # Domain specialists
+            "ui_designer": ["developer", "architect", "business_analyst", "marketing_manager"],
+            "sales_manager": ["marketing_manager", "accountant", "business_analyst", "operations_manager"],
+            "marketing_manager": ["sales_manager", "data_analyst", "ui_designer", "business_strategist"],
+            "accountant": ["sales_manager", "operations_manager", "data_analyst", "business_analyst"],
+            "data_governance_specialist": ["architect", "data_analyst", "developer", "documenter"],
+            "librarian_curator": ["architect", "business_analyst", "data_governance_specialist", "documenter"]
+        }
+        
+        # Set up peer connections for each agent
+        for agent_name, peer_names in peer_groups.items():
+            if agent_name in self._sub_agents:
+                agent = self._sub_agents[agent_name]
+                peers = {}
+                for peer_name in peer_names:
+                    if peer_name in self._sub_agents:
+                        peers[peer_name] = self._sub_agents[peer_name]
+                
+                if peers:
+                    agent.set_peers(peers)
+                    # Register peer communication tools
+                    agent._register_peer_tools()
+                    logger.debug(f"Agent {agent_name} connected to peers: {list(peers.keys())}")
+    
+    def _setup_external_service_messaging(self) -> None:
+        """
+        Configure messaging client for agents that need to call external services.
+        
+        Agents like data_scientist need to call the ML service, 
+        architect may need to call the metadata service, etc.
+        """
+        # Get the messaging client from the main app context
+        # This will be injected via set_messaging_client method
+        from ..main import get_messaging_client
+        
+        try:
+            messaging_client = get_messaging_client()
+            if not messaging_client:
+                logger.warning("Messaging client not available. External service calls will fail.")
+                return
+            
+            # Agents that need external service access
+            external_service_agents = [
+                "data_scientist",      # Needs ML service
+                "architect",           # Needs metadata service
+                "data_analyst",        # Needs database service
+                "data_governance_specialist",  # Needs metadata service
+                "librarian_curator",   # Needs metadata service for ontology management
+            ]
+            
+            for agent_name in external_service_agents:
+                if agent_name in self._sub_agents:
+                    self._sub_agents[agent_name].set_messaging_client(messaging_client)
+                    logger.info(f"Agent {agent_name} configured for external service messaging")
+                    
+        except Exception as e:
+            logger.warning(f"Failed to configure external service messaging: {e}")
     
     async def create_session(
         self, 
@@ -257,7 +360,7 @@ class AgentOrchestrator:
         self, 
         session_id: str, 
         message: str
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[Any]:
         """
         Process a message with streaming response.
         
@@ -266,14 +369,20 @@ class AgentOrchestrator:
             message: User message
             
         Yields:
-            Response text chunks
+            StreamEvent objects (text chunks and activity events)
         """
+        from .base_agent import StreamEvent, StreamEventType
+        
         if not self._initialized:
             await self.initialize()
         
         session = self._sessions.get(session_id)
         if not session:
-            yield f"Error: Session {session_id} not found"
+            yield StreamEvent(
+                event_type=StreamEventType.TEXT,
+                content=f"Error: Session {session_id} not found",
+                source="orchestrator"
+            )
             return
         
         # Update session
@@ -291,22 +400,30 @@ class AgentOrchestrator:
         # Stream from coordinator
         full_response = []
         try:
-            async for chunk in self._coordinator.stream_process(message, session.context):
-                full_response.append(chunk)
-                yield chunk
+            async for event in self._coordinator.stream_process(message, session.context):
+                # Pass through all events
+                yield event
+                # Collect text for history
+                if event.event_type == StreamEventType.TEXT and event.content:
+                    full_response.append(event.content)
             
             # Add complete response to history
             complete_response = "".join(full_response)
-            session.context.conversation_history.append(
-                AgentMessage(
-                    role=MessageRole.ASSISTANT,
-                    content=complete_response
+            if complete_response:
+                session.context.conversation_history.append(
+                    AgentMessage(
+                        role=MessageRole.ASSISTANT,
+                        content=complete_response
+                    )
                 )
-            )
             
         except Exception as e:
             logger.error(f"Error streaming message in session {session_id}: {e}")
-            yield f"\n\nError: {str(e)}"
+            yield StreamEvent(
+                event_type=StreamEventType.TEXT,
+                content=f"\n\nError: {str(e)}",
+                source="orchestrator"
+            )
     
     async def run_parallel_analysis(
         self, 

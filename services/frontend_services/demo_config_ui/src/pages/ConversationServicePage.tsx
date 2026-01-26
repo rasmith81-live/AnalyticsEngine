@@ -1,57 +1,54 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mic,
+  Send,
+  RefreshCw,
+  Network,
   Brain,
   GitBranch,
   Link2,
-  RefreshCw,
-  Network,
-  AudioWaveform,
-  Volume2,
-  Square,
-  Circle,
-  Trash2,
-  Send,
-  Save,
-  FolderOpen,
-  Search,
-  X,
   ChevronRight,
+  X,
+  Users,
+  Activity,
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  Zap,
+  Database,
+  MessageSquare,
+  Bot,
+  User,
+  Loader2,
+  AlertCircle,
+  Mic,
+  Square,
+  AudioWaveform,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Card, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
-import { 
-  conversationApi, 
-  SaveFullConfigurationRequest,
-  ClientConfigurationResponse
-} from '../api/conversationApi';
+import {
+  agentsApi,
+  AgentWebSocket,
+  AgentActivity,
+  DesignProgress,
+  DESIGN_CATEGORIES,
+  getProgressPercentage,
+  WSMessage,
+  SendMessageResponse,
+} from '../api/agentsApi';
 
-interface BusinessIntent {
-  name: string;
-  confidence: number;
-  parameters: Record<string, any>;
-  description?: string;
-  domain?: string;
-  target_entities?: string[];
-  requested_metrics?: string[];
-}
+// =============================================================================
+// Types
+// =============================================================================
 
-interface TranscriptSegment {
+interface ChatMessage {
   id: string;
-  text: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
   timestamp: Date;
-  isFinal: boolean;
-  intents?: BusinessIntent[];
-}
-
-interface SessionInfo {
-  id: string;
-  user_id: string;
-  start_time: string;
-  last_activity: string;
-  status: string;
-  intents_identified: BusinessIntent[];
+  agentRole?: string;
+  isStreaming?: boolean;
 }
 
 interface ValueChainNode {
@@ -68,14 +65,6 @@ interface ValueChainLink {
   type: string;
 }
 
-interface ValueChainModel {
-  id: string;
-  name: string;
-  nodes: ValueChainNode[];
-  links: ValueChainLink[];
-  created_at: string;
-}
-
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -83,7 +72,9 @@ declare global {
   }
 }
 
-const API_BASE = 'http://127.0.0.1:8090/api/v1/conversation';
+// =============================================================================
+// Components
+// =============================================================================
 
 function TabButton({ active, onClick, children, badge }: { 
   active: boolean; 
@@ -111,73 +102,184 @@ function TabButton({ active, onClick, children, badge }: {
   );
 }
 
+function ProgressBar({ progress }: { progress: DesignProgress }) {
+  const percentage = getProgressPercentage(progress);
+  
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium theme-text-title">Design Progress</span>
+        <span className="text-sm theme-text-muted">{percentage}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-alpha-500 to-green-500 transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-1 mt-2">
+        {Object.entries(DESIGN_CATEGORIES).map(([key, cat]) => {
+          const categoryProgress = progress[key as keyof DesignProgress];
+          const status = categoryProgress?.status || 'not_started';
+          return (
+            <span 
+              key={key}
+              className={cn(
+                "px-2 py-0.5 rounded-full text-xs",
+                status === 'complete' && "bg-green-500/20 text-green-400",
+                status === 'partially_complete' && "bg-amber-500/20 text-amber-400",
+                status === 'in_progress' && "bg-blue-500/20 text-blue-400",
+                status === 'not_started' && "bg-gray-500/20 text-gray-400"
+              )}
+              title={cat.description}
+            >
+              {cat.icon} {cat.name}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AgentActivityItem({ activity }: { activity: AgentActivity }) {
+  const getIcon = () => {
+    switch (activity.type) {
+      case 'delegation': return <ArrowRight className="w-4 h-4 text-blue-400" />;
+      case 'peer_consultation': return <Users className="w-4 h-4 text-purple-400" />;
+      case 'mcp_tool': return <Database className="w-4 h-4 text-green-400" />;
+      case 'external_service': return <Zap className="w-4 h-4 text-amber-400" />;
+      case 'synthesis': return <Brain className="w-4 h-4 text-pink-400" />;
+      case 'tool_call': return <Activity className="w-4 h-4 text-cyan-400" />;
+      case 'ready_signal': return <CheckCircle2 className="w-4 h-4 text-green-400" />;
+      default: return <Circle className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
+  const getLabel = () => {
+    switch (activity.type) {
+      case 'delegation': return `${activity.source} → ${activity.target}`;
+      case 'peer_consultation': return `${activity.source} ⟷ ${activity.target}`;
+      case 'mcp_tool': return `${activity.source} → MCP: ${activity.tool}`;
+      case 'external_service': return `${activity.source} → Service: ${activity.target}`;
+      case 'synthesis': return `${activity.source} synthesizing...`;
+      case 'tool_call': return `${activity.source}: ${activity.tool}`;
+      case 'ready_signal': return `${activity.source} ready`;
+      default: return activity.details || 'Unknown activity';
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg theme-card-bg-hover">
+      {getIcon()}
+      <span className="text-xs theme-text flex-1">{getLabel()}</span>
+      <span className="text-xs theme-text-muted">
+        {activity.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      </span>
+    </div>
+  );
+}
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
 export default function ConversationServicePage() {
+  // Session state
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [textInput, setTextInput] = useState('');
+  const [streamingContent, setStreamingContent] = useState('');
+
+  // Agent activity state
+  const [activities, setActivities] = useState<AgentActivity[]>([]);
+  const [designProgress, setDesignProgress] = useState<DesignProgress>({});
+
+  // Artifacts state
+  const [entities, setEntities] = useState<string[]>([]);
+  const [kpis, setKpis] = useState<string[]>([]);
+  const [valueChainNodes, setValueChainNodes] = useState<ValueChainNode[]>([]);
+  const [valueChainLinks, setValueChainLinks] = useState<ValueChainLink[]>([]);
+
+  // UI state
+  const [activeTab, setActiveTab] = useState(0); // 0=Agents, 1=Intents, 2=Entities, 3=Model
+
+  // Speech recognition state
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [audioLevel, setAudioLevel] = useState(0);
   const [speechSupported, setSpeechSupported] = useState(true);
-  const [textInput, setTextInput] = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [allIntents, setAllIntents] = useState<BusinessIntent[]>([]);
-  const [generatedModel, setGeneratedModel] = useState<ValueChainModel | null>(null);
-  const [isGeneratingModel, setIsGeneratingModel] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
-  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
-  const [searchClientName, setSearchClientName] = useState('');
-  const [searchDateFrom, setSearchDateFrom] = useState('');
-  const [searchDateTo, setSearchDateTo] = useState('');
-  const [searchResults, setSearchResults] = useState<ClientConfigurationResponse[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
+  // Refs
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const activityEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<AgentWebSocket | null>(null);
   const recognitionRef = useRef<any>(null);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
+  const isListeningRef = useRef(false); // Ref to avoid stale closure in onend
 
   const userId = 'demo_user';
 
-  useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
-
-  const scrollToBottom = () => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [transcript, currentTranscript]);
-
+  // Check speech recognition support
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSpeechSupported(false);
-      setError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
     }
   }, []);
 
+  // Auto-scroll chat
+  const scrollToBottom = useCallback(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingContent, scrollToBottom]);
+
+  // Auto-scroll activity feed
+  useEffect(() => {
+    activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activities]);
+
+  // Create session on mount
   const createSession = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/sessions?user_id=${userId}`, {
-        method: 'POST',
-      });
-      if (!response.ok) throw new Error('Failed to create session');
-      const session: SessionInfo = await response.json();
-      setSessionId(session.id);
-      setTranscript([]);
-      setAllIntents([]);
-      setGeneratedModel(null);
+      setIsProcessing(true);
       setError(null);
+      
+      const response = await agentsApi.createSession({
+        user_id: userId,
+      });
+      
+      setSessionId(response.session_id);
+      setMessages([{
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: response.message,
+        timestamp: new Date(),
+        agentRole: 'coordinator'
+      }]);
+      setActivities([]);
+      setDesignProgress({});
+      setEntities([]);
+      setKpis([]);
+      setValueChainNodes([]);
+      setValueChainLinks([]);
+      
     } catch (err) {
-      setError('Failed to create session. Is the Conversation Service running?');
+      console.error('Failed to create session:', err);
+      setError('Failed to create session. Is the Conversation Service running on port 8026?');
+    } finally {
+      setIsProcessing(false);
     }
   }, [userId]);
 
@@ -185,44 +287,99 @@ export default function ConversationServicePage() {
     createSession();
   }, [createSession]);
 
-  const processTranscript = useCallback(async (text: string, segmentId: string) => {
-    const currentSessionId = sessionIdRef.current;
-    if (!text.trim() || !currentSessionId) return;
+  // WebSocket connection
+  useEffect(() => {
+    if (!sessionId) return;
 
-    setIsProcessing(true);
-    try {
-      const response = await fetch(`${API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: currentSessionId,
-          user_id: userId,
-          message: text,
-          skip_response: true,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to process transcript');
-
-      const data = await response.json();
-
-      if (data.intents && data.intents.length > 0) {
-        setTranscript(prev => prev.map(seg => 
-          seg.id === segmentId ? { ...seg, intents: data.intents } : seg
-        ));
-        setAllIntents(prev => [...prev, ...data.intents]);
+    const ws = new AgentWebSocket(sessionId, {
+      onMessage: (message: WSMessage) => {
+        if (message.type === 'chunk') {
+          setStreamingContent(prev => prev + (message.content || ''));
+        } else if (message.type === 'complete') {
+          // Finalize streaming message
+          if (streamingContent || message.content) {
+            setMessages(prev => [...prev, {
+              id: `msg_${Date.now()}`,
+              role: 'assistant',
+              content: message.content || streamingContent,
+              timestamp: new Date(),
+              agentRole: 'coordinator'
+            }]);
+            setStreamingContent('');
+          }
+          setIsProcessing(false);
+        } else if (message.type === 'processing') {
+          setIsProcessing(true);
+        } else if (message.type === 'analysis_complete' || message.type === 'finalized') {
+          setIsProcessing(false);
+          fetchArtifacts();
+        }
+      },
+      onActivity: (activity: AgentActivity) => {
+        setActivities(prev => {
+          // Check for duplicate user->coordinator activities (aggregate them)
+          const isDuplicate = prev.some(a => 
+            a.type === activity.type && 
+            a.source === activity.source && 
+            a.target === activity.target &&
+            // Within 5 seconds is considered duplicate
+            Math.abs(new Date(a.timestamp).getTime() - new Date(activity.timestamp).getTime()) < 5000
+          );
+          if (isDuplicate) {
+            return prev; // Don't add duplicate
+          }
+          return [...prev, activity];
+        });
+      },
+      onProgress: (progress: DesignProgress) => {
+        setDesignProgress(progress);
+      },
+      onError: (errorMsg: string) => {
+        // Only show errors that aren't WebSocket connection issues
+        // REST fallback will handle those cases
+        if (!errorMsg.includes('WebSocket') && !errorMsg.includes('Session') ) {
+          setError(errorMsg);
+        }
+        setIsProcessing(false);
+      },
+      onConnect: () => {
+        setIsConnected(true);
+      },
+      onDisconnect: () => {
+        setIsConnected(false);
       }
+    });
 
-      if (data.session_id) {
-        setSessionId(data.session_id);
+    ws.connect();
+    wsRef.current = ws;
+
+    return () => {
+      ws.disconnect();
+      wsRef.current = null;
+    };
+  }, [sessionId]);
+
+  // Fetch artifacts
+  const fetchArtifacts = useCallback(async () => {
+    if (!sessionId) return;
+    
+    try {
+      const artifacts = await agentsApi.getArtifacts(sessionId);
+      setEntities(artifacts.entities || []);
+      setKpis(artifacts.kpis || []);
+      
+      // Extract value chain from artifacts if present
+      if (artifacts.artifacts?.value_chain) {
+        const vc = artifacts.artifacts.value_chain;
+        setValueChainNodes(vc.nodes || []);
+        setValueChainLinks(vc.links || []);
       }
     } catch (err) {
-      console.error('Error processing transcript:', err);
-    } finally {
-      setIsProcessing(false);
+      console.error('Failed to fetch artifacts:', err);
     }
-  }, [userId]);
+  }, [sessionId]);
 
+  // Audio monitoring for visual feedback
   const setupAudioMonitoring = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -257,6 +414,53 @@ export default function ConversationServicePage() {
     setAudioLevel(0);
   }, []);
 
+  // Process speech transcript
+  const processSpeechTranscript = useCallback(async (text: string) => {
+    if (!text.trim() || !sessionId) return;
+
+    const userMessage: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      if (wsRef.current?.isConnected()) {
+        // WebSocket will send activities from backend
+        wsRef.current.sendMessage(text);
+      } else {
+        // REST fallback - add activity locally
+        setActivities(prev => [...prev, {
+          id: `act_${Date.now()}`,
+          type: 'delegation',
+          source: 'user',
+          target: 'coordinator',
+          timestamp: new Date()
+        }]);
+        const response = await agentsApi.sendMessage(sessionId, text);
+        setMessages(prev => [...prev, {
+          id: `msg_${Date.now()}`,
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+          agentRole: response.agent_role
+        }]);
+        await fetchArtifacts();
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      setError('Failed to send message. Please try again.');
+      setIsProcessing(false);
+    }
+  }, [sessionId, fetchArtifacts]);
+
+  // Speech recognition
   const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
@@ -268,6 +472,7 @@ export default function ConversationServicePage() {
 
     recognitionRef.current.onstart = () => {
       setIsListening(true);
+      isListeningRef.current = true;
       setupAudioMonitoring();
     };
 
@@ -287,16 +492,8 @@ export default function ConversationServicePage() {
       setCurrentTranscript(interimTranscript);
 
       if (finalTranscript) {
-        const segmentId = `seg_${Date.now()}`;
-        const newSegment: TranscriptSegment = {
-          id: segmentId,
-          text: finalTranscript,
-          timestamp: new Date(),
-          isFinal: true,
-        };
-        setTranscript(prev => [...prev, newSegment]);
         setCurrentTranscript('');
-        processTranscript(finalTranscript, segmentId);
+        processSpeechTranscript(finalTranscript);
       }
     };
 
@@ -308,16 +505,18 @@ export default function ConversationServicePage() {
     };
 
     recognitionRef.current.onend = () => {
-      if (isListening && recognitionRef.current) {
+      // Use ref to avoid stale closure - isListeningRef stays current
+      if (isListeningRef.current && recognitionRef.current) {
         recognitionRef.current.start();
       }
     };
 
     recognitionRef.current.start();
-  }, [isListening, setupAudioMonitoring, processTranscript]);
+  }, [setupAudioMonitoring, processSpeechTranscript]);
 
   const stopListening = useCallback(() => {
     setIsListening(false);
+    isListeningRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -333,219 +532,140 @@ export default function ConversationServicePage() {
     }
   };
 
-  const clearTranscript = () => {
-    setTranscript([]);
-    setCurrentTranscript('');
-    setAllIntents([]);
+  // Send message via REST (fallback if WS not connected)
+  const sendMessageRest = async (message: string): Promise<SendMessageResponse> => {
+    if (!sessionId) throw new Error('No session');
+    return await agentsApi.sendMessage(sessionId, message);
   };
 
-  const submitTextInput = async () => {
-    if (!textInput.trim() || isProcessing) return;
-    
-    const segmentId = `seg_${Date.now()}`;
-    const newSegment: TranscriptSegment = {
-      id: segmentId,
-      text: textInput,
-      timestamp: new Date(),
-      isFinal: true,
+  // Handle send message
+  const handleSendMessage = async () => {
+    if (!textInput.trim() || isProcessing || !sessionId) return;
+
+    const userMessage: ChatMessage = {
+      id: `msg_${Date.now()}`,
+      role: 'user',
+      content: textInput,
+      timestamp: new Date()
     };
-    setTranscript(prev => [...prev, newSegment]);
+    
+    setMessages(prev => [...prev, userMessage]);
     const inputText = textInput;
     setTextInput('');
-    await processTranscript(inputText, segmentId);
-  };
-
-  const handleTextKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submitTextInput();
-    }
-  };
-
-  const generateValueChainModel = async () => {
-    if (!sessionId || transcript.length === 0) return;
-
-    setIsGeneratingModel(true);
+    setIsProcessing(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/sessions/${sessionId}/model`, {
-        method: 'POST',
-      });
+      // Try WebSocket first, fallback to REST
+      if (wsRef.current?.isConnected()) {
+        // WebSocket will send activities from backend
+        wsRef.current.sendMessage(inputText);
+      } else {
+        // REST fallback - add activity locally
+        setActivities(prev => [...prev, {
+          id: `act_${Date.now()}`,
+          type: 'delegation',
+          source: 'user',
+          target: 'coordinator',
+          timestamp: new Date()
+        }]);
+        const response = await sendMessageRest(inputText);
+        
+        setMessages(prev => [...prev, {
+          id: `msg_${Date.now()}`,
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+          agentRole: response.agent_role
+        }]);
 
-      if (!response.ok) throw new Error('Failed to generate model');
-
-      const model: ValueChainModel = await response.json();
-      setGeneratedModel(model);
-      setActiveTab(2);
-    } catch (err) {
-      setError('Failed to generate value chain model. Need more conversation context.');
-    } finally {
-      setIsGeneratingModel(false);
-    }
-  };
-
-  const saveConfiguration = async () => {
-    if (!sessionId || (transcript.length === 0 && allIntents.length === 0)) {
-      setError('Nothing to save. Start a conversation first.');
-      return;
-    }
-
-    setIsSaving(true);
-    setError(null);
-    setSaveSuccess(null);
-
-    try {
-      const fullTranscript = transcript.map(seg => seg.text).join('\n');
-      const uniqueEntities = [...new Set(allIntents.flatMap(i => i.target_entities || []))];
-      const uniqueMetrics = [...new Set(allIntents.flatMap(i => i.requested_metrics || []))];
-
-      const request: SaveFullConfigurationRequest = {
-        configuration: {
-          client_id: userId,
-          client_name: 'Demo Client',
-          name: `Conversation ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-          description: `Configuration extracted from conversation session ${sessionId}`,
-          source_session_id: sessionId,
-        },
-        recordings: [{
-          session_id: sessionId,
-          transcript: fullTranscript,
-          recorded_at: new Date().toISOString(),
-          segments: transcript.map(seg => ({
-            id: seg.id,
-            text: seg.text,
-            timestamp: seg.timestamp.toISOString(),
-            isFinal: seg.isFinal,
-          })),
-        }],
-        intents: allIntents.map(intent => ({
-          name: intent.name,
-          description: intent.description,
-          confidence: intent.confidence,
-          domain: intent.domain || 'general',
-          target_entities: intent.target_entities,
-          requested_metrics: intent.requested_metrics,
-          parameters: intent.parameters,
-        })),
-        entities: [
-          ...uniqueEntities.map(name => ({
-            name,
-            entity_type: 'Entity',
-            description: `Entity extracted from conversation`,
-          })),
-          ...uniqueMetrics.map(name => ({
-            name,
-            entity_type: 'Metric',
-            description: `Metric extracted from conversation`,
-          })),
-        ],
-        value_chain_model: generatedModel ? {
-          name: generatedModel.name,
-          nodes: generatedModel.nodes.map(n => ({
-            id: n.id,
-            name: n.name,
-            type: n.type,
-            description: n.description,
-            properties: n.properties,
-          })),
-          links: generatedModel.links.map(l => ({
-            source_id: l.source_id,
-            target_id: l.target_id,
-            type: l.type,
-          })),
-          generated_from_session: sessionId,
-          generation_method: 'llm',
-        } : undefined,
-      };
-
-      const result = await conversationApi.saveFullConfiguration(request);
-      setSaveSuccess(`Configuration saved successfully! ID: ${result.configuration.uuid}`);
-    } catch (err) {
-      console.error('Error saving configuration:', err);
-      setError('Failed to save configuration. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const searchConfigurations = async () => {
-    setIsSearching(true);
-    setError(null);
-    
-    try {
-      const result = await conversationApi.searchConfigurations(
-        searchClientName || undefined,
-        searchDateFrom || undefined,
-        searchDateTo || undefined
-      );
-      setSearchResults(result.items);
-    } catch (err) {
-      console.error('Error searching configurations:', err);
-      setError('Failed to search configurations.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const loadConfiguration = async (configId: number) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const config = await conversationApi.getConfiguration(configId);
-      
-      if (config.recordings.length > 0) {
-        const recording = config.recordings[0];
-        if (recording.segments) {
-          const loadedTranscript: TranscriptSegment[] = recording.segments.map((seg: any) => ({
-            id: seg.id,
-            text: seg.text,
-            timestamp: new Date(seg.timestamp),
-            isFinal: seg.isFinal,
-          }));
-          setTranscript(loadedTranscript);
+        // Parse artifacts from response for activities
+        if (response.artifacts) {
+          parseArtifactsForActivities(response.artifacts);
         }
+
+        await fetchArtifacts();
+        setIsProcessing(false);
       }
-      
-      if (config.intents.length > 0) {
-        const loadedIntents: BusinessIntent[] = config.intents.map((intent: any) => ({
-          name: intent.name,
-          confidence: intent.confidence,
-          parameters: intent.parameters || {},
-          description: intent.description,
-          domain: intent.domain,
-          target_entities: intent.target_entities,
-          requested_metrics: intent.requested_metrics,
-        }));
-        setAllIntents(loadedIntents);
-      }
-      
-      if (config.value_chain_models.length > 0) {
-        const model = config.value_chain_models[0];
-        setGeneratedModel({
-          id: model.uuid,
-          name: model.name,
-          nodes: model.nodes,
-          links: model.links,
-          created_at: model.created_at,
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      setError('Failed to send message. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  // Parse artifacts to extract agent activities
+  const parseArtifactsForActivities = (artifacts: Record<string, any>) => {
+    const newActivities: AgentActivity[] = [];
+    
+    // Check for delegations
+    if (artifacts.delegations) {
+      for (const delegation of artifacts.delegations) {
+        newActivities.push({
+          id: `act_${Date.now()}_${Math.random()}`,
+          type: 'delegation',
+          source: 'coordinator',
+          target: delegation.agent || delegation.target,
+          details: delegation.task,
+          timestamp: new Date()
         });
       }
-      
-      setLoadDialogOpen(false);
-      setSaveSuccess(`Configuration "${config.configuration.name}" loaded successfully!`);
-    } catch (err) {
-      console.error('Error loading configuration:', err);
-      setError('Failed to load configuration.');
-    } finally {
-      setIsLoading(false);
+    }
+
+    // Check for peer consultations
+    if (artifacts.peer_consultations) {
+      for (const consultation of artifacts.peer_consultations) {
+        newActivities.push({
+          id: `act_${Date.now()}_${Math.random()}`,
+          type: 'peer_consultation',
+          source: consultation.from,
+          target: consultation.to,
+          details: consultation.question,
+          timestamp: new Date()
+        });
+      }
+    }
+
+    // Check for tool calls
+    if (artifacts.tool_calls) {
+      for (const tool of artifacts.tool_calls) {
+        newActivities.push({
+          id: `act_${Date.now()}_${Math.random()}`,
+          type: tool.is_mcp ? 'mcp_tool' : 'tool_call',
+          source: tool.agent,
+          tool: tool.name,
+          details: tool.result,
+          timestamp: new Date()
+        });
+      }
+    }
+
+    // Check for synthesis
+    if (artifacts.synthesis) {
+      newActivities.push({
+        id: `act_${Date.now()}_${Math.random()}`,
+        type: 'synthesis',
+        source: 'coordinator',
+        details: 'Synthesizing agent results',
+        timestamp: new Date()
+      });
+    }
+
+    if (newActivities.length > 0) {
+      setActivities(prev => [...prev, ...newActivities]);
+    }
+
+    // Update design progress from artifacts
+    if (artifacts.design_progress) {
+      setDesignProgress(artifacts.design_progress);
     }
   };
 
-  const getIntentColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'bg-green-500/20 text-green-400 border-green-500/30';
-    if (confidence >= 0.5) return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-    return 'bg-red-500/20 text-red-400 border-red-500/30';
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   const getNodeTypeColor = (type: string): string => {
@@ -558,286 +678,298 @@ export default function ConversationServicePage() {
     return colors[type] || 'bg-gray-500';
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
-
-  const uniqueEntities = [...new Set(allIntents.flatMap(i => i.target_entities || []))];
-  const uniqueMetrics = [...new Set(allIntents.flatMap(i => i.requested_metrics || []))];
-
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold theme-text-title tracking-wide">AI Interview</h1>
-          <p className="theme-text-muted mt-1">Listen to conversations and extract business entities & relationships in real-time</p>
+          <p className="theme-text-muted mt-1">
+            Multi-agent design system for business value chain modeling
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={createSession}>
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <div className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs",
+            isConnected 
+              ? "bg-green-500/20 text-green-400" 
+              : "bg-amber-500/20 text-amber-400"
+          )}>
+            <Circle className={cn("w-2 h-2", isConnected && "animate-pulse")} />
+            {isConnected ? 'Connected' : 'Connecting...'}
+          </div>
+          <Button variant="outline" size="sm" onClick={createSession} disabled={isProcessing}>
+            <RefreshCw className={cn("w-4 h-4 mr-2", isProcessing && "animate-spin")} />
             New Session
-          </Button>
-          <Button 
-            size="sm" 
-            onClick={generateValueChainModel}
-            disabled={transcript.length === 0 || isGeneratingModel}
-          >
-            <Network className="w-4 h-4 mr-2" />
-            {isGeneratingModel ? 'Generating...' : 'Generate Model'}
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={saveConfiguration}
-            disabled={isSaving || (transcript.length === 0 && allIntents.length === 0)}
-          >
-            {isSaving ? (
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            {isSaving ? 'Saving...' : 'Save'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setLoadDialogOpen(true)}>
-            <FolderOpen className="w-4 h-4 mr-2" />
-            Load
           </Button>
         </div>
       </div>
 
       {/* Alerts */}
-      {saveSuccess && (
+      {successMessage && (
         <div className="mb-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 flex items-center justify-between">
-          <span>{saveSuccess}</span>
-          <button onClick={() => setSaveSuccess(null)}><X className="w-4 h-4" /></button>
+          <span>{successMessage}</span>
+          <button onClick={() => setSuccessMessage(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {error && (
         <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-between">
-          <span>{error}</span>
+          <AlertCircle className="w-5 h-5 mr-2" />
+          <span className="flex-1">{error}</span>
           <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* Main Content */}
       <div className="flex gap-4 flex-1 min-h-0">
-        {/* Left Panel - Audio Listener & Transcript */}
-        <Card className="flex-[2] flex flex-col overflow-hidden">
-          {/* Audio Controls */}
-          <div className={cn(
-            "p-4 border-b theme-border",
-            isListening ? "bg-red-500/10" : "theme-card-bg"
-          )}>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleListening}
-                disabled={!speechSupported}
-                className={cn(
-                  "w-16 h-16 rounded-full flex items-center justify-center transition-all",
-                  isListening 
-                    ? "bg-red-500 hover:bg-red-600 animate-pulse" 
-                    : "bg-alpha-500 hover:bg-alpha-600",
-                  "text-white"
-                )}
-              >
-                {isListening ? <Square className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-              </button>
-              
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  {isListening && <Circle className="w-3 h-3 text-red-500 animate-pulse" />}
-                  <span className="text-lg font-semibold theme-text-title">
-                    {isListening ? 'Listening...' : 'Click to Start Listening'}
-                  </span>
-                </div>
-                {isListening && (
-                  <div className="mt-2">
-                    <div className="h-2 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 overflow-hidden">
-                      <div 
-                        className={cn(
-                          "h-full transition-all duration-100",
-                          audioLevel > 0.5 ? "bg-green-500" : "bg-alpha-500"
-                        )}
-                        style={{ width: `${audioLevel * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <AudioWaveform className="w-3 h-3 theme-text-muted" />
-                      <span className="text-xs theme-text-muted">Audio Level</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearTranscript}
-                disabled={transcript.length === 0}
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Clear
-              </Button>
+        {/* Left Panel - Conversation */}
+        <Card className="flex-1 flex flex-col overflow-hidden">
+          <CardHeader className="py-3 border-b theme-border">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-alpha-500" />
+                Conversation
+              </CardTitle>
+              <span className="text-xs theme-text-muted">
+                {sessionId ? `Session: ${sessionId.substring(0, 8)}...` : 'No session'}
+              </span>
             </div>
-          </div>
+          </CardHeader>
 
-          {/* Transcript Display */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {transcript.length === 0 && !currentTranscript ? (
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && !isProcessing ? (
               <div className="text-center py-16">
-                <Volume2 className="w-16 h-16 mx-auto theme-text-muted opacity-30 mb-4" />
-                <h3 className="text-lg font-semibold theme-text-title mb-2">Ready to Listen</h3>
+                <Bot className="w-16 h-16 mx-auto theme-text-muted opacity-30 mb-4" />
+                <h3 className="text-lg font-semibold theme-text-title mb-2">Ready to Design</h3>
                 <p className="theme-text-muted text-sm max-w-md mx-auto">
-                  Click the microphone button to start listening to your conversation.
-                  The system will transcribe speech and extract business intents in real-time.
+                  Start a conversation to design your business value chain model.
+                  Our multi-agent system will analyze and collaborate to create a comprehensive design.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {transcript.map((segment) => (
-                  <div key={segment.id} className="p-3 rounded-xl theme-card-bg border theme-border">
-                    <div className="flex items-start gap-3">
-                      <Volume2 className="w-5 h-5 theme-info-icon mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="theme-text">{segment.text}</p>
-                        <p className="text-xs theme-text-muted mt-1">{formatTime(segment.timestamp)}</p>
-                        {segment.intents && segment.intents.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            {segment.intents.map((intent, idx) => (
-                              <span
-                                key={idx}
-                                className={cn(
-                                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                                  getIntentColor(intent.confidence)
-                                )}
-                                title={intent.description || intent.name}
-                              >
-                                <Brain className="w-3 h-3" />
-                                {intent.name} ({Math.round(intent.confidence * 100)}%)
-                              </span>
-                            ))}
-                          </div>
-                        )}
+              <>
+                {messages.map((msg) => (
+                  <div 
+                    key={msg.id} 
+                    className={cn(
+                      "flex gap-3",
+                      msg.role === 'user' ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    {msg.role !== 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-alpha-500/20 flex items-center justify-center flex-shrink-0">
+                        <Bot className="w-5 h-5 text-alpha-500" />
+                      </div>
+                    )}
+                    <div className={cn(
+                      "max-w-[80%] rounded-xl px-4 py-3",
+                      msg.role === 'user' 
+                        ? "bg-alpha-500 text-white" 
+                        : "theme-card-bg border theme-border"
+                    )}>
+                      {msg.agentRole && msg.role !== 'user' && (
+                        <div className="text-xs theme-text-muted mb-1 capitalize">
+                          {msg.agentRole}
+                        </div>
+                      )}
+                      <div className={cn(
+                        "text-sm whitespace-pre-wrap",
+                        msg.role === 'user' ? "text-white" : "theme-text"
+                      )}>
+                        {msg.content}
+                      </div>
+                      <div className={cn(
+                        "text-xs mt-1",
+                        msg.role === 'user' ? "text-white/70" : "theme-text-muted"
+                      )}>
+                        {msg.timestamp.toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
                       </div>
                     </div>
+                    {msg.role === 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-500/20 flex items-center justify-center flex-shrink-0">
+                        <User className="w-5 h-5 theme-text-muted" />
+                      </div>
+                    )}
                   </div>
                 ))}
                 
-                {currentTranscript && (
-                  <div className="p-3 rounded-xl theme-card-bg border border-dashed theme-border opacity-70">
-                    <div className="flex items-start gap-3">
-                      <Volume2 className="w-5 h-5 theme-text-muted mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="theme-text-muted italic">{currentTranscript}</p>
-                        <p className="text-xs theme-text-muted mt-1">Listening...</p>
+                {/* Streaming message */}
+                {streamingContent && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-8 h-8 rounded-full bg-alpha-500/20 flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-5 h-5 text-alpha-500" />
+                    </div>
+                    <div className="max-w-[80%] rounded-xl px-4 py-3 theme-card-bg border theme-border">
+                      <div className="text-sm whitespace-pre-wrap theme-text">
+                        {streamingContent}
+                        <span className="inline-block w-2 h-4 bg-alpha-500 animate-pulse ml-1" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Processing indicator */}
+                {isProcessing && !streamingContent && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-8 h-8 rounded-full bg-alpha-500/20 flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-5 h-5 text-alpha-500" />
+                    </div>
+                    <div className="rounded-xl px-4 py-3 theme-card-bg border theme-border">
+                      <div className="flex items-center gap-2 text-sm theme-text-muted">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Agents are processing...
                       </div>
                     </div>
                   </div>
                 )}
                 
-                <div ref={transcriptEndRef} />
-              </div>
+                <div ref={chatEndRef} />
+              </>
             )}
           </div>
 
-          {/* Text Input */}
+          {/* Speech Recognition & Input */}
           <div className="p-4 border-t theme-border">
-            <p className="text-xs theme-text-muted mb-2">Or type to simulate conversation input:</p>
+            {/* Current transcript display */}
+            {currentTranscript && (
+              <div className="mb-2 p-2 rounded-lg theme-card-bg border border-dashed theme-border">
+                <div className="flex items-center gap-2">
+                  <AudioWaveform className="w-4 h-4 text-red-400 animate-pulse" />
+                  <span className="text-sm theme-text-muted italic">{currentTranscript}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Audio level indicator */}
+            {isListening && (
+              <div className="mb-2">
+                <div className="h-1.5 rounded-full bg-alpha-faded-200 dark:bg-alpha-faded-800 overflow-hidden">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-100",
+                      audioLevel > 0.5 ? "bg-green-500" : "bg-red-500"
+                    )}
+                    style={{ width: `${audioLevel * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
             <div className="flex gap-2">
+              {/* Microphone button */}
+              <button
+                onClick={toggleListening}
+                disabled={!speechSupported || !sessionId}
+                className={cn(
+                  "w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
+                  isListening 
+                    ? "bg-red-500 hover:bg-red-600 animate-pulse" 
+                    : "bg-alpha-500 hover:bg-alpha-600",
+                  "text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+                title={isListening ? "Stop listening" : "Start speaking"}
+              >
+                {isListening ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+              
               <input
                 type="text"
-                placeholder="Type what you would say in a conversation..."
+                placeholder="Type or speak to describe your business..."
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={handleTextKeyPress}
-                disabled={isProcessing}
-                className="flex-1 px-4 py-2 rounded-xl theme-card-bg border theme-border
+                onKeyPress={handleKeyPress}
+                disabled={isProcessing || !sessionId}
+                className="flex-1 px-4 py-2.5 rounded-xl theme-card-bg border theme-border
                   theme-text placeholder:theme-text-muted text-sm
                   focus:outline-none focus:ring-2 focus:ring-alpha-500"
               />
               <Button
-                onClick={submitTextInput}
-                disabled={!textInput.trim() || isProcessing}
+                onClick={handleSendMessage}
+                disabled={!textInput.trim() || isProcessing || !sessionId}
               >
                 {isProcessing ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
               </Button>
             </div>
           </div>
-
-          {/* Status Bar */}
-          <div className="px-4 py-2 border-t theme-border theme-card-bg">
-            <div className="flex items-center justify-between text-xs theme-text-muted">
-              <span>{sessionId ? `Session: ${sessionId.substring(0, 8)}...` : 'No session'}</span>
-              <div className="flex items-center gap-4">
-                <span>Segments: {transcript.length}</span>
-                <span>Intents: {allIntents.length}</span>
-                {isProcessing && (
-                  <span className="flex items-center gap-1 text-alpha-400">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    Processing...
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
         </Card>
 
-        {/* Right Panel - Extracted Data */}
+        {/* Right Panel - Agent Activity & Artifacts */}
         <Card className="flex-1 flex flex-col overflow-hidden">
+          {/* Design Progress */}
+          <div className="p-4 border-b theme-border">
+            <ProgressBar progress={designProgress} />
+          </div>
+
           {/* Tabs */}
           <div className="flex border-b theme-border">
-            <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} badge={allIntents.length}>
-              Intents
+            <TabButton active={activeTab === 0} onClick={() => setActiveTab(0)} badge={activities.length}>
+              <Brain className="w-4 h-4 mr-1.5 inline" />
+              Agents
             </TabButton>
             <TabButton active={activeTab === 1} onClick={() => setActiveTab(1)}>
-              Entities
+              <Activity className="w-4 h-4 mr-1.5 inline" />
+              KPIs
             </TabButton>
             <TabButton active={activeTab === 2} onClick={() => setActiveTab(2)}>
+              <GitBranch className="w-4 h-4 mr-1.5 inline" />
+              Entities
+            </TabButton>
+            <TabButton active={activeTab === 3} onClick={() => setActiveTab(3)}>
+              <Network className="w-4 h-4 mr-1.5 inline" />
               Model
             </TabButton>
           </div>
 
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4">
-            {/* Intents Tab */}
+            {/* Agents Tab */}
             {activeTab === 0 && (
               <div>
-                {allIntents.length === 0 ? (
+                {activities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Activity className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
+                    <p className="theme-text-muted text-sm">
+                      Agent activity will appear here as they collaborate on your design
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {activities.map((activity) => (
+                      <AgentActivityItem key={activity.id} activity={activity} />
+                    ))}
+                    <div ref={activityEndRef} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* KPIs Tab */}
+            {activeTab === 1 && (
+              <div>
+                {kpis.length === 0 ? (
                   <div className="text-center py-12">
                     <Brain className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
-                    <p className="theme-text-muted text-sm">Business intents will appear here as you speak</p>
+                    <p className="theme-text-muted text-sm">
+                      KPIs and metrics will appear here as they are identified
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {allIntents.map((intent, idx) => (
+                    {kpis.map((kpi, idx) => (
                       <div key={idx} className="p-3 rounded-xl theme-card-bg border theme-border">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold theme-text-title text-sm">{intent.name}</span>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-xs border",
-                            getIntentColor(intent.confidence)
-                          )}>
-                            {Math.round(intent.confidence * 100)}%
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-purple-400" />
+                          <span className="text-sm theme-text">{kpi}</span>
                         </div>
-                        {intent.description && (
-                          <p className="text-xs theme-text-muted mb-2">{intent.description}</p>
-                        )}
-                        {intent.target_entities && intent.target_entities.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {intent.target_entities.map((e, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded-full text-xs border theme-border theme-text-muted">
-                                {e}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -846,65 +978,48 @@ export default function ConversationServicePage() {
             )}
 
             {/* Entities Tab */}
-            {activeTab === 1 && (
+            {activeTab === 2 && (
               <div>
-                {allIntents.length === 0 ? (
+                {entities.length === 0 ? (
                   <div className="text-center py-12">
                     <GitBranch className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
-                    <p className="theme-text-muted text-sm">Extracted entities will appear here</p>
+                    <p className="theme-text-muted text-sm">
+                      Business entities will appear here as they are discovered
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-semibold theme-text-title text-sm mb-2">
-                        Entities ({uniqueEntities.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {uniqueEntities.map((entity, idx) => (
-                          <div key={idx} className="p-2 rounded-lg theme-card-bg border theme-border flex items-center gap-2">
-                            <GitBranch className="w-4 h-4 theme-info-icon" />
-                            <span className="text-sm theme-text">{entity}</span>
-                          </div>
-                        ))}
+                  <div className="space-y-2">
+                    {entities.map((entity, idx) => (
+                      <div key={idx} className="p-3 rounded-xl theme-card-bg border theme-border">
+                        <div className="flex items-center gap-2">
+                          <GitBranch className="w-4 h-4 theme-info-icon" />
+                          <span className="text-sm theme-text">{entity}</span>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="border-t theme-border pt-4">
-                      <h4 className="font-semibold theme-text-title text-sm mb-2">
-                        Metrics ({uniqueMetrics.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {uniqueMetrics.map((metric, idx) => (
-                          <div key={`m-${idx}`} className="p-2 rounded-lg theme-card-bg border theme-border flex items-center gap-2">
-                            <Brain className="w-4 h-4 text-purple-400" />
-                            <span className="text-sm theme-text">{metric}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
             {/* Model Tab */}
-            {activeTab === 2 && (
+            {activeTab === 3 && (
               <div>
-                {!generatedModel ? (
+                {valueChainNodes.length === 0 ? (
                   <div className="text-center py-12">
                     <Network className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
-                    <p className="theme-text-muted text-sm">Click "Generate Model" to create a value chain model from the conversation</p>
+                    <p className="theme-text-muted text-sm">
+                      The value chain model will appear here once agents complete the design
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <h3 className="font-semibold theme-text-title">{generatedModel.name}</h3>
-                    
                     <div>
                       <h4 className="text-sm font-medium theme-text-title mb-2">
-                        Nodes ({generatedModel.nodes.length})
+                        Nodes ({valueChainNodes.length})
                       </h4>
                       <div className="space-y-1">
-                        {generatedModel.nodes.map((node) => (
+                        {valueChainNodes.map((node) => (
                           <div key={node.id} className="p-2 rounded-lg theme-card-bg border theme-border">
                             <div className="flex items-center gap-2">
                               <div className={cn("w-3 h-3 rounded-full", getNodeTypeColor(node.type))} />
@@ -921,31 +1036,33 @@ export default function ConversationServicePage() {
                       </div>
                     </div>
 
-                    <div>
-                      <h4 className="text-sm font-medium theme-text-title mb-2">
-                        Relationships ({generatedModel.links.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {generatedModel.links.map((link, idx) => {
-                          const sourceNode = generatedModel.nodes.find(n => n.id === link.source_id);
-                          const targetNode = generatedModel.nodes.find(n => n.id === link.target_id);
-                          return (
-                            <div key={idx} className="p-2 rounded-lg theme-card-bg border theme-border">
-                              <div className="flex items-center gap-2 flex-wrap text-sm">
-                                <Link2 className="w-4 h-4 theme-text-muted" />
-                                <span className="theme-text">{sourceNode?.name || link.source_id}</span>
-                                <ChevronRight className="w-4 h-4 theme-text-muted" />
-                                <span className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">
-                                  {link.type}
-                                </span>
-                                <ChevronRight className="w-4 h-4 theme-text-muted" />
-                                <span className="theme-text">{targetNode?.name || link.target_id}</span>
+                    {valueChainLinks.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium theme-text-title mb-2">
+                          Relationships ({valueChainLinks.length})
+                        </h4>
+                        <div className="space-y-1">
+                          {valueChainLinks.map((link, idx) => {
+                            const sourceNode = valueChainNodes.find(n => n.id === link.source_id);
+                            const targetNode = valueChainNodes.find(n => n.id === link.target_id);
+                            return (
+                              <div key={idx} className="p-2 rounded-lg theme-card-bg border theme-border">
+                                <div className="flex items-center gap-2 flex-wrap text-sm">
+                                  <Link2 className="w-4 h-4 theme-text-muted" />
+                                  <span className="theme-text">{sourceNode?.name || link.source_id}</span>
+                                  <ChevronRight className="w-4 h-4 theme-text-muted" />
+                                  <span className="px-2 py-0.5 rounded-full text-xs bg-alpha-500/20 text-alpha-400 border border-alpha-500/30">
+                                    {link.type}
+                                  </span>
+                                  <ChevronRight className="w-4 h-4 theme-text-muted" />
+                                  <span className="theme-text">{targetNode?.name || link.target_id}</span>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -953,107 +1070,6 @@ export default function ConversationServicePage() {
           </div>
         </Card>
       </div>
-
-      {/* Load Configuration Dialog */}
-      {loadDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="w-full max-w-3xl mx-4 rounded-2xl theme-card-bg border theme-border shadow-2xl">
-            <div className="p-6 border-b theme-border">
-              <h2 className="text-xl font-bold theme-text-title">Load Saved Configuration</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm theme-text-muted">
-                Search for saved configurations by client name and/or date range.
-              </p>
-              
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Client name..."
-                  value={searchClientName}
-                  onChange={(e) => setSearchClientName(e.target.value)}
-                  className="flex-1 px-4 py-2 rounded-xl theme-card-bg border theme-border
-                    theme-text placeholder:theme-text-muted text-sm
-                    focus:outline-none focus:ring-2 focus:ring-alpha-500"
-                />
-                <input
-                  type="date"
-                  value={searchDateFrom}
-                  onChange={(e) => setSearchDateFrom(e.target.value)}
-                  className="px-4 py-2 rounded-xl theme-card-bg border theme-border
-                    theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
-                />
-                <input
-                  type="date"
-                  value={searchDateTo}
-                  onChange={(e) => setSearchDateTo(e.target.value)}
-                  className="px-4 py-2 rounded-xl theme-card-bg border theme-border
-                    theme-text text-sm focus:outline-none focus:ring-2 focus:ring-alpha-500"
-                />
-                <Button onClick={searchConfigurations} disabled={isSearching}>
-                  {isSearching ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-
-              {searchResults.length > 0 && (
-                <div className="rounded-xl border theme-border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="theme-card-bg">
-                      <tr>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Client</th>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Name</th>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Created</th>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Intents</th>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Entities</th>
-                        <th className="px-4 py-2 text-left theme-text-muted font-medium">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {searchResults.map((config) => (
-                        <tr key={config.id} className="border-t theme-border hover:theme-card-bg-hover">
-                          <td className="px-4 py-2 theme-text">{config.client_name}</td>
-                          <td className="px-4 py-2 theme-text">{config.name}</td>
-                          <td className="px-4 py-2 theme-text-muted">
-                            {new Date(config.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-2 theme-text-muted">{config.intent_count}</td>
-                          <td className="px-4 py-2 theme-text-muted">{config.entity_count}</td>
-                          <td className="px-4 py-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => loadConfiguration(config.id)}
-                              disabled={isLoading}
-                            >
-                              {isLoading ? 'Loading...' : 'Load'}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {searchResults.length === 0 && !isSearching && (
-                <div className="text-center py-12">
-                  <FolderOpen className="w-12 h-12 mx-auto theme-text-muted opacity-50 mb-4" />
-                  <p className="theme-text-muted text-sm">No configurations found. Try searching with different criteria.</p>
-                </div>
-              )}
-            </div>
-            <div className="p-6 border-t theme-border flex justify-end">
-              <Button variant="outline" onClick={() => setLoadDialogOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

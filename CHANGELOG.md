@@ -5,6 +5,76 @@ All notable changes to the Analytics Engine project will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-01-23] - LibrarianCurator Agent
+
+### Added
+- **LibrarianCuratorAgent** (`conversation_service/app/agents/sub_agents.py`):
+  - Ontology steward responsible for managing value chains, modules, KPIs, entities, attributes
+  - Tools: `search_catalog`, `get_definition_details`, `suggest_reuse`, `identify_gaps`
+  - Tools: `create_kpi_definition`, `create_entity_definition`, `define_calculation`
+  - Tools: `update_definition`, `merge_definitions`, `validate_ontology`
+  - Full Knowledge Graph MCP access for ontology persistence
+  - Collaborates with Data Analyst for calculation logic review
+
+### Modified
+- `conversation_service/app/agents/base_agent.py`: Added `LIBRARIAN_CURATOR` to `AgentRole` enum
+- `conversation_service/app/agents/orchestrator.py`: Added `librarian_curator` to sub-agents
+- `conversation_service/app/mcp/mcp_client_manager.py`: Added `librarian_curator` role mapping
+
+---
+
+## [2026-01-23] - MCP (Model Context Protocol) Integration
+
+### Added
+
+#### Database Service MCP Servers
+- **PostgreSQL MCP Server** (`database_service/app/mcp/`):
+  - `postgres_mcp_server.py`: FastAPI router with MCP protocol endpoints
+  - `postgres_mcp_tools.py`: 8 tools for database introspection
+    - `list_schemas`, `list_tables`, `describe_table`, `list_hypertables`
+    - `list_continuous_aggregates`, `query_sample`, `explain_query`, `get_table_stats`
+  - `postgres_mcp_models.py`: Pydantic models for request/response
+
+- **Knowledge Graph MCP Server** (`database_service/app/mcp/`):
+  - `knowledge_graph_mcp_server.py`: MCP server for ontology management
+  - `knowledge_graph_mcp_tools.py`: 7 tools for graph operations
+    - `create_entity`, `create_relation`, `search_nodes`, `get_entity_context`
+    - `get_lineage`, `open_nodes`, `add_observations`
+  - `knowledge_graph_manager.py`: TimescaleDB-backed graph storage
+  - `knowledge_graph_models.py`: Entity types, relation types, node/edge models
+
+#### Conversation Service MCP Clients
+- **MCP Client Infrastructure** (`conversation_service/app/mcp/`):
+  - `mcp_client_manager.py`: Centralized manager for all MCP clients
+  - `mcp_config.py`: Environment-based configuration
+  - `postgres_mcp_client.py`: Client for PostgreSQL MCP Server
+  - `knowledge_graph_mcp_client.py`: Client for Knowledge Graph MCP Server
+  - `exa_search_client.py`: Exa AI semantic web search client with rate limiting/caching
+
+#### Agent MCP Integration
+- **BaseAgent**: Added `mcp_manager` parameter and `_register_mcp_tools()` method
+- **AgentOrchestrator**: Initializes `MCPClientManager` and passes to all agents
+- **Role-Based Tool Access**: Agents receive MCP tools based on their role:
+  - `architect`: postgres introspection, knowledge graph lineage
+  - `business_strategist`: knowledge graph, web search
+  - `competitive_analyst`: full web search capabilities
+  - `data_analyst`: query tools, continuous aggregates
+
+### Technical Details
+- Hybrid MCP integration: Direct calls for reads, messaging events for writes
+- Knowledge graph backed by TimescaleDB (no separate graph DB)
+- Exa web search with rate limiting (10 req/min) and result caching (1hr TTL)
+- MCP tools automatically registered based on agent role mapping
+
+### Files Modified
+- `database_service/app/main.py`: Added MCP router initialization
+- `database_service/app/mcp/__init__.py`: Module exports
+- `conversation_service/app/agents/base_agent.py`: MCP support
+- `conversation_service/app/agents/coordinator.py`: MCP parameter
+- `conversation_service/app/agents/orchestrator.py`: MCPClientManager init
+- `conversation_service/app/agents/sub_agents.py`: MCP parameters for all agents
+- `conversation_service/app/agents/business_agents.py`: MCP parameters for all agents
+
 ## [2026-01-18] - Multi-Agent Design System for Conversation Service
 
 ### Added

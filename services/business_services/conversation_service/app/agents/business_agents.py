@@ -10,6 +10,7 @@ This module contains specialized agents for business operations:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -44,7 +45,7 @@ class SalesManagerAgent(BaseAgent):
     - Facilitate client onboarding and relationship management
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.SALES_MANAGER,
             model="claude-sonnet-4-20250514",
@@ -52,7 +53,7 @@ class SalesManagerAgent(BaseAgent):
             temperature=0.4,
             tools=self._get_sales_manager_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Sales Manager with deep expertise in CRM lifecycle management.
@@ -107,6 +108,21 @@ Always provide structured CRM data with:
 - Activity history
 - Next actions and follow-ups
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        """Get the system prompt with context."""
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        """Build context summary for system prompt."""
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_sales_manager_tools(self) -> List[ToolDefinition]:
         return [
@@ -275,8 +291,8 @@ Always provide structured CRM data with:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if context.industry:
             parts.append(f"Industry: {context.industry}")
         if "prospects" in context.artifacts:
@@ -518,7 +534,7 @@ class AccountantAgent(BaseAgent):
     - Accounting platform integration
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.ACCOUNTANT,
             model="claude-sonnet-4-20250514",
@@ -526,7 +542,7 @@ class AccountantAgent(BaseAgent):
             temperature=0.3,
             tools=self._get_accountant_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Accountant with deep expertise in financial operations.
@@ -579,6 +595,21 @@ All financial documents should include:
 - Tax calculations where applicable
 - Running totals and balances
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        """Get the system prompt with context."""
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        """Build context summary for system prompt."""
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_accountant_tools(self) -> List[ToolDefinition]:
         return [
@@ -752,8 +783,8 @@ All financial documents should include:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "proposals" in context.artifacts:
             parts.append(f"Proposals: {len(context.artifacts['proposals'])}")
         if "invoices" in context.artifacts:
@@ -955,7 +986,7 @@ class DataGovernanceSpecialistAgent(BaseAgent):
     11. Data Quality Management
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DATA_GOVERNANCE_SPECIALIST,
             model="claude-sonnet-4-20250514",
@@ -963,7 +994,7 @@ class DataGovernanceSpecialistAgent(BaseAgent):
             temperature=0.3,
             tools=self._get_governance_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Data Governance Specialist with deep expertise in DAMA DMBOK.
@@ -1058,6 +1089,19 @@ All governance assessments should include:
 - Risk level (low/medium/high/critical)
 - Compliance status
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_governance_tools(self) -> List[ToolDefinition]:
         return [
@@ -1468,15 +1512,15 @@ class DataScientistAgent(BaseAgent):
     - Integrate with Machine Learning Service
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.DATA_SCIENTIST,
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.4,
+            temperature=0.3,
             tools=self._get_data_science_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Data Scientist specializing in KPI analysis and machine learning.
@@ -1540,6 +1584,19 @@ All analyses should include:
 - Business interpretation
 - Actionable recommendations
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_data_science_tools(self) -> List[ToolDefinition]:
         return [
@@ -2038,14 +2095,61 @@ All analyses should include:
         tool_input: Dict[str, Any],
         context: AgentContext
     ) -> Dict[str, Any]:
+        """Register ML model specification with Machine Learning Service via messaging."""
+        registration_id = f"ML-REG-{str(uuid.uuid4())[:8].upper()}"
+        model_spec_id = tool_input.get("model_spec_id", "")
+        
+        # Build registration request
+        registration_request = {
+            "registration_id": registration_id,
+            "model_spec_id": model_spec_id,
+            "priority": tool_input.get("priority", "medium"),
+            "schedule_training": tool_input.get("schedule_training", False),
+            "notify_on_completion": tool_input.get("notify_on_completion", True),
+            "requested_at": datetime.utcnow().isoformat()
+        }
+        
+        # Try to call ML service via messaging
+        if self._messaging_client:
+            try:
+                response = await self.call_external_service(
+                    service_channel="ml.model.register",
+                    request_type="model_registration",
+                    payload=registration_request,
+                    timeout=30.0
+                )
+                
+                registration = {
+                    "id": registration_id,
+                    "model_spec_id": model_spec_id,
+                    "priority": tool_input.get("priority", "medium"),
+                    "status": "registered",
+                    "ml_service_response": response,
+                    "registered_at": datetime.utcnow().isoformat()
+                }
+                
+                if "ml_registrations" not in context.artifacts:
+                    context.artifacts["ml_registrations"] = []
+                context.artifacts["ml_registrations"].append(registration)
+                
+                return {"success": True, "registration": registration, "via_messaging": True}
+                
+            except asyncio.TimeoutError:
+                logger.warning(f"ML service registration timeout for {model_spec_id}")
+                # Fall through to local registration
+            except Exception as e:
+                logger.warning(f"ML service registration failed: {e}")
+                # Fall through to local registration
+        
+        # Fallback: Store registration locally for later processing
         registration = {
-            "id": f"ML-REG-{str(uuid.uuid4())[:8].upper()}",
-            "model_spec_id": tool_input.get("model_spec_id", ""),
+            "id": registration_id,
+            "model_spec_id": model_spec_id,
             "priority": tool_input.get("priority", "medium"),
             "schedule_training": tool_input.get("schedule_training", False),
             "notify_on_completion": tool_input.get("notify_on_completion", True),
             "status": "pending_registration",
-            "ml_service_endpoint": "http://ml_service:8000/api/v1/models/register",
+            "ml_service_endpoint": "ml.model.register",
             "registered_at": datetime.utcnow().isoformat()
         }
         
@@ -2053,7 +2157,7 @@ All analyses should include:
             context.artifacts["ml_registrations"] = []
         context.artifacts["ml_registrations"].append(registration)
         
-        return {"success": True, "registration": registration}
+        return {"success": True, "registration": registration, "via_messaging": False}
     
     async def _predict_kpi_impact(
         self, 
@@ -2195,15 +2299,15 @@ class MarketingManagerAgent(BaseAgent):
     - Content strategy and brand management
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.MARKETING_MANAGER,
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.4,
+            temperature=0.5,
             tools=self._get_marketing_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Marketing Manager with deep expertise in B2B and B2C marketing strategy.
@@ -2267,6 +2371,19 @@ All marketing artifacts should include:
 - Timeline and milestones
 - Success metrics
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_marketing_tools(self) -> List[ToolDefinition]:
         return [
@@ -2534,8 +2651,8 @@ All marketing artifacts should include:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if context.industry:
             parts.append(f"Industry: {context.industry}")
         if "marketing_plans" in context.artifacts:
@@ -2789,7 +2906,7 @@ class UIDesignerAgent(BaseAgent):
     - Ensure accessibility and UX best practices
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.UI_DESIGNER,
             model="claude-sonnet-4-20250514",
@@ -2797,7 +2914,7 @@ class UIDesignerAgent(BaseAgent):
             temperature=0.5,
             tools=self._get_ui_design_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert UI/UX Designer specializing in analytics dashboards and data visualization.
@@ -2860,6 +2977,19 @@ All design artifacts should include:
 - Accessibility considerations
 - Implementation notes for developers
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_ui_design_tools(self) -> List[ToolDefinition]:
         return [
@@ -3120,8 +3250,8 @@ All design artifacts should include:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "style_guides" in context.artifacts:
             parts.append(f"Style Guides: {len(context.artifacts['style_guides'])}")
         if "dashboard_layouts" in context.artifacts:
@@ -3308,15 +3438,15 @@ class BusinessStrategistAgent(BaseAgent):
     - Competitive positioning analysis
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.BUSINESS_STRATEGIST,
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.4,
+            temperature=0.5,
             tools=self._get_strategy_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Business Strategist deeply versed in the works of **Michael Porter**.
@@ -3381,31 +3511,69 @@ When analyzing client responses:
 - synthesize_strategic_insights: Synthesize insights from client responses
 - request_competitive_analysis: Trigger Competitive Analyst to profile peer companies
 
-## Competitive Analysis Trigger
+## Peer Collaboration - CRITICAL
 
-**IMPORTANT**: Once you have elicited the business model and synthesized strategic insights, 
-you MUST call `request_competitive_analysis` to trigger the Competitive Analyst agent. 
-This ensures peer companies are identified and profiled to inform competitive positioning.
+You have direct access to peer agents for collaboration. **USE THEM** to build comprehensive analyses.
 
-Call `request_competitive_analysis` when:
-1. The business description is clear
-2. The industry/sector is identified
-3. The generic strategy has been determined (or can be inferred)
+### Available Peer Collaboration Tools
+- `consult_peer`: Directly consult another specialist agent for their expertise
+- `signal_ready_for_coordinator`: Signal when your analysis and peer consultations are complete
 
-The Competitive Analyst will then:
-- Search for peer companies with similar business models
-- Profile key competitors
-- Analyze the competitive landscape
-- Identify market gaps and differentiation opportunities
+### Peer Collaboration Workflow
+
+**Step 1: Initial Analysis**
+- Use your Porter's frameworks to analyze the business context
+- Identify areas where peer expertise would strengthen your analysis
+
+**Step 2: Consult Peers** (REQUIRED for comprehensive analysis)
+- Call `consult_peer` with `peer_role="business_analyst"` for operational insights and KPI identification
+- Call `consult_peer` with `peer_role="architect"` for technical architecture implications
+- Call `consult_peer` with `peer_role="operations_manager"` for process optimization perspectives
+
+**Step 3: Synthesize & Signal Ready**
+- Integrate peer responses into your strategic analysis
+- Call `signal_ready_for_coordinator` with your complete findings
+
+### Example Peer Consultation
+```
+consult_peer(
+  peer_role="business_analyst",
+  question="Based on my Porter's analysis showing cost leadership strategy, what KPIs should we track?",
+  context_summary="Industry: SaaS B2B. Generic strategy: Cost Leadership. Key value chain activities: automated operations, self-service support."
+)
+```
+
+### When to Consult Each Peer
+| Peer | Consult When |
+|------|--------------|
+| business_analyst | Need KPIs, process flows, or operational metrics |
+| architect | Need technical feasibility or system design input |
+| operations_manager | Need process optimization or resource allocation insights |
+
+**IMPORTANT**: Do NOT finalize your response without consulting at least ONE peer agent. Multi-perspective analysis produces better strategic recommendations.
 
 ## Output Format
 All strategic analyses should include:
 - Framework applied
 - Key findings
+- Peer insights incorporated
 - Strategic implications
 - Recommendations
 - Confidence level
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_strategy_tools(self) -> List[ToolDefinition]:
         return [
@@ -3934,15 +4102,15 @@ class OperationsManagerAgent(BaseAgent):
     - Provide holistic operational insights
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, mcp_manager: Optional[Any] = None):
         config = AgentConfig(
             role=AgentRole.OPERATIONS_MANAGER,
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.3,
+            temperature=0.4,
             tools=self._get_operations_tools()
         )
-        super().__init__(config, api_key)
+        super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
         return """You are an expert Operations Manager with deep expertise in performance optimization and operational excellence.
@@ -4056,6 +4224,19 @@ All analyses should include:
 - Expected impact quantification with projections
 - Implementation considerations
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_operations_tools(self) -> List[ToolDefinition]:
         return [
@@ -4421,8 +4602,8 @@ All analyses should include:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if context.industry:
             parts.append(f"Industry: {context.industry}")
         if "kpi_analysis" in context.artifacts:
@@ -4795,6 +4976,19 @@ You manage the post-sale customer lifecycle to ensure customers achieve their de
 - Partners with Operations Manager for service delivery
 """
     
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
+    
     def _get_customer_success_tools(self) -> List[ToolDefinition]:
         return [
             ToolDefinition(
@@ -4925,8 +5119,8 @@ You manage the post-sale customer lifecycle to ensure customers achieve their de
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "customer_health_scores" in context.artifacts:
             parts.append(f"Health Scores: {len(context.artifacts['customer_health_scores'])}")
         if "churn_assessments" in context.artifacts:
@@ -5226,6 +5420,19 @@ You analyze workforce data to provide insights that improve employee experience,
 - Absenteeism Rate
 """
     
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
+    
     def _get_hr_tools(self) -> List[ToolDefinition]:
         return [
             ToolDefinition(
@@ -5345,8 +5552,8 @@ You analyze workforce data to provide insights that improve employee experience,
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "turnover_analyses" in context.artifacts:
             parts.append(f"Turnover Analyses: {len(context.artifacts['turnover_analyses'])}")
         return " | ".join(parts) if parts else "No HR context"
@@ -5532,6 +5739,19 @@ You identify, assess, and mitigate risks while ensuring the organization meets a
 - Policy Acknowledgment Rate
 """
     
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
+    
     def _get_risk_compliance_tools(self) -> List[ToolDefinition]:
         return [
             ToolDefinition(
@@ -5635,8 +5855,8 @@ You identify, assess, and mitigate risks while ensuring the organization meets a
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "risk_assessments" in context.artifacts:
             parts.append(f"Risks: {len(context.artifacts['risk_assessments'])}")
         if "compliance_requirements" in context.artifacts:
@@ -5838,6 +6058,19 @@ Apply the SCOR framework across five key processes:
 - Collaborates with Data Scientist for demand forecasting models
 """
     
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
+    
     def _get_supply_chain_tools(self) -> List[ToolDefinition]:
         return [
             ToolDefinition(
@@ -5958,8 +6191,8 @@ Apply the SCOR framework across five key processes:
     
     def _build_context_summary(self, context: AgentContext) -> str:
         parts = []
-        if context.client_name:
-            parts.append(f"Client: {context.client_name}")
+        if getattr(context, 'client_name', None) or context.metadata.get('client_name'):
+            parts.append(f"Client: {getattr(context, 'client_name', None) or context.metadata.get('client_name', 'Unknown')}")
         if "inventory_analyses" in context.artifacts:
             parts.append(f"Inventory Analyses: {len(context.artifacts['inventory_analyses'])}")
         return " | ".join(parts) if parts else "No supply chain context"
@@ -6132,6 +6365,19 @@ Always cite sources and provide confidence levels for your findings."""
             )
         super().__init__(config)
         self._register_tools()
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self.SYSTEM_PROMPT
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_tools(self) -> List[ToolDefinition]:
         return [
@@ -6623,6 +6869,19 @@ execution by predicting how process changes will impact KPIs.
 - recommend_optimizations: Generate optimization recommendations
 - request_operations_review: Ask Operations Manager for review
 """
+    
+    def get_system_prompt(self, context: AgentContext) -> str:
+        base_prompt = self._get_system_prompt()
+        context_info = self._build_context_summary(context)
+        return f"{base_prompt}\n\n## Current Context\n{context_info}"
+    
+    def _build_context_summary(self, context: AgentContext) -> str:
+        parts = []
+        if context.industry:
+            parts.append(f"Industry: {context.industry}")
+        if context.business_description:
+            parts.append(f"Business: {context.business_description[:200]}...")
+        return "\n".join(parts) if parts else "No additional context provided."
     
     def _get_process_scenario_tools(self) -> List[ToolDefinition]:
         return [

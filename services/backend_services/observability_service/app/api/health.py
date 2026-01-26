@@ -188,6 +188,57 @@ async def ingest_health_batch(
 
 
 @router.get(
+    "/{service}/history",
+    responses={
+        404: {"model": ErrorResponse, "description": "Not Found"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"}
+    }
+)
+@trace_method(name="api.health.get_service_health_history", kind="SERVER")
+async def get_service_health_history(
+    service: str = Path(..., description="Service name"),
+    limit: int = Query(50, description="Maximum number of history entries"),
+    messaging_client: MessagingClient = Depends(lambda: MessagingClient(
+        base_url=get_settings().messaging_service_url,
+        service_name=get_settings().service_name
+    ))
+):
+    """
+    Get health check history for a service.
+    
+    Args:
+        service: Service name
+        limit: Maximum entries to return
+        
+    Returns:
+        List of historical health data
+    """
+    correlation_id = get_correlation_id()
+    
+    try:
+        add_span_attributes({
+            "health.service": service,
+            "health.history_limit": limit,
+            "correlation_id": correlation_id
+        })
+        
+        # TODO: Query historical health data from database
+        # For now return empty history - will be populated as services push data
+        return {
+            "service": service,
+            "history": [],
+            "message": "Health history tracking enabled. Data will appear as services report their status."
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get health history: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get health history: {str(e)}"
+        )
+
+
+@router.get(
     "/{service}",
     response_model=HealthData,
     responses={

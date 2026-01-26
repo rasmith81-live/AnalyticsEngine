@@ -210,20 +210,23 @@ def instrument_sqlalchemy(engine):
     
     Args:
         engine: SQLAlchemy engine instance
+        
+    Note: SQLAlchemy instrumentation is disabled for async engines as it causes
+    greenlet context issues with async session operations. The instrumentation
+    uses sync context managers that break the async greenlet spawn context.
     """
     if not SQLAlchemyInstrumentor:
         logger.warning("SQLAlchemy instrumentation not available, skipping instrumentation")
         return
+    
+    # Skip instrumentation for async engines - causes greenlet_spawn errors
+    if hasattr(engine, 'sync_engine'):
+        logger.info("Async engine detected. Skipping SQLAlchemy instrumentation to avoid greenlet context issues.")
+        return
         
     try:
-        # For async engines, instrument the underlying sync engine
-        target_engine = engine
-        if hasattr(engine, 'sync_engine'):
-            logger.info("Async engine detected. Instrumenting the underlying sync_engine.")
-            target_engine = engine.sync_engine
-
         SQLAlchemyInstrumentor().instrument(
-            engine=target_engine,
+            engine=engine,
             tracer_provider=trace.get_tracer_provider()
         )
         logger.info("SQLAlchemy instrumented with OpenTelemetry")

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     ANTHROPIC_COORDINATOR_MODEL: str = os.getenv("ANTHROPIC_COORDINATOR_MODEL", "claude-opus-4-20250514")
     ANTHROPIC_SUBAGENT_MODEL: str = os.getenv("ANTHROPIC_SUBAGENT_MODEL", "claude-sonnet-4-20250514")
     
+    # Database Service (for secure storage)
+    DATABASE_SERVICE_URL: str = os.getenv("DATABASE_SERVICE_URL", "http://database_service:8025")
+    
     # Messaging
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  Users,
   Gauge,
   Activity,
   Cpu,
@@ -11,6 +11,13 @@ import {
   TrendingDown,
   Wifi,
   WifiOff,
+  MoreVertical,
+  History,
+  RotateCcw,
+  Hammer,
+  X,
+  Network,
+  Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { cn } from '../lib/utils';
@@ -30,24 +37,9 @@ interface RealTimeMetrics {
   cpuUsage: number;
 }
 
-const ALL_SERVICES = [
-  { name: 'Database Service', url: 'http://localhost:8000/health' },
-  { name: 'Messaging Service', url: 'http://localhost:8002/health' },
-  { name: 'Observability Service', url: 'http://localhost:8080/health' },
-  { name: 'Archival Service', url: 'http://localhost:8005/health' },
-  { name: 'Business Metadata', url: 'http://localhost:8020/health' },
-  { name: 'Calculation Engine', url: 'http://localhost:8021/health' },
-  { name: 'Demo Config Service', url: 'http://localhost:8022/health' },
-  { name: 'Connector Service', url: 'http://localhost:8023/health' },
-  { name: 'Ingestion Service', url: 'http://localhost:8024/health' },
-  { name: 'Metadata Ingestion', url: 'http://localhost:8025/health' },
-  { name: 'Conversation Service', url: 'http://localhost:8026/health' },
-  { name: 'Systems Monitor', url: 'http://localhost:8010/health' },
-  { name: 'Entity Resolution', url: 'http://localhost:8012/health' },
-  { name: 'Data Governance', url: 'http://localhost:8013/health' },
-  { name: 'Machine Learning', url: 'http://localhost:8014/health' },
-  { name: 'API Gateway', url: 'http://127.0.0.1:8090/health' },
-];
+const HEALTH_SERVICES_URL = '/api/health/services';
+const CONTAINER_API_URL = '/api/v1/containers';
+const STATS_URL = '/api/v1/observability/stats/realtime';
 
 function MetricCard({ 
   label, 
@@ -95,21 +87,81 @@ function MetricCard({
 }
 
 export default function SystemMonitorPage() {
-  const [services, setServices] = useState<ServiceStatus[]>(
-    ALL_SERVICES.map(s => ({ ...s, status: 'checking' as const }))
-  );
+  const [services, setServices] = useState<ServiceStatus[]>([]);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [historyModal, setHistoryModal] = useState<{ service: string; data: any[] } | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  const handleServiceAction = async (serviceName: string, action: 'restart' | 'rebuild') => {
+    setActionLoading(`${serviceName}-${action}`);
+    setOpenMenu(null);
+    try {
+      const response = await fetch(`${CONTAINER_API_URL}/${serviceName}/${action}`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        console.log(`${action} initiated for ${serviceName}`);
+      } else {
+        console.error(`Failed to ${action} ${serviceName}`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing ${serviceName}:`, error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleViewHistory = async (serviceName: string) => {
+    setOpenMenu(null);
+    try {
+      const response = await fetch(`/api/v1/observability/health/${serviceName}/history`);
+      if (response.ok) {
+        const data = await response.json();
+        setHistoryModal({ service: serviceName, data: data.history || [] });
+      } else {
+        setHistoryModal({ service: serviceName, data: [] });
+      }
+    } catch (error) {
+      console.error(`Error fetching history for ${serviceName}:`, error);
+      setHistoryModal({ service: serviceName, data: [] });
+    }
+  };
+
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState<RealTimeMetrics>({
-    activeUsers: 142,
-    transactionsPerSecond: 45,
-    avgLatencyMs: 120,
-    cpuUsage: 35
+    activeUsers: 0,
+    transactionsPerSecond: 0,
+    avgLatencyMs: 0,
+    cpuUsage: 0
   });
 
   const { isConnected, lastMessage } = useWebSocket({
     url: 'ws://127.0.0.1:8090/ws',
     onOpen: () => console.log('System Monitor connected to websocket'),
   });
+
+  const fetchRealTimeStats = useCallback(async () => {
+    try {
+      const response = await fetch(STATS_URL);
+      if (response.ok) {
+        const data = await response.json();
+        setMetrics({
+          activeUsers: data.activeConnections || 0,
+          transactionsPerSecond: data.messagesPerSecond || 0,
+          avgLatencyMs: data.avgLatencyMs || 0,
+          cpuUsage: data.cpuUsage || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching real-time stats:', error);
+    }
+  }, [metrics]);
+
+  useEffect(() => {
+    fetchRealTimeStats();
+    const interval = setInterval(fetchRealTimeStats, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (lastMessage && lastMessage.type === 'dashboard_update') {
@@ -118,40 +170,24 @@ export default function SystemMonitorPage() {
   }, [lastMessage]);
 
   useEffect(() => {
-    if (!isConnected) return;
-
-    const interval = setInterval(() => {
-      setMetrics(prev => ({
-        activeUsers: Math.max(0, prev.activeUsers + Math.floor(Math.random() * 10) - 5),
-        transactionsPerSecond: Math.max(0, prev.transactionsPerSecond + Math.floor(Math.random() * 20) - 10),
-        avgLatencyMs: Math.max(0, 100 + Math.floor(Math.random() * 50) - 25),
-        cpuUsage: Math.min(100, Math.max(0, prev.cpuUsage + Math.floor(Math.random() * 10) - 5))
-      }));
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isConnected]);
-
-  useEffect(() => {
-    const checkServices = () => {
-      services.forEach((service, index) => {
-        fetch(service.url)
-          .then(res => res.json())
-          .then(data => {
-            setServices(prev => {
-              const updated = [...prev];
-              updated[index] = { ...updated[index], status: 'healthy', details: data };
-              return updated;
-            });
-          })
-          .catch(() => {
-            setServices(prev => {
-              const updated = [...prev];
-              updated[index] = { ...updated[index], status: 'error' };
-              return updated;
-            });
-          });
-      });
+    const checkServices = async () => {
+      try {
+        const response = await fetch(HEALTH_SERVICES_URL);
+        if (response.ok) {
+          const data = await response.json();
+          const serviceStatuses: ServiceStatus[] = data.services.map((svc: any) => ({
+            name: svc.service || svc.name,
+            url: svc.url,
+            status: svc.status === 'healthy' ? 'healthy' : 'error',
+            details: svc.details
+          }));
+          setServices(serviceStatuses);
+        } else {
+          console.error('Failed to fetch service health:', response.status);
+        }
+      } catch (error) {
+        console.error('Error checking services:', error);
+      }
     };
 
     checkServices();
@@ -171,14 +207,23 @@ export default function SystemMonitorPage() {
           <h1 className="text-3xl font-bold theme-text-title tracking-wide">System Monitor</h1>
           <p className="theme-text-muted mt-1">Real-time monitoring of all Analytics Engine services and system metrics</p>
         </div>
-        <div className={cn(
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/deployment/traffic')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Network className="w-4 h-4" />
+            Service Traffic
+          </button>
+          <div className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-full border text-sm",
           isConnected 
             ? "bg-green-500/10 border-green-500/30 text-green-400"
             : "bg-gray-500/10 border-gray-500/30 theme-text-muted"
         )}>
-          {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-          {isConnected ? "Live Stream Connected" : "Connecting Stream..."}
+            {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+            {isConnected ? "Live Stream Connected" : "Connecting Stream..."}
+          </div>
         </div>
       </div>
 
@@ -292,6 +337,7 @@ export default function SystemMonitorPage() {
                   <th className="px-4 py-3 text-left theme-text-muted font-medium">Status</th>
                   <th className="px-4 py-3 text-left theme-text-muted font-medium">Endpoint</th>
                   <th className="px-4 py-3 text-left theme-text-muted font-medium">Details</th>
+                  <th className="px-4 py-3 text-right theme-text-muted font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,6 +371,43 @@ export default function SystemMonitorPage() {
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-right relative">
+                      {actionLoading === `${service.name}-restart` || actionLoading === `${service.name}-rebuild` ? (
+                        <RefreshCw className="w-4 h-4 animate-spin inline-block theme-text-muted" />
+                      ) : (
+                        <button
+                          onClick={() => setOpenMenu(openMenu === service.name ? null : service.name)}
+                          className="p-1 rounded hover:bg-alpha-500/20 transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4 theme-text-muted" />
+                        </button>
+                      )}
+                      {openMenu === service.name && (
+                        <div className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg theme-card-bg border theme-border z-50">
+                          <button
+                            onClick={() => handleViewHistory(service.name)}
+                            className="w-full px-4 py-2 text-left text-sm theme-text hover:bg-alpha-500/10 flex items-center gap-2 rounded-t-lg"
+                          >
+                            <History className="w-4 h-4" />
+                            View History
+                          </button>
+                          <button
+                            onClick={() => handleServiceAction(service.name, 'restart')}
+                            className="w-full px-4 py-2 text-left text-sm theme-text hover:bg-alpha-500/10 flex items-center gap-2"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            Restart Container
+                          </button>
+                          <button
+                            onClick={() => handleServiceAction(service.name, 'rebuild')}
+                            className="w-full px-4 py-2 text-left text-sm text-amber-400 hover:bg-amber-500/10 flex items-center gap-2 rounded-b-lg"
+                          >
+                            <Hammer className="w-4 h-4" />
+                            Rebuild (No Cache)
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -332,6 +415,63 @@ export default function SystemMonitorPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* History Modal */}
+      {historyModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="theme-card-bg rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b theme-border">
+              <h3 className="text-lg font-semibold theme-text">
+                Health History: {historyModal.service}
+              </h3>
+              <button
+                onClick={() => setHistoryModal(null)}
+                className="p-1 rounded hover:bg-alpha-500/20 transition-colors"
+              >
+                <X className="w-5 h-5 theme-text-muted" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {historyModal.data.length === 0 ? (
+                <p className="text-center theme-text-muted py-8">
+                  No health history available yet. History will be recorded as services push their status.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b theme-border">
+                      <th className="px-3 py-2 text-left theme-text-muted">Timestamp</th>
+                      <th className="px-3 py-2 text-left theme-text-muted">Status</th>
+                      <th className="px-3 py-2 text-left theme-text-muted">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyModal.data.map((entry: any, idx: number) => (
+                      <tr key={idx} className="border-b theme-border">
+                        <td className="px-3 py-2 theme-text-muted text-xs">
+                          {new Date(entry.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs",
+                            entry.status === 'healthy' && "bg-green-500/20 text-green-400",
+                            entry.status !== 'healthy' && "bg-red-500/20 text-red-400"
+                          )}>
+                            {entry.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 theme-text-muted text-xs">
+                          {entry.details ? JSON.stringify(entry.details).slice(0, 50) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

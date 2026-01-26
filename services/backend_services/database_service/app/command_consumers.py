@@ -109,14 +109,15 @@ class CommandConsumer:
         """Handle ArchiveCommand event."""
         try:
             parameters = event_data.get("parameters", {})
+            table_name = parameters.get("table_name", "telemetry_events")
             age_days = parameters.get("age_days", 1)
 
             await self.retention_manager.manually_trigger_archival(
-                table_name='news_articles',
+                table_name=table_name,
                 retention_period_days=age_days
             )
 
-            logger.info(f"Processed archive command for news_articles older than {age_days} days.")
+            logger.info(f"Processed archive command for {table_name} older than {age_days} days.")
         except Exception as e:
             logger.error(f"Failed to handle archive command: {e}")
             raise

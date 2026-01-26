@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import { useObjectModels } from '../hooks/useObjectModelDetails';
 import ObjectModelDiagram from '../components/ObjectModelDiagram';
