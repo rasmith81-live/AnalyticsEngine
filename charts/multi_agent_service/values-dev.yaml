@@ -1,0 +1,35 @@
+# Development environment values for multi-agent-service
+
+replicaCount: 1
+
+image:
+  pullPolicy: Always
+  tag: "dev"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+
+env:
+  SERVICE_NAME: multi_agent_service
+  REDIS_URL: redis://redis:6379
+  BLACKBOARD_TTL_SECONDS: "3600"
+  AUDIT_LOG_RETENTION_DAYS: "7"
+  MAX_CONCURRENT_AGENTS: "5"
+  ENABLE_DISTRIBUTED_TRACING: "true"
+  ENABLE_PROMETHEUS_METRICS: "true"
+  DEBUG: "true"
+
+# Use local Redis
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false

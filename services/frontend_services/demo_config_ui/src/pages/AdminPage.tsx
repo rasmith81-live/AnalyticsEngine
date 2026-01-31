@@ -12,6 +12,10 @@ import {
   RefreshCw,
   Square,
   Play,
+  Shield,
+  Eye,
+  EyeOff,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -60,11 +64,63 @@ export default function AdminPage() {
     logRetentionDays: 30, dataRetentionDays: 365, archiveEnabled: true,
   });
 
+  // API Key Management State
+  const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<'unknown' | 'checking' | 'valid' | 'invalid' | 'not_set'>('unknown');
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+
   const [alertSettings, setAlertSettings] = useState({
     emailNotifications: true, slackNotifications: false, errorThreshold: 10, emailAddress: 'admin@example.com',
   });
 
-  useEffect(() => { fetchConfig(); checkHealth(); }, []);
+  useEffect(() => { fetchConfig(); checkHealth(); checkApiKeyStatus(); }, []);
+
+  const checkApiKeyStatus = async () => {
+    setApiKeyStatus('checking');
+    try {
+      const response = await fetch('/api/v1/admin/api-keys/anthropic/status');
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeyStatus(data.configured ? (data.valid ? 'valid' : 'invalid') : 'not_set');
+      } else {
+        setApiKeyStatus('unknown');
+      }
+    } catch (error) {
+      console.error('Error checking API key status:', error);
+      setApiKeyStatus('unknown');
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!anthropicApiKey.trim()) return;
+    setApiKeySaving(true);
+    try {
+      const response = await fetch('/api/v1/admin/api-keys/anthropic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: anthropicApiKey }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeyStatus(data.valid ? 'valid' : 'invalid');
+        setAnthropicApiKey('');
+        setShowApiKey(false);
+        if (data.valid) {
+          alert('API key saved and verified successfully!');
+        } else {
+          alert('API key saved but verification failed. Please check if the key is correct.');
+        }
+      } else {
+        alert('Failed to save API key');
+      }
+    } catch (error) {
+      console.error('Error saving API key:', error);
+      alert('Failed to save API key');
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLive) return;
@@ -203,6 +259,100 @@ export default function AdminPage() {
                     <span className="font-medium theme-text">{item.value}</span>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* API Keys Section */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-alpha-500" />
+                <CardTitle>AI Service API Keys</CardTitle>
+              </div>
+              <p className="text-sm theme-text-muted">Configure API keys for AI-powered features</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Anthropic API Key */}
+              <div className="p-4 rounded-xl border theme-border theme-card-bg">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-semibold theme-text-title">Anthropic API Key</h4>
+                    <p className="text-sm theme-text-muted">Required for AI conversation and analysis features</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {apiKeyStatus === 'checking' && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Checking...
+                      </span>
+                    )}
+                    {apiKeyStatus === 'valid' && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+                        <CheckCircle className="w-3 h-3" />
+                        Configured & Valid
+                      </span>
+                    )}
+                    {apiKeyStatus === 'invalid' && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                        <XCircle className="w-3 h-3" />
+                        Invalid Key
+                      </span>
+                    )}
+                    {apiKeyStatus === 'not_set' && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400">
+                        <AlertTriangle className="w-3 h-3" />
+                        Not Configured
+                      </span>
+                    )}
+                    {apiKeyStatus === 'unknown' && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 theme-text-muted">
+                        Unknown
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={anthropicApiKey}
+                      onChange={(e) => setAnthropicApiKey(e.target.value)}
+                      placeholder="sk-ant-api03-..."
+                      className="w-full px-4 py-3 pr-12 rounded-xl theme-card-bg border theme-border theme-text focus:outline-none focus:ring-2 focus:ring-alpha-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 theme-text-muted hover:theme-text"
+                    >
+                      {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  <p className="text-xs theme-text-muted">
+                    Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-alpha-500 hover:underline">console.anthropic.com</a>
+                  </p>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveApiKey} disabled={apiKeySaving || !anthropicApiKey.trim()}>
+                      {apiKeySaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save & Verify Key
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={checkApiKeyStatus}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Check Status
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

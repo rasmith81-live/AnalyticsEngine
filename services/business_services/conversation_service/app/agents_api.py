@@ -17,13 +17,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel, Field
 
-from .agents.orchestrator import (
-    AgentOrchestrator,
-    OrchestratorConfig,
-    DesignSession,
-    get_orchestrator
-)
-from .agents.base_agent import AgentResponse
+from .agents.redis_agent_client import RedisAgentClient, get_redis_agent_client
+from .agents.config import get_multi_agent_config
 
 logger = logging.getLogger(__name__)
 
@@ -102,10 +97,9 @@ class SessionListResponse(BaseModel):
 # Dependency Injection
 # =============================================================================
 
-async def get_agent_orchestrator() -> AgentOrchestrator:
-    """Dependency to get the agent orchestrator."""
-    config = OrchestratorConfig()
-    return await get_orchestrator(config)
+def get_multi_agent_client() -> RedisAgentClient:
+    """Dependency to get the Redis-based multi-agent client."""
+    return get_redis_agent_client()
 
 
 # =============================================================================
@@ -115,7 +109,7 @@ async def get_agent_orchestrator() -> AgentOrchestrator:
 @router.post("/design-session", response_model=CreateSessionResponse)
 async def create_design_session(
     request: CreateSessionRequest,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """
     Create a new multi-agent design session.
@@ -124,10 +118,12 @@ async def create_design_session(
     will lead an interview to design a business value chain model.
     """
     try:
-        session = await orchestrator.create_session(
+        session = await client.create_session(
             user_id=request.user_id,
-            business_description=request.business_description,
-            industry=request.industry
+            context={
+                "business_description": request.business_description,
+                "industry": request.industry
+            }
         )
         
         # Generate initial greeting
@@ -140,9 +136,9 @@ async def create_design_session(
             initial_message += "\n\nTo get started, could you tell me about your business? What industry are you in, and what are your main products or services?"
         
         return CreateSessionResponse(
-            session_id=session.id,
-            user_id=session.user_id,
-            status=session.status,
+            session_id=session.get("id", session.get("session_id", "unknown")),
+            user_id=request.user_id,
+            status=session.get("status", "active"),
             message=initial_message
         )
         
@@ -154,35 +150,26 @@ async def create_design_session(
 @router.get("/sessions/{session_id}", response_model=Dict[str, Any])
 async def get_session(
     session_id: str,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """Get details of a design session."""
-    session = orchestrator.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    
-    return {
-        "session_id": session.id,
-        "user_id": session.user_id,
-        "status": session.status,
-        "created_at": session.created_at.isoformat(),
-        "updated_at": session.updated_at.isoformat(),
-        "message_count": session.message_count,
-        "artifacts_generated": session.artifacts_generated,
-        "context": {
-            "industry": session.context.industry,
-            "value_chain_type": session.context.value_chain_type,
-            "identified_entities": session.context.identified_entities,
-            "identified_kpis": session.context.identified_kpis
-        }
-    }
+    try:
+        session = await client.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        return session
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/sessions/{session_id}/message", response_model=SendMessageResponse)
 async def send_message(
     session_id: str,
     request: SendMessageRequest,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """
     Send a message to a design session.
@@ -190,20 +177,16 @@ async def send_message(
     The Strategy Coordinator will process the message, potentially
     delegating to sub-agents, and return a response.
     """
-    session = orchestrator.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    
     try:
-        response = await orchestrator.process_message(session_id, request.message)
+        response = await client.send_message(session_id, request.message)
         
         return SendMessageResponse(
             session_id=session_id,
-            agent_role=response.agent_role.value if hasattr(response.agent_role, 'value') else str(response.agent_role),
-            content=response.content,
-            artifacts=response.artifacts,
-            success=response.success,
-            error=response.error
+            agent_role=response.get("agent_role", "coordinator"),
+            content=response.get("content", ""),
+            artifacts=response.get("artifacts", {}),
+            success=response.get("success", True),
+            error=response.get("error")
         )
         
     except Exception as e:
@@ -215,7 +198,7 @@ async def send_message(
 async def run_parallel_analysis(
     session_id: str,
     request: ParallelAnalysisRequest,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """
     Run parallel analysis with multiple sub-agents.
@@ -223,33 +206,15 @@ async def run_parallel_analysis(
     This triggers the Architect, Business Analyst, and Developer agents
     to work in parallel on the current session context.
     """
-    session = orchestrator.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    
     try:
-        results = await orchestrator.run_parallel_analysis(
+        results = await client.run_parallel_analysis(
             session_id, 
             request.analysis_type
         )
         
-        # Convert AgentResponse objects to dicts
-        serialized_results = {}
-        for agent_name, response in results.items():
-            if isinstance(response, AgentResponse):
-                serialized_results[agent_name] = {
-                    "agent_role": str(response.agent_role),
-                    "content": response.content,
-                    "artifacts": response.artifacts,
-                    "success": response.success,
-                    "error": response.error
-                }
-            else:
-                serialized_results[agent_name] = response
-        
         return ParallelAnalysisResponse(
             session_id=session_id,
-            results=serialized_results
+            results=results
         )
         
     except Exception as e:
@@ -258,22 +223,22 @@ async def run_parallel_analysis(
 
 
 @router.get("/sessions/{session_id}/artifacts", response_model=SessionArtifactsResponse)
-async def get_session_artifacts(
+async def get_session_artifacts_endpoint(
     session_id: str,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """Get all artifacts generated in a session."""
     try:
-        result = await orchestrator.get_session_artifacts(session_id)
+        result = await client.get_session_artifacts(session_id)
         
-        if "error" in result:
+        if isinstance(result, dict) and "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         
         return SessionArtifactsResponse(
-            session_id=result["session_id"],
-            artifacts=result["artifacts"],
-            entities=result["entities"],
-            kpis=result["kpis"]
+            session_id=session_id,
+            artifacts=result if isinstance(result, dict) else {},
+            entities=result.get("entities", []) if isinstance(result, dict) else [],
+            kpis=result.get("kpis", []) if isinstance(result, dict) else []
         )
         
     except HTTPException:
@@ -286,7 +251,7 @@ async def get_session_artifacts(
 @router.post("/sessions/{session_id}/finalize", response_model=FinalizeSessionResponse)
 async def finalize_session(
     session_id: str,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """
     Finalize a design session.
@@ -294,23 +259,19 @@ async def finalize_session(
     This runs validation, generates documentation, and prepares
     all artifacts for persistence to the Business Metadata Service.
     """
-    session = orchestrator.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    
     try:
-        result = await orchestrator.finalize_session(session_id)
+        result = await client.finalize_session(session_id)
         
         if not result.get("success"):
             raise HTTPException(status_code=500, detail=result.get("error", "Finalization failed"))
         
         return FinalizeSessionResponse(
-            success=result["success"],
-            session_id=result["session_id"],
-            status=result["status"],
-            value_chain=result["value_chain"],
-            artifacts=result["artifacts"],
-            validation=result["validation"]
+            success=result.get("success", True),
+            session_id=session_id,
+            status=result.get("status", "finalized"),
+            value_chain=result.get("value_chain", {}),
+            artifacts=result.get("artifacts", {}),
+            validation=result.get("validation", {})
         )
         
     except HTTPException:
@@ -323,37 +284,29 @@ async def finalize_session(
 @router.delete("/sessions/{session_id}")
 async def cancel_session(
     session_id: str,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """Cancel a design session."""
-    success = await orchestrator.cancel_session(session_id)
-    
-    if not success:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    
-    return {"success": True, "session_id": session_id, "status": "cancelled"}
+    try:
+        result = await client.cancel_session(session_id)
+        return {"success": True, "session_id": session_id, "status": "cancelled"}
+    except Exception as e:
+        logger.error(f"Failed to cancel session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/sessions", response_model=SessionListResponse)
 async def list_sessions(
     user_id: Optional[str] = None,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    client: RedisAgentClient = Depends(get_multi_agent_client)
 ):
     """List all design sessions, optionally filtered by user."""
-    sessions = orchestrator.list_sessions(user_id)
-    
-    return SessionListResponse(
-        sessions=[
-            {
-                "session_id": s.id,
-                "user_id": s.user_id,
-                "status": s.status,
-                "created_at": s.created_at.isoformat(),
-                "message_count": s.message_count
-            }
-            for s in sessions
-        ]
-    )
+    try:
+        sessions = await client.list_sessions(user_id)
+        return SessionListResponse(sessions=sessions if isinstance(sessions, list) else [])
+    except Exception as e:
+        logger.error(f"Failed to list sessions: {e}")
+        return SessionListResponse(sessions=[])
 
 
 # =============================================================================
@@ -460,24 +413,14 @@ async def websocket_design_session(
     await websocket.accept()
     
     try:
-        # Get orchestrator
-        orchestrator = await get_orchestrator()
-        
-        # Verify session exists
-        session = orchestrator.get_session(session_id)
-        if not session:
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Session {session_id} not found"
-            })
-            await websocket.close()
-            return
+        # Get client
+        client = MultiAgentServiceClient()
         
         # Send connection confirmation
         await websocket.send_json({
             "type": "connected",
             "session_id": session_id,
-            "status": session.status
+            "status": "active"
         })
         
         while True:
@@ -493,9 +436,7 @@ async def websocket_design_session(
                 content = data
             
             if message_type == "message":
-                from .agents.base_agent import StreamEvent, StreamEventType
-                
-                # Stream response from coordinator
+                # Stream response from coordinator via client
                 await websocket.send_json({
                     "type": "processing",
                     "message": "Processing your message..."
@@ -513,88 +454,25 @@ async def websocket_design_session(
                     }
                 })
                 
-                full_response = []
-                activity_counter = 0
-                async for event in orchestrator.stream_message(session_id, content):
-                    if isinstance(event, StreamEvent):
-                        if event.event_type == StreamEventType.TEXT:
-                            # Text chunk - send as before
-                            if event.content:
-                                full_response.append(event.content)
-                                await websocket.send_json({
-                                    "type": "chunk",
-                                    "content": event.content
-                                })
-                        elif event.event_type == StreamEventType.DELEGATION:
-                            # Real-time delegation activity
-                            activity_counter += 1
-                            await websocket.send_json({
-                                "type": "agent_activity",
-                                "activity": {
-                                    "id": f"act_del_{session_id}_{activity_counter}",
-                                    "type": "delegation",
-                                    "source": event.source or "coordinator",
-                                    "target": event.target or "unknown",
-                                    "details": event.details,
-                                    "timestamp": event.timestamp.isoformat()
-                                }
-                            })
-                        elif event.event_type == StreamEventType.PEER_CONSULTATION:
-                            # Real-time peer consultation
-                            activity_counter += 1
-                            await websocket.send_json({
-                                "type": "agent_activity",
-                                "activity": {
-                                    "id": f"act_peer_{session_id}_{activity_counter}",
-                                    "type": "peer_consultation",
-                                    "source": event.source or "unknown",
-                                    "target": event.target or "unknown",
-                                    "details": event.details,
-                                    "timestamp": event.timestamp.isoformat()
-                                }
-                            })
-                        elif event.event_type == StreamEventType.TOOL_CALL:
-                            # Real-time tool call activity
-                            activity_counter += 1
-                            await websocket.send_json({
-                                "type": "agent_activity",
-                                "activity": {
-                                    "id": f"act_tool_{session_id}_{activity_counter}",
-                                    "type": "tool_call",
-                                    "source": event.source or "unknown",
-                                    "tool_name": event.tool_name,
-                                    "details": event.details,
-                                    "timestamp": event.timestamp.isoformat()
-                                }
-                            })
-                    else:
-                        # Legacy string handling (fallback)
-                        full_response.append(str(event))
-                        await websocket.send_json({
-                            "type": "chunk",
-                            "content": str(event)
-                        })
-                
-                # Fetch artifacts after processing for design progress
+                # Send message via client (non-streaming for now)
                 try:
-                    artifacts_result = await orchestrator.get_session_artifacts(session_id)
-                    if "artifacts" in artifacts_result:
-                        artifacts = artifacts_result["artifacts"]
-                        
-                        # Send design progress if available
-                        if "design_progress" in artifacts:
-                            await websocket.send_json({
-                                "type": "design_progress",
-                                "progress": artifacts["design_progress"]
-                            })
+                    response = await client.send_message(session_id, content)
+                    
+                    await websocket.send_json({
+                        "type": "chunk",
+                        "content": response.get("content", "")
+                    })
+                    
+                    # Send completion
+                    await websocket.send_json({
+                        "type": "complete",
+                        "content": response.get("content", "")
+                    })
                 except Exception as e:
-                    logger.debug(f"Could not fetch artifacts for design progress: {e}")
-                
-                # Send completion
-                await websocket.send_json({
-                    "type": "complete",
-                    "content": "".join(full_response)
-                })
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e)
+                    })
                 
             elif message_type == "analyze":
                 # Run parallel analysis
@@ -605,27 +483,21 @@ async def websocket_design_session(
                     "message": f"Running {analysis_type} analysis with multiple agents..."
                 })
                 
-                results = await orchestrator.run_parallel_analysis(
-                    session_id, 
-                    analysis_type
-                )
-                
-                # Send results
-                serialized = {}
-                for agent, response in results.items():
-                    if isinstance(response, AgentResponse):
-                        serialized[agent] = {
-                            "content": response.content,
-                            "artifacts": response.artifacts,
-                            "success": response.success
-                        }
-                    else:
-                        serialized[agent] = response
-                
-                await websocket.send_json({
-                    "type": "analysis_complete",
-                    "results": serialized
-                })
+                try:
+                    results = await client.run_parallel_analysis(
+                        session_id, 
+                        analysis_type
+                    )
+                    
+                    await websocket.send_json({
+                        "type": "analysis_complete",
+                        "results": results
+                    })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e)
+                    })
                 
             elif message_type == "finalize":
                 # Finalize session
@@ -634,12 +506,18 @@ async def websocket_design_session(
                     "message": "Finalizing design session..."
                 })
                 
-                result = await orchestrator.finalize_session(session_id)
-                
-                await websocket.send_json({
-                    "type": "finalized",
-                    "result": result
-                })
+                try:
+                    result = await client.finalize_session(session_id)
+                    
+                    await websocket.send_json({
+                        "type": "finalized",
+                        "result": result
+                    })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e)
+                    })
                 
             elif message_type == "ping":
                 await websocket.send_json({"type": "pong"})
@@ -656,3 +534,194 @@ async def websocket_design_session(
         except Exception:
             pass
         await websocket.close()
+
+
+# =============================================================================
+# Phase 16: Blackboard Access Endpoints
+# =============================================================================
+
+class BlackboardTaskResponse(BaseModel):
+    """Response containing blackboard tasks."""
+    session_id: str
+    tasks: List[Dict[str, Any]]
+    total: int
+
+
+class BlackboardArtifactResponse(BaseModel):
+    """Response containing blackboard artifacts."""
+    session_id: str
+    artifacts: List[Dict[str, Any]]
+    total: int
+
+
+class ContractStatusResponse(BaseModel):
+    """Response containing contract status for agents."""
+    session_id: str
+    agents: List[Dict[str, Any]]
+    degraded_mode: bool
+    degraded_reason: Optional[str] = None
+
+
+class AgentStateResponse(BaseModel):
+    """Response containing agent state machine status."""
+    session_id: str
+    agent_role: str
+    current_state: str
+    assumption_count: int
+    failed_attempts: int
+    last_transition: Optional[str] = None
+    contract_violations: int
+
+
+@router.get("/{session_id}/blackboard/tasks", response_model=BlackboardTaskResponse)
+async def get_session_tasks(
+    session_id: str,
+    client: RedisAgentClient = Depends(get_multi_agent_client)
+):
+    """
+    Get all tasks on the blackboard for a session.
+    
+    Returns tasks with their status, assignee, and completion criteria.
+    """
+    from .agents.config import get_agent_settings, should_use_blackboard
+    
+    settings = get_agent_settings()
+    
+    if not should_use_blackboard(session_id):
+        return BlackboardTaskResponse(
+            session_id=session_id,
+            tasks=[],
+            total=0
+        )
+    
+    try:
+        tasks = await client.get_session_tasks(session_id)
+        
+        return BlackboardTaskResponse(
+            session_id=session_id,
+            tasks=[t.model_dump() if hasattr(t, 'model_dump') else t for t in tasks],
+            total=len(tasks)
+        )
+    except Exception as e:
+        logger.warning(f"Failed to fetch blackboard tasks: {e}")
+        return BlackboardTaskResponse(
+            session_id=session_id,
+            tasks=[],
+            total=0
+        )
+
+
+@router.get("/{session_id}/blackboard/artifacts", response_model=BlackboardArtifactResponse)
+async def get_blackboard_artifacts(
+    session_id: str,
+    client: RedisAgentClient = Depends(get_multi_agent_client)
+):
+    """
+    Get all artifacts submitted for a session.
+    
+    Returns artifacts with their type, creator, and review status.
+    """
+    from .agents.config import should_use_blackboard
+    
+    if not should_use_blackboard(session_id):
+        return BlackboardArtifactResponse(session_id=session_id, artifacts=[], total=0)
+    
+    try:
+        artifacts = await client.get_session_artifacts(session_id)
+        
+        return BlackboardArtifactResponse(
+            session_id=session_id,
+            artifacts=[a.model_dump() if hasattr(a, 'model_dump') else a for a in artifacts],
+            total=len(artifacts)
+        )
+    except Exception as e:
+        logger.warning(f"Failed to fetch blackboard artifacts: {e}")
+        return BlackboardArtifactResponse(session_id=session_id, artifacts=[], total=0)
+
+
+@router.get("/{session_id}/contract-status", response_model=ContractStatusResponse)
+async def get_contract_status(
+    session_id: str,
+    client: RedisAgentClient = Depends(get_multi_agent_client)
+):
+    """
+    Get contract compliance status for all agents in session.
+    
+    Returns current state, violation count, and degraded mode status.
+    """
+    from .agents.config import get_agent_settings, should_use_blackboard
+    
+    settings = get_agent_settings()
+    
+    if not should_use_blackboard(session_id):
+        return ContractStatusResponse(
+            session_id=session_id,
+            agents=[],
+            degraded_mode=not settings.MULTI_AGENT_SERVICE_ENABLED,
+            degraded_reason="Blackboard not enabled for this session"
+        )
+    
+    try:
+        status = await client.get_contract_status(session_id)
+        
+        return ContractStatusResponse(
+            session_id=session_id,
+            agents=status.get("agents", []),
+            degraded_mode=status.get("degraded_mode", False),
+            degraded_reason=status.get("degraded_reason")
+        )
+    except Exception as e:
+        logger.warning(f"Failed to fetch contract status: {e}")
+        return ContractStatusResponse(
+            session_id=session_id,
+            agents=[],
+            degraded_mode=True,
+            degraded_reason=f"multi_agent_service unavailable: {str(e)}"
+        )
+
+
+@router.get("/{session_id}/agent/{agent_role}/state", response_model=AgentStateResponse)
+async def get_agent_state(
+    session_id: str,
+    agent_role: str,
+    client: RedisAgentClient = Depends(get_multi_agent_client)
+):
+    """
+    Get current state machine state for an agent.
+    
+    Returns the agent's current state, transition history, and metrics.
+    """
+    from .agents.config import should_use_blackboard
+    
+    if not should_use_blackboard(session_id):
+        return AgentStateResponse(
+            session_id=session_id,
+            agent_role=agent_role,
+            current_state="unknown",
+            assumption_count=0,
+            failed_attempts=0,
+            contract_violations=0
+        )
+    
+    try:
+        state = await client.get_agent_state(session_id, agent_role)
+        
+        return AgentStateResponse(
+            session_id=session_id,
+            agent_role=agent_role,
+            current_state=state.get("current_state", "idle"),
+            assumption_count=state.get("assumption_count", 0),
+            failed_attempts=state.get("failed_attempts", 0),
+            last_transition=state.get("last_transition"),
+            contract_violations=state.get("contract_violations", 0)
+        )
+    except Exception as e:
+        logger.warning(f"Failed to fetch agent state: {e}")
+        return AgentStateResponse(
+            session_id=session_id,
+            agent_role=agent_role,
+            current_state="unknown",
+            assumption_count=0,
+            failed_attempts=0,
+            contract_violations=0
+        )

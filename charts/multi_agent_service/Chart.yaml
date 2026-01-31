@@ -1,0 +1,23 @@
+apiVersion: v2
+name: multi-agent-service
+description: Agent contracts, blackboard coordination, and peer review for multi-agent system
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: AnalyticsEngine Team
+    email: team@analyticsengine.io
+
+keywords:
+  - multi-agent
+  - contracts
+  - blackboard
+  - peer-review
+  - ai-agents
+
+dependencies:
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

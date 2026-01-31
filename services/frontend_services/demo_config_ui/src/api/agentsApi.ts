@@ -152,7 +152,72 @@ export type WSMessageType =
   | 'agent_activity'
   | 'design_progress'
   | 'error'
-  | 'pong';
+  | 'pong'
+  // Phase 17: Contract-related message types
+  | 'contract_violation'
+  | 'state_transition'
+  | 'peer_review_required'
+  | 'peer_review_complete'
+  | 'struggle_signal'
+  | 'hard_stop'
+  | 'degraded_mode';
+
+// Phase 17: Contract Event Interfaces
+export interface ContractViolationMessage {
+  type: 'contract_violation';
+  agentRole: string;
+  tier: number;
+  ruleId: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface StateTransitionMessage {
+  type: 'state_transition';
+  agentRole: string;
+  fromState: string;
+  toState: string;
+  rationale: string;
+  timestamp: string;
+}
+
+export interface PeerReviewMessage {
+  type: 'peer_review_required' | 'peer_review_complete';
+  artifactId: string;
+  artifactType: string;
+  creatorRole: string;
+  reviewerRole: string;
+  verdict?: 'approved' | 'rejected' | 'revision_needed';
+  timestamp: string;
+}
+
+export interface StruggleSignalMessage {
+  type: 'struggle_signal';
+  agentRole: string;
+  signalType: 'sync_needed' | 'blocked' | 'needs_clarification' | 'resource_needed';
+  whatIUnderstand: string;
+  whatITried: { action: string; result: string }[];
+  whereImStuck: string;
+  whatWouldHelp: string;
+  timestamp: string;
+}
+
+export interface HardStopMessage {
+  type: 'hard_stop';
+  agentRole: string;
+  triggerType: string;
+  reason: string;
+  timestamp: string;
+}
+
+export interface DegradedModeMessage {
+  type: 'degraded_mode';
+  active: boolean;
+  reason: string;
+  suspendedFeatures: string[];
+  activeFeatures: string[];
+  timestamp: string;
+}
 
 export interface WSMessage {
   type: WSMessageType;
@@ -164,6 +229,30 @@ export interface WSMessage {
   result?: Record<string, any>;
   activity?: AgentActivity;
   progress?: DesignProgress;
+  // Phase 17: Contract event fields
+  agentRole?: string;
+  tier?: number;
+  ruleId?: string;
+  description?: string;
+  fromState?: string;
+  toState?: string;
+  rationale?: string;
+  artifactId?: string;
+  artifactType?: string;
+  creatorRole?: string;
+  reviewerRole?: string;
+  verdict?: string;
+  signalType?: string;
+  whatIUnderstand?: string;
+  whatITried?: { action: string; result: string }[];
+  whereImStuck?: string;
+  whatWouldHelp?: string;
+  triggerType?: string;
+  reason?: string;
+  active?: boolean;
+  suspendedFeatures?: string[];
+  activeFeatures?: string[];
+  timestamp?: string;
 }
 
 // =============================================================================

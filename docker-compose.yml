@@ -458,6 +458,54 @@ services:
       retries: 3
       start_period: 40s
 
+  # Multi-Agent Service - Agent contracts, blackboard, peer review
+  multi_agent_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: services/backend_services/multi_agent_service
+    ports:
+      - "8091:8000"
+    env_file:
+      - .env
+      - path: .env.secrets
+        required: false
+    environment:
+      - SERVICE_NAME=multi_agent_service
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - PROMETHEUS_PUSH_GATEWAY=http://prometheus-pushgateway:9091
+      - METRICS_PUSH_INTERVAL=15
+      - BLACKBOARD_TTL_SECONDS=86400
+      - AUDIT_LOG_RETENTION_DAYS=90
+      - MAX_CONCURRENT_AGENTS=10
+      - PYTHONPATH=.
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      observability_service:
+        condition: service_healthy
+      prometheus-pushgateway:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Conversation Service
   conversation_service:
     build:
@@ -476,6 +524,11 @@ services:
       - DATABASE_SERVICE_URL=http://database_service:8000
       - MESSAGING_SERVICE_URL=http://messaging_service:8000
       - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - MULTI_AGENT_SERVICE_URL=http://multi_agent_service:8000
+      - MULTI_AGENT_SERVICE_ENABLED=true
+      - BLACKBOARD_ROLLOUT_PERCENT=100
+      - CONTRACT_ENFORCEMENT_ENABLED=true
+      - PEER_REVIEW_REQUIRED=true
       - REDIS_URL=redis://redis:6379
       - MCP_POSTGRES_ENABLED=true
       - MCP_KNOWLEDGE_GRAPH_ENABLED=true
@@ -489,6 +542,8 @@ services:
       database_service:
         condition: service_healthy
       messaging_service:
+        condition: service_healthy
+      multi_agent_service:
         condition: service_healthy
     volumes:
       - .:/app

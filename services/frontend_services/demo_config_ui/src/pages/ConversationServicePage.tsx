@@ -201,6 +201,11 @@ export default function ConversationServicePage() {
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [designProgress, setDesignProgress] = useState<DesignProgress>({});
 
+  // Phase 17: Contract event state
+  const [contractViolations, setContractViolations] = useState<any[]>([]);
+  const [struggleSignals, setStruggleSignals] = useState<any[]>([]);
+  const [degradedMode, setDegradedMode] = useState<{active: boolean; reason: string} | null>(null);
+
   // Artifacts state
   const [entities, setEntities] = useState<string[]>([]);
   const [kpis, setKpis] = useState<string[]>([]);
@@ -313,6 +318,42 @@ export default function ConversationServicePage() {
         } else if (message.type === 'analysis_complete' || message.type === 'finalized') {
           setIsProcessing(false);
           fetchArtifacts();
+        }
+        // Phase 17: Handle contract-related message types
+        else if (message.type === 'contract_violation') {
+          setContractViolations(prev => [...prev, {
+            id: `violation_${Date.now()}`,
+            agentRole: message.agentRole,
+            tier: message.tier,
+            ruleId: message.ruleId,
+            description: message.description,
+            timestamp: message.timestamp || new Date().toISOString()
+          }]);
+        } else if (message.type === 'struggle_signal') {
+          setStruggleSignals(prev => [...prev, {
+            id: `struggle_${Date.now()}`,
+            agentRole: message.agentRole,
+            signalType: message.signalType,
+            whatIUnderstand: message.whatIUnderstand,
+            whatITried: message.whatITried,
+            whereImStuck: message.whereImStuck,
+            whatWouldHelp: message.whatWouldHelp,
+            timestamp: message.timestamp || new Date().toISOString()
+          }]);
+        } else if (message.type === 'degraded_mode') {
+          setDegradedMode({
+            active: message.active ?? true,
+            reason: message.reason || 'Multi-agent service unavailable'
+          });
+        } else if (message.type === 'hard_stop') {
+          // Hard stop - add as a system message
+          setMessages(prev => [...prev, {
+            id: `msg_${Date.now()}`,
+            role: 'system',
+            content: `⛔ HARD STOP: ${message.reason} (Agent: ${message.agentRole})`,
+            timestamp: new Date()
+          }]);
+          setIsProcessing(false);
         }
       },
       onActivity: (activity: AgentActivity) => {

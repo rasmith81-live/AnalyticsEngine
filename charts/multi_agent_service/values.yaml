@@ -1,0 +1,128 @@
+# Default values for multi-agent-service
+# This is a YAML-formatted file.
+
+replicaCount: 2
+
+image:
+  repository: analyticsengine/multi-agent-service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: multi-agent.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment variables
+env:
+  SERVICE_NAME: multi_agent_service
+  REDIS_URL: redis://redis:6379
+  BLACKBOARD_TTL_SECONDS: "86400"
+  AUDIT_LOG_RETENTION_DAYS: "90"
+  MAX_CONCURRENT_AGENTS: "10"
+  ENABLE_DISTRIBUTED_TRACING: "true"
+  ENABLE_PROMETHEUS_METRICS: "true"
+  METRICS_PUSH_INTERVAL: "15"
+
+# Secrets (reference to external secrets)
+secrets:
+  databaseUrl:
+    secretName: multi-agent-secrets
+    key: database-url
+  anthropicApiKey:
+    secretName: multi-agent-secrets
+    key: anthropic-api-key
+
+# Redis sidecar configuration
+redis:
+  enabled: false
+  architecture: standalone
+  auth:
+    enabled: false
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Service dependencies
+dependencies:
+  redis:
+    host: redis
+    port: 6379
+  timescaledb:
+    host: timescaledb
+    port: 5432
+  observability:
+    host: observability-service
+    port: 8000

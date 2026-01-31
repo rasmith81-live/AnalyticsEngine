@@ -1,110 +1,55 @@
+# =============================================================================
+# Conversation Service Agents Module
+# Post-Migration: All agent runtime components now live in multi_agent_service
+# =============================================================================
 """
-Multi-Agent Framework for Analytics Engine
+Multi-Agent Framework Client for Conversation Service
 
-This module provides a multi-agent architecture using Claude models:
-- Strategy Coordinator (Claude Opus 4.5): Master orchestrator
-- Specialized Sub-Agents (Claude Sonnet 4): Domain experts
+This module provides access to the multi-agent architecture via the
+multi_agent_service backend using Redis Streams for event-driven communication.
 
-The agents collaborate to design comprehensive business value chain models
-through client interviews conducted via the Conversation Service.
+Communication Pattern:
+- Commands → Redis Streams (reliable, persistent, consumer groups)
+- Responses → Redis Pub/Sub (real-time, low latency)
+- State → Redis Hash (session caching)
+
+Local components:
+- RedisAgentClient: Redis Streams/Pub/Sub client for multi_agent_service
+- MultiAgentServiceClient: HTTP client (fallback/external API access)
+- CircuitBreaker: Resilience for service calls
+- Config: Feature flags and configuration
+
+Remote components (via multi_agent_service):
+- All 27 specialized agents
+- Strategy Coordinator
+- Agent Orchestrator
+- Blackboard operations
+- Contract enforcement
 """
 
-from .base_agent import BaseAgent, AgentConfig, AgentResponse, AgentMessage
-from .coordinator import StrategyCoordinator
-from .sub_agents import (
-    ArchitectAgent,
-    BusinessAnalystAgent,
-    DataAnalystAgent,
-    DeveloperAgent,
-    TesterAgent,
-    DocumenterAgent,
-    DeploymentSpecialistAgent,
-    ProjectManagerAgent,
-    ITILManagerAgent,
-    MappingSpecialistAgent,
-    ConnectionSpecialistAgent,
-    DocumentAnalyzerAgent
+from .config import (
+    should_use_blackboard,
+    get_multi_agent_config,
+    is_contract_enforcement_enabled,
 )
-from .business_agents import (
-    SalesManagerAgent,
-    AccountantAgent,
-    DataGovernanceSpecialistAgent,
-    DataScientistAgent,
-    MarketingManagerAgent,
-    UIDesignerAgent,
-    BusinessStrategistAgent,
-    OperationsManagerAgent,
-    CustomerSuccessManagerAgent,
-    HRTalentAnalystAgent,
-    RiskComplianceOfficerAgent,
-    SupplyChainAnalystAgent,
-    CompetitiveAnalystAgent,
-    ProcessScenarioModelerAgent
-)
-from .orchestrator import AgentOrchestrator
-from .tools import (
-    DesignValueChainTool,
-    DefineEntityTool,
-    IdentifyKPIsTool,
-    GenerateSchemaTool,
-    ValidateSchemaTool,
-    GenerateDocsTool
-)
+from .circuit_breaker import CircuitBreaker, CircuitState
+from .multi_agent_client import MultiAgentServiceClient
+from .redis_agent_client import RedisAgentClient, get_redis_agent_client
 
 __all__ = [
-    # Base classes
-    "BaseAgent",
-    "AgentConfig",
-    "AgentResponse",
-    "AgentMessage",
+    # Redis-based client (primary)
+    "RedisAgentClient",
+    "get_redis_agent_client",
     
-    # Coordinator
-    "StrategyCoordinator",
+    # HTTP client (fallback/external)
+    "MultiAgentServiceClient",
     
-    # Sub-agents
-    "ArchitectAgent",
-    "BusinessAnalystAgent",
-    "DataAnalystAgent",
-    "DeveloperAgent",
-    "TesterAgent",
-    "DocumenterAgent",
-    "DeploymentSpecialistAgent",
-    "ProjectManagerAgent",
+    # Resilience
+    "CircuitBreaker",
+    "CircuitState",
     
-    # Business agents
-    "SalesManagerAgent",
-    "AccountantAgent",
-    "DataGovernanceSpecialistAgent",
-    "DataScientistAgent",
-    "MarketingManagerAgent",
-    "UIDesignerAgent",
-    "BusinessStrategistAgent",
-    "OperationsManagerAgent",
-    "CustomerSuccessManagerAgent",
-    "HRTalentAnalystAgent",
-    "RiskComplianceOfficerAgent",
-    "SupplyChainAnalystAgent",
-    "CompetitiveAnalystAgent",
-    "ProcessScenarioModelerAgent",
-    
-    # Technical agents
-    "ITILManagerAgent",
-    
-    # Analytics/Integration specialists
-    "MappingSpecialistAgent",
-    "ConnectionSpecialistAgent",
-    
-    # Document analysis
-    "DocumentAnalyzerAgent",
-    
-    # Orchestrator
-    "AgentOrchestrator",
-    
-    # Tools
-    "DesignValueChainTool",
-    "DefineEntityTool",
-    "IdentifyKPIsTool",
-    "GenerateSchemaTool",
-    "ValidateSchemaTool",
-    "GenerateDocsTool",
+    # Configuration
+    "should_use_blackboard",
+    "get_multi_agent_config",
+    "is_contract_enforcement_enabled",
 ]

@@ -117,6 +117,20 @@ sessions_store: Dict[str, InterviewSession] = {} # Stores structured session met
 async def health_check():
     return {"status": "healthy", "service": "conversation-service"}
 
+
+@app.post("/admin/clear-secrets-cache")
+async def clear_secrets_cache():
+    """Clear the secrets manager cache to pick up new API keys."""
+    from .secrets_manager import get_secrets_manager
+    try:
+        manager = await get_secrets_manager()
+        manager.clear_cache()
+        logger.info("Secrets cache cleared")
+        return {"status": "success", "message": "Secrets cache cleared"}
+    except Exception as e:
+        logger.error(f"Failed to clear secrets cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post(f"{settings.API_V1_STR}/sessions", response_model=InterviewSession)
 async def create_session(user_id: str):
     """Create a new interview session."""
@@ -315,24 +329,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 async def websocket_agents_endpoint(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for multi-agent design sessions.
-    Uses Claude Opus 4.5 coordinator with specialized Sonnet 4 sub-agents.
+    Uses multi_agent_service via Redis Streams/Pub/Sub.
     """
-    from .agents.orchestrator import get_orchestrator
+    from .agents.redis_agent_client import get_redis_agent_client
     
     await websocket.accept()
     
     try:
-        orchestrator = await get_orchestrator()
-        
-        # Check if session exists, create if not
-        session = orchestrator._sessions.get(session_id)
-        if not session:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": f"Session {session_id} not found. Create via POST /api/v1/agents/design-session first."
-            }))
-            await websocket.close()
-            return
+        client = get_redis_agent_client()
         
         await websocket.send_text(json.dumps({
             "type": "connected",
@@ -349,29 +353,32 @@ async def websocket_agents_endpoint(websocket: WebSocket, session_id: str):
             except json.JSONDecodeError:
                 message = data
             
-            # Stream response from multi-agent system
+            # Process via multi-agent service client
             await websocket.send_text(json.dumps({
                 "type": "processing",
                 "message": "Processing with multi-agent system..."
             }))
             
-            full_response = []
-            async for chunk in orchestrator.stream_message(session_id, message):
-                full_response.append(chunk)
+            try:
+                response = await client.send_message(session_id, message)
+                
                 await websocket.send_text(json.dumps({
                     "type": "chunk",
-                    "content": chunk
+                    "content": response.get("content", "")
                 }))
-            
-            # Send completion with artifacts
-            session = orchestrator._sessions.get(session_id)
-            await websocket.send_text(json.dumps({
-                "type": "complete",
-                "content": "".join(full_response),
-                "artifacts": list(session.context.artifacts.keys()) if session else [],
-                "entities": session.context.identified_entities if session else [],
-                "kpis": session.context.identified_kpis if session else []
-            }))
+                
+                # Send completion
+                await websocket.send_text(json.dumps({
+                    "type": "complete",
+                    "content": response.get("content", ""),
+                    "artifacts": response.get("artifacts", {}),
+                    "success": response.get("success", True)
+                }))
+            except Exception as e:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": str(e)
+                }))
             
     except WebSocketDisconnect:
         logger.info(f"Multi-agent session {session_id} disconnected")

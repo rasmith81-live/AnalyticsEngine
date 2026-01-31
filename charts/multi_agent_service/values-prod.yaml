@@ -1,0 +1,57 @@
+# Production environment values for multi-agent-service
+
+replicaCount: 3
+
+image:
+  pullPolicy: IfNotPresent
+  tag: "stable"
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+env:
+  SERVICE_NAME: multi_agent_service
+  BLACKBOARD_TTL_SECONDS: "172800"
+  AUDIT_LOG_RETENTION_DAYS: "365"
+  MAX_CONCURRENT_AGENTS: "50"
+  ENABLE_DISTRIBUTED_TRACING: "true"
+  ENABLE_PROMETHEUS_METRICS: "true"
+  DEBUG: "false"
+
+# Use external Redis cluster
+redis:
+  enabled: false
+
+# Production ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: multi-agent.analyticsengine.io
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: multi-agent-tls
+      hosts:
+        - multi-agent.analyticsengine.io
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
