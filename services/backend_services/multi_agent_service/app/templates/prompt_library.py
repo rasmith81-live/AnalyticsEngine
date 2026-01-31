@@ -139,21 +139,27 @@ class PromptLibrary:
         self._init_base_templates()
     
     def _init_scenarios(self) -> None:
-        """Initialize default scenarios."""
+        """
+        Initialize default scenarios.
+        
+        NOTE: Industry-specific scenarios (supply_chain, retail, etc.) are NOT
+        pre-defined here. They are loaded dynamically from client configuration.
+        Only generic, industry-agnostic scenarios are initialized by default.
+        """
         scenarios = [
             PromptScenario(
-                name="supply_chain",
-                description="Supply chain analytics and operations",
+                name="analytics_setup",
+                description="Generic analytics platform setup and configuration",
                 shared_fragments=["collaboration", "contract_rules"]
             ),
             PromptScenario(
-                name="retail_analytics",
-                description="Retail sales and inventory analytics",
+                name="data_modeling",
+                description="Data modeling and schema design",
                 shared_fragments=["collaboration", "contract_rules"]
             ),
             PromptScenario(
-                name="financial_services",
-                description="Financial analysis and accounting",
+                name="kpi_definition",
+                description="KPI definition and calculation design",
                 shared_fragments=["collaboration", "contract_rules"]
             ),
             PromptScenario(
@@ -165,6 +171,35 @@ class PromptLibrary:
         
         for scenario in scenarios:
             self._scenarios[scenario.name] = scenario
+    
+    def register_client_scenario(
+        self, 
+        name: str, 
+        description: str,
+        shared_fragments: List[str] = None
+    ) -> PromptScenario:
+        """
+        Register a client-specific scenario dynamically.
+        
+        Called when loading client configuration to add industry-specific
+        scenarios based on the client's value chain framework.
+        
+        Args:
+            name: Scenario identifier (e.g., client's framework code)
+            description: Human-readable description
+            shared_fragments: List of shared fragment names to include
+            
+        Returns:
+            The created PromptScenario
+        """
+        scenario = PromptScenario(
+            name=name,
+            description=description,
+            shared_fragments=shared_fragments or ["collaboration", "contract_rules"]
+        )
+        self._scenarios[name] = scenario
+        logger.info(f"Registered client scenario: {name}")
+        return scenario
     
     def _init_shared_prompts(self) -> None:
         """Initialize shared prompts available across scenarios."""

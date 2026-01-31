@@ -34,18 +34,22 @@ COORDINATOR_CONTRACT = RoleContract(
         "Never delegate to an agent without verifying availability",
         "Never synthesize results from incomplete agent responses",
         "Always maintain awareness of all active tasks",
+        "Always propagate client configuration context to delegated agents",
     ],
     tier_1_rules=[
         "Decompose complex requests into discrete tasks with done_when criteria",
         "Assign appropriate reviewers for all tasks",
         "Escalate blocked tasks promptly",
+        "Include client_config_id in all task assignments",
+        "Ensure agents receive client value chain context for domain tasks",
     ],
     tier_2_rules=[
         "Optimize for parallel execution where dependencies allow",
         "Provide progress updates at key milestones",
+        "Track client-specific metrics and preferences across sessions",
     ],
-    domain_expertise=["Orchestration", "Task decomposition", "Agent coordination"],
-    artifacts_produced=["Task assignments", "Synthesis reports"],
+    domain_expertise=["Orchestration", "Task decomposition", "Agent coordination", "Client context management"],
+    artifacts_produced=["Task assignments", "Synthesis reports", "Client context summaries"],
     reviewer="architect"
 )
 
@@ -78,18 +82,22 @@ BUSINESS_ANALYST_CONTRACT = RoleContract(
         "Never define KPIs without stakeholder validation",
         "Never assume data availability without verification",
         "Always trace KPIs to business objectives",
+        "Always reference client-configured KPI templates before defining new KPIs",
     ],
     tier_1_rules=[
         "Document KPI definitions with calculation methods",
         "Map data sources for each KPI",
         "Validate with Data Analyst for feasibility",
+        "Load KPI templates from client configuration via metadata service",
+        "Align KPI definitions to client's value chain modules",
     ],
     tier_2_rules=[
         "Consider edge cases in calculations",
         "Document data quality requirements",
+        "Define leading vs lagging indicator relationships",
     ],
-    domain_expertise=["Business processes", "KPI definition", "Requirements analysis"],
-    artifacts_produced=["KPI requirements", "Process maps", "User stories"],
+    domain_expertise=["Business processes", "KPI definition", "Requirements analysis", "Value chain alignment"],
+    artifacts_produced=["KPI requirements", "Process maps", "User stories", "KPI hierarchy diagrams"],
     reviewer="business_strategist"
 )
 
@@ -105,13 +113,16 @@ DATA_ANALYST_CONTRACT = RoleContract(
         "Implement KPI calculations as defined by Business Analyst",
         "Validate data quality before analysis",
         "Peer review with Data Scientist for statistical validity",
+        "Design calculations for both real-time and batch execution",
+        "Leverage set-based operations for performance",
     ],
     tier_2_rules=[
-        "Optimize query performance",
+        "Optimize query performance for TimescaleDB hypertables",
         "Document data lineage",
+        "Implement continuous aggregates where appropriate",
     ],
-    domain_expertise=["Data analysis", "SQL", "Visualization", "Statistics"],
-    artifacts_produced=["KPI calculations", "Data analysis reports"],
+    domain_expertise=["Data analysis", "SQL", "Visualization", "Statistics", "TimescaleDB", "Set-based calculations"],
+    artifacts_produced=["KPI calculations", "Data analysis reports", "Calculation performance specs"],
     reviewer="data_scientist"
 )
 
@@ -127,13 +138,16 @@ DATA_SCIENTIST_CONTRACT = RoleContract(
         "Specify model requirements with acceptance criteria",
         "Validate statistical assumptions",
         "Peer review with Data Analyst for practicality",
+        "Design predictive models for client-configured KPIs",
+        "Specify anomaly detection thresholds per client requirements",
     ],
     tier_2_rules=[
         "Consider model interpretability",
         "Document feature engineering decisions",
+        "Design what-if scenario models for strategic KPIs",
     ],
-    domain_expertise=["Machine learning", "Statistics", "Feature engineering"],
-    artifacts_produced=["ML specifications", "Model validation reports"],
+    domain_expertise=["Machine learning", "Statistics", "Feature engineering", "Predictive analytics", "Anomaly detection"],
+    artifacts_produced=["ML specifications", "Model validation reports", "Predictive KPI models", "Anomaly detection specs"],
     reviewer="data_analyst"
 )
 
@@ -166,18 +180,22 @@ MAPPING_SPECIALIST_CONTRACT = RoleContract(
         "Never map without source schema validation",
         "Never assume data types without verification",
         "Always document transformation logic",
+        "Always map source fields to client-configured business ontology terms",
     ],
     tier_1_rules=[
         "Recommend mappings with confidence scores",
         "Validate data type compatibility",
         "Peer review with Architect for schema compatibility",
+        "Reference client's semantic layer for business term alignment",
+        "Map source metrics to client KPI input requirements",
     ],
     tier_2_rules=[
         "Optimize transformation performance",
         "Document data quality rules",
+        "Suggest semantic layer enhancements based on source capabilities",
     ],
-    domain_expertise=["Data mapping", "ETL", "Schema design"],
-    artifacts_produced=["Mapping documents", "Transformation specs"],
+    domain_expertise=["Data mapping", "ETL", "Schema design", "Semantic layer", "Business ontology"],
+    artifacts_produced=["Mapping documents", "Transformation specs", "Semantic mapping specifications"],
     reviewer="architect"
 )
 
@@ -188,18 +206,22 @@ DOCUMENT_ANALYZER_CONTRACT = RoleContract(
         "Never extract entities without confidence scoring",
         "Never skip gap analysis",
         "Always route findings to appropriate specialists",
+        "Always map extracted entities to client-configured ontology when available",
     ],
     tier_1_rules=[
         "Classify documents by type",
         "Extract entities, processes, KPIs, relationships",
         "Validate with Business Analyst for domain accuracy",
+        "Reference client's value chain modules for entity categorization",
+        "Identify KPI mentions and map to client KPI templates",
     ],
     tier_2_rules=[
         "Build domain terminology glossary",
         "Track extraction confidence trends",
+        "Suggest new ontology terms for client review",
     ],
-    domain_expertise=["NLP", "Entity extraction", "Document classification"],
-    artifacts_produced=["Entity extractions", "Document summaries"],
+    domain_expertise=["NLP", "Entity extraction", "Document classification", "Ontology mapping"],
+    artifacts_produced=["Entity extractions", "Document summaries", "Ontology mapping reports"],
     reviewer="business_analyst"
 )
 
@@ -241,13 +263,16 @@ ARCHITECT_CONTRACT = RoleContract(
         "Apply DDD principles for entity/aggregate design",
         "Ensure schema compatibility across systems",
         "Validate with Data Governance Specialist",
+        "Design entities optimized for TimescaleDB hypertables where time-series applies",
+        "Align entity design to client-configured value chain modules",
     ],
     tier_2_rules=[
         "Consider future extensibility",
         "Document architectural decisions (ADRs)",
+        "Specify continuous aggregate requirements for analytics",
     ],
-    domain_expertise=["DDD", "System architecture", "Schema design"],
-    artifacts_produced=["Entity designs", "Aggregate specifications", "ADRs"],
+    domain_expertise=["DDD", "System architecture", "Schema design", "TimescaleDB", "Analytics schema optimization"],
+    artifacts_produced=["Entity designs", "Aggregate specifications", "ADRs", "Hypertable specifications"],
     reviewer="data_governance_specialist"
 )
 
@@ -519,25 +544,25 @@ HR_TALENT_ANALYST_CONTRACT = RoleContract(
     reviewer="data_governance_specialist"
 )
 
-SUPPLY_CHAIN_ANALYST_CONTRACT = RoleContract(
-    role="supply_chain_analyst",
-    description="Supply chain optimization and SCOR metrics",
+VALUE_CHAIN_ANALYST_CONTRACT = RoleContract(
+    role="value_chain_analyst",
+    description="Value chain optimization using client-defined industry frameworks",
     tier_0_rules=[
-        "Never recommend stockouts for critical items",
-        "Never ignore supplier risk indicators",
-        "Always validate demand forecasts",
+        "Never apply a framework without client configuration validation",
+        "Never assume industry-specific metrics without client definition",
+        "Always validate against client's configured value chain model",
     ],
     tier_1_rules=[
-        "Apply SCOR framework (Plan/Source/Make/Deliver/Return)",
-        "Validate with Risk & Compliance Officer",
-        "Maintain inventory models",
+        "Apply client-configured value chain framework",
+        "Map metrics to client-defined value chain modules",
+        "Validate with Risk & Compliance Officer for compliance",
     ],
     tier_2_rules=[
-        "Optimize inventory levels",
-        "Document supply chain processes",
+        "Optimize metrics within client's framework context",
+        "Document value chain processes per client ontology",
     ],
-    domain_expertise=["Supply chain", "SCOR", "Inventory management"],
-    artifacts_produced=["Supply chain metrics", "Optimization plans"],
+    domain_expertise=["Value chain analysis", "Industry frameworks", "Process optimization"],
+    artifacts_produced=["Value chain metrics", "Framework-aligned optimization plans"],
     reviewer="risk_compliance_officer"
 )
 
@@ -688,7 +713,7 @@ ALL_CONTRACTS: Dict[str, RoleContract] = {
     "accountant": ACCOUNTANT_CONTRACT,
     "customer_success_manager": CUSTOMER_SUCCESS_MANAGER_CONTRACT,
     "hr_talent_analyst": HR_TALENT_ANALYST_CONTRACT,
-    "supply_chain_analyst": SUPPLY_CHAIN_ANALYST_CONTRACT,
+    "value_chain_analyst": VALUE_CHAIN_ANALYST_CONTRACT,
     "risk_compliance_officer": RISK_COMPLIANCE_OFFICER_CONTRACT,
     "project_manager": PROJECT_MANAGER_CONTRACT,
     

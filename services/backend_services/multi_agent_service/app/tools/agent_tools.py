@@ -271,148 +271,86 @@ class IdentifyKPIsTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "domain": {
+                "module_code": {
                     "type": "string",
-                    "description": "Business domain (e.g., supply_chain, sales, finance)"
-                },
-                "industry": {
-                    "type": "string",
-                    "description": "Industry context"
+                    "description": "Client-defined value chain module code"
                 },
                 "focus_areas": {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Specific areas to focus on"
+                },
+                "client_config_id": {
+                    "type": "string",
+                    "description": "Client configuration ID for loading framework-specific templates"
                 }
             },
-            "required": ["domain"]
+            "required": []
         }
     
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
-        """Identify relevant KPIs."""
-        domain = params.get("domain", "").lower()
-        industry = params.get("industry", "")
+        """
+        Identify relevant KPIs from client-configured templates.
+        
+        KPI templates are loaded from:
+        1. Client configuration (primary - industry-specific)
+        2. Value chain module definitions
+        3. Generic fallbacks only if no client config exists
+        """
+        module_code = params.get("module_code", "")
         focus_areas = params.get("focus_areas", [])
+        client_config_id = params.get("client_config_id", "")
         
-        # Domain-specific KPI templates
-        kpi_templates = {
-            "supply_chain": [
-                {
-                    "name": "Order Fulfillment Rate",
-                    "code": "order_fulfillment_rate",
-                    "formula": "(Orders Fulfilled / Total Orders) * 100",
-                    "unit": "%",
-                    "required_objects": ["order"]
-                },
-                {
-                    "name": "Inventory Turnover",
-                    "code": "inventory_turnover",
-                    "formula": "Cost of Goods Sold / Average Inventory",
-                    "unit": "ratio",
-                    "required_objects": ["inventory", "cost"]
-                },
-                {
-                    "name": "Perfect Order Rate",
-                    "code": "perfect_order_rate",
-                    "formula": "(Perfect Orders / Total Orders) * 100",
-                    "unit": "%",
-                    "required_objects": ["order"]
-                }
-            ],
-            "sales": [
-                {
-                    "name": "Revenue",
-                    "code": "revenue",
-                    "formula": "SUM(Order.Amount)",
-                    "unit": "currency",
-                    "required_objects": ["order"]
-                },
-                {
-                    "name": "Conversion Rate",
-                    "code": "conversion_rate",
-                    "formula": "(Conversions / Leads) * 100",
-                    "unit": "%",
-                    "required_objects": ["lead", "opportunity"]
-                },
-                {
-                    "name": "Average Deal Size",
-                    "code": "average_deal_size",
-                    "formula": "Total Revenue / Number of Deals",
-                    "unit": "currency",
-                    "required_objects": ["deal"]
-                }
-            ],
-            "finance": [
-                {
-                    "name": "Gross Margin",
-                    "code": "gross_margin",
-                    "formula": "(Revenue - COGS) / Revenue * 100",
-                    "unit": "%",
-                    "required_objects": ["revenue", "cost"]
-                },
-                {
-                    "name": "Operating Margin",
-                    "code": "operating_margin",
-                    "formula": "Operating Income / Revenue * 100",
-                    "unit": "%",
-                    "required_objects": ["income", "revenue"]
-                }
-            ],
-            "operations": [
-                {
-                    "name": "Overall Equipment Effectiveness",
-                    "code": "oee",
-                    "formula": "Availability * Performance * Quality",
-                    "unit": "%",
-                    "required_objects": ["equipment", "production"]
-                },
-                {
-                    "name": "Throughput",
-                    "code": "throughput",
-                    "formula": "Units Produced / Time Period",
-                    "unit": "units/time",
-                    "required_objects": ["production"]
-                }
-            ],
-            "customer_service": [
-                {
-                    "name": "Customer Satisfaction Score",
-                    "code": "csat",
-                    "formula": "AVG(Survey Responses)",
-                    "unit": "score",
-                    "required_objects": ["survey", "customer"]
-                },
-                {
-                    "name": "Net Promoter Score",
-                    "code": "nps",
-                    "formula": "% Promoters - % Detractors",
-                    "unit": "score",
-                    "required_objects": ["survey", "customer"]
-                }
-            ]
-        }
-        
-        kpis = kpi_templates.get(domain, [])
+        # Attempt to load KPIs from client configuration
+        # This would typically call the metadata service to get client-defined KPIs
+        kpis = await self._load_client_kpis(client_config_id, module_code)
         
         if not kpis:
-            kpis = [
-                {
-                    "name": "Revenue Growth",
-                    "code": "revenue_growth",
-                    "formula": "(Current Revenue - Previous Revenue) / Previous Revenue * 100",
-                    "unit": "%",
-                    "required_objects": ["revenue"]
+            # Fallback: Return guidance for client to define KPIs
+            return ToolResult(
+                success=True,
+                data={
+                    "module_code": module_code,
+                    "kpis": [],
+                    "message": "No KPIs defined for this module. Client should define KPIs via the metadata service.",
+                    "guidance": {
+                        "action": "Define KPIs in client configuration",
+                        "required_fields": ["name", "code", "formula", "unit", "required_objects"],
+                        "example": {
+                            "name": "Example KPI",
+                            "code": "example_kpi",
+                            "formula": "(Numerator / Denominator) * 100",
+                            "unit": "%",
+                            "required_objects": ["entity1", "entity2"]
+                        }
+                    }
                 }
-            ]
+            )
         
         return ToolResult(
             success=True,
             data={
-                "domain": domain,
-                "industry": industry,
-                "kpis": kpis
+                "module_code": module_code,
+                "focus_areas": focus_areas,
+                "kpis": kpis,
+                "source": "client_configuration"
             }
         )
+    
+    async def _load_client_kpis(
+        self, 
+        client_config_id: str, 
+        module_code: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Load KPIs from client configuration via metadata service.
+        
+        In production, this calls the business_metadata service to retrieve
+        client-defined KPI templates for the specified module.
+        """
+        # TODO: Integrate with MetadataEventClient to fetch client KPIs
+        # For now, return empty to indicate client needs to define KPIs
+        return []
 
 
 class GenerateSchemaTool(BaseTool):

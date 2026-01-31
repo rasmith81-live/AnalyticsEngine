@@ -18,6 +18,7 @@ from . import dependencies
 from .api import router as metadata_router
 from .api.schema_extraction_api import router as schema_extraction_router
 from .consumers import ConversationEventConsumer
+from .messaging import MetadataCommandConsumer
 from .services.entity_event_handler import EntityEventHandler
 from .services.schema_metrics import SchemaMetrics
 
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Global consumer and handler instances
 conversation_consumer: ConversationEventConsumer = None
+metadata_command_consumer: MetadataCommandConsumer = None
 entity_event_handler: EntityEventHandler = None
 schema_metrics: SchemaMetrics = None
 
@@ -37,7 +39,7 @@ schema_metrics: SchemaMetrics = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for FastAPI application."""
-    global conversation_consumer, entity_event_handler, schema_metrics
+    global conversation_consumer, metadata_command_consumer, entity_event_handler, schema_metrics
     
     # Startup
     logger.info(f"Starting {settings.service_name} service...")
@@ -86,6 +88,20 @@ async def lifespan(app: FastAPI):
         await conversation_consumer.start()
         logger.info("Conversation Event Consumer started")
         
+        # Initialize and start Redis Command Consumer (Phase 21)
+        import asyncio
+        metadata_command_consumer = MetadataCommandConsumer(
+            db_manager=dependencies.db_manager,
+            event_publisher=dependencies.event_publisher
+        )
+        try:
+            await metadata_command_consumer.start()
+            app.state.command_consumer = metadata_command_consumer
+            app.state.consumer_task = asyncio.create_task(metadata_command_consumer.consume())
+            logger.info("Metadata Command Consumer started (Redis Streams)")
+        except Exception as e:
+            logger.warning(f"Failed to start Metadata Command Consumer: {e}")
+        
         logger.info(f"{settings.service_name} service started on port {settings.service_port}")
         
         yield
@@ -101,6 +117,17 @@ async def lifespan(app: FastAPI):
         if conversation_consumer:
             await conversation_consumer.stop()
             logger.info("Conversation Event Consumer stopped")
+        
+        # Stop Redis Command Consumer
+        if hasattr(app.state, 'consumer_task'):
+            app.state.consumer_task.cancel()
+            try:
+                await app.state.consumer_task
+            except asyncio.CancelledError:
+                pass
+        if hasattr(app.state, 'command_consumer'):
+            await app.state.command_consumer.stop()
+            logger.info("Metadata Command Consumer stopped")
             
         await dependencies.shutdown_backend_services()
         logger.info("Backend services shut down successfully")

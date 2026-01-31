@@ -6642,6 +6642,198 @@ Comprehensive test strategy documented in `docs/testing/MULTI_AGENT_TEST_STRATEG
 
 ---
 
+## Phase 21: Event-Driven Service Integration
+
+### 21.1 Overview
+
+This phase extends the Redis Streams/Pub/Sub communication pattern established in Phase 20 to all internal service-to-service communication, removing HTTP dependencies and creating a fully event-driven architecture.
+
+### 21.2 Current HTTP Integration Analysis
+
+**36 HTTP client files identified across the application:**
+
+| Category | Count | Services |
+|----------|-------|----------|
+| **API Gateway → Business Services** | 9 | metadata, calculation, connector, conversation, ingestion, simulator, config, entity_resolution |
+| **Business Service → Business Service** | 8 | metadata_ingestion→business_metadata, calculation→database, connector→database, etc. |
+| **Business Service → Backend Service** | 6 | multi_agent→database, conversation→multi_agent, archival→database |
+| **Support Services** | 7 | ML, data_governance, entity_resolution, systems_monitor |
+| **External APIs** | 6 | Azure AD, Exa Search, MCP clients (keep HTTP) |
+
+### 21.3 Migration Priority Matrix
+
+| Priority | Integration | Pattern | Reason |
+|----------|-------------|---------|--------|
+| **P1 - Critical** | multi_agent ↔ business_metadata | Redis Streams | Agents create entities/KPIs frequently |
+| **P1 - Critical** | multi_agent ↔ calculation_engine | Redis Streams | KPI calculations during agent work |
+| **P1 - Critical** | multi_agent ↔ connector_service | Redis Streams | Data fetching for analysis |
+| **P2 - High** | metadata_ingestion ↔ business_metadata | Redis Streams | Entity extraction pipeline |
+| **P2 - High** | metadata_ingestion ↔ entity_resolution | Redis Streams | Semantic mapping |
+| **P2 - High** | calculation_engine ↔ database_service | Redis Streams | Query execution |
+| **P3 - Medium** | data_simulator ↔ business_metadata | Redis Streams | Metadata lookup |
+| **P3 - Medium** | archival_service ↔ database_service | Redis Streams | Data archival |
+| **P4 - Keep HTTP** | api_gateway ↔ all services | HTTP | External API boundary |
+| **P4 - Keep HTTP** | External APIs (Azure, Exa) | HTTP | Third-party services |
+
+### 21.4 Target Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Redis Event Bus                                    │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │ Streams                           │ Pub/Sub                          │   │
+│  │ agent:commands:*                  │ agent:responses:{id}             │   │
+│  │ meta:commands:entities            │ meta:events:entity_created       │   │
+│  │ meta:commands:kpis                │ meta:events:kpi_updated          │   │
+│  │ calc:commands:execute             │ calc:events:result_ready         │   │
+│  │ connector:commands:fetch          │ connector:events:data_ready      │   │
+│  │ db:commands:query                 │ db:events:query_complete         │   │
+│  │ ingestion:commands:process        │ ingestion:events:enriched        │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+        ▲              ▲              ▲              ▲              ▲
+        │              │              │              │              │
+   ┌────┴────┐   ┌─────┴─────┐   ┌────┴────┐   ┌─────┴─────┐   ┌────┴────┐
+   │ multi   │   │ business  │   │ calc    │   │ connector │   │ database│
+   │ agent   │   │ metadata  │   │ engine  │   │ service   │   │ service │
+   └─────────┘   └───────────┘   └─────────┘   └───────────┘   └─────────┘
+```
+
+### 21.5 Event Schema Standards
+
+**Command Schema:**
+```python
+@dataclass
+class ServiceCommand:
+    command_id: str              # UUID
+    command_type: str            # e.g., "create_entity"
+    source_service: str          # e.g., "multi_agent_service"
+    target_service: str          # e.g., "business_metadata"
+    session_id: Optional[str]    # For tracing
+    payload: Dict[str, Any]      # Command-specific data
+    reply_channel: str           # Pub/Sub channel for response
+    timestamp: str               # ISO format
+```
+
+**Response Schema:**
+```python
+@dataclass
+class ServiceResponse:
+    command_id: str              # Correlates to command
+    response_type: str           # e.g., "entity_created"
+    source_service: str          # e.g., "business_metadata"
+    payload: Dict[str, Any]      # Response data
+    success: bool
+    error: Optional[str]
+    timestamp: str
+```
+
+### 21.6 Stream Naming Convention
+
+| Stream | Consumer Group | Description |
+|--------|----------------|-------------|
+| `meta:commands:entities` | `meta_consumers` | Entity CRUD operations |
+| `meta:commands:kpis` | `meta_consumers` | KPI CRUD operations |
+| `meta:commands:modules` | `meta_consumers` | Module operations |
+| `calc:commands:execute` | `calc_consumers` | KPI calculations |
+| `calc:commands:batch` | `calc_consumers` | Batch calculations |
+| `connector:commands:fetch` | `connector_consumers` | Data source queries |
+| `db:commands:query` | `db_consumers` | Database queries |
+| `ingestion:commands:process` | `ingestion_consumers` | Ingestion pipeline |
+
+### 21.7 Implementation Phases
+
+**Phase 21a: Shared Event Library**
+- Create `services/shared/events/` package
+- Define command/response schemas
+- Create Redis client base class
+- Add consumer group utilities
+
+**Phase 21b: multi_agent ↔ business_metadata**
+- Add Redis consumer to business_metadata
+- Create metadata event client in multi_agent
+- Migrate entity/KPI creation from agents
+
+**Phase 21c: multi_agent ↔ calculation_engine**
+- Add Redis consumer to calculation_engine
+- Create calculation event client
+- Migrate KPI calculation requests
+
+**Phase 21d: multi_agent ↔ connector_service**
+- Add Redis consumer to connector_service
+- Create connector event client
+- Migrate data fetch operations
+
+**Phase 21e: metadata_ingestion Pipeline**
+- Migrate business_metadata interactions
+- Migrate entity_resolution interactions
+- Full async ingestion pipeline
+
+**Phase 21f: Database Service Integration**
+- Convert query operations to streams
+- Add result caching with Redis
+- Integrate with calculation_engine
+
+### 21.8 Files to Create
+
+| File | Purpose |
+|------|---------|
+| `services/shared/events/__init__.py` | Event package exports |
+| `services/shared/events/schemas.py` | Command/Response schemas |
+| `services/shared/events/redis_client.py` | Base Redis event client |
+| `services/shared/events/consumer.py` | Base consumer class |
+| `business_metadata/messaging/command_consumer.py` | Metadata command handler |
+| `business_metadata/events/publisher.py` | Metadata event publisher |
+| `calculation_engine/messaging/command_consumer.py` | Calculation command handler |
+| `connector_service/messaging/command_consumer.py` | Connector command handler |
+| `multi_agent_service/clients/metadata_client.py` | Redis metadata client |
+| `multi_agent_service/clients/calculation_client.py` | Redis calculation client |
+| `multi_agent_service/clients/connector_client.py` | Redis connector client |
+
+### 21.9 Migration Checklist
+
+| Task | Status |
+|------|--------|
+| Create shared events package | ✅ |
+| Define command/response schemas | ✅ |
+| Create Redis client base class | ✅ |
+| Implement business_metadata consumer | ✅ |
+| Create metadata event client for agents | ✅ |
+| Implement calculation_engine consumer | ✅ |
+| Create calculation event client | ✅ |
+| Implement connector_service consumer | ✅ |
+| Create connector event client | ✅ |
+| Migrate metadata_ingestion to events | ⬜ |
+| Migrate database queries to streams | ⬜ |
+| Update agent tools to use event clients | ⬜ |
+| Add event metrics to Grafana dashboard | ⬜ |
+| Document event-driven patterns | ⬜ |
+
+### 21.10 Benefits
+
+| Aspect | Before (HTTP) | After (Redis Streams) |
+|--------|---------------|----------------------|
+| **Latency** | Request/response overhead | Sub-millisecond pub/sub |
+| **Coupling** | Tight, synchronous | Loose, async |
+| **Resilience** | Circuit breakers | Consumer groups + persistence |
+| **Scalability** | Connection limits | Horizontal scaling |
+| **Observability** | Separate logging | Built-in stream audit |
+| **Consistency** | Mixed patterns | Unified event-driven |
+
+### 21.11 Keep as HTTP
+
+These integrations remain HTTP-based:
+
+| Integration | Reason |
+|-------------|--------|
+| API Gateway → All Services | External API boundary, REST contracts |
+| Azure AD SSO | Third-party OAuth2 |
+| Exa Search Client | External AI service |
+| MCP Protocol Clients | External tool protocol |
+| Health endpoints | Kubernetes probes |
+
+---
+
 ## References
 
 1. Vass, T. (2025). "Turning AI Coding Agents into Senior Engineering Peers" - Medium
