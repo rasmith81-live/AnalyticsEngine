@@ -11,6 +11,9 @@ __pycache__/
 # VSCODE
 .vscode/
 
+# LARGE DATA FILES (temporary until persisted through metadata service)
+scripts/kpiDepotScraper/output/
+
 # ENVIRONMENT VARIABLES
 .env
 .env.secrets
