@@ -1,0 +1,344 @@
+{
+  "total_count": 19790,
+  "category_distribution": {
+    "corporate-finance": 1146,
+    "corporate-marketing": 1185,
+    "corporate-strategy": 1185,
+    "customer-service": 1422,
+    "data-management": 1185,
+    "general-council": 1185,
+    "human-resources": 1690,
+    "information-technology": 1625,
+    "innovation-management": 1157,
+    "legal": 1374,
+    "operations-management": 1185,
+    "product-management": 1162,
+    "regulatory-compliance": 1375,
+    "sales-management": 1185,
+    "supply-chain-management": 1729
+  },
+  "subcategory_distribution": {
+    "Retail KPIs": 660,
+    "Financial Services KPIs": 630,
+    "Aviation KPIs": 546,
+    "Construction KPIs": 518,
+    "Cosmetics KPIs": 495,
+    "Mining KPIs": 476,
+    "Telecommunication KPIs": 465,
+    "Industrials KPIs": 450,
+    "Biotechnology KPIs": 450,
+    "Consulting KPIs": 450,
+    "Waste Management KPIs": 435,
+    "Electronics KPIs": 434,
+    "Healthcare KPIs": 405,
+    "Textiles & Apparel KPIs": 405,
+    "Banking KPIs": 405,
+    "Electric Vehicle (EV) KPIs": 392,
+    "Pharmaceutical KPIs": 392,
+    "Insurance KPIs": 390,
+    "Life Sciences KPIs": 390,
+    "Real Estate KPIs": 390,
+    "Automotive Supplier KPIs": 390,
+    "Oil & Gas KPIs": 378,
+    "Engineering KPIs": 375,
+    "Private Equity KPIs": 375,
+    "Chemicals KPIs": 375,
+    "Electric Power KPIs": 360,
+    "Food & Beverage KPIs": 360,
+    "Infrastructure KPIs": 360,
+    "Luxury Goods KPIs": 360,
+    "Manufacturing KPIs": 360,
+    "Robotics KPIs": 360,
+    "Semiconductor KPIs": 360,
+    "Technology KPIs": 360,
+    "E-Commerce KPIs": 345,
+    "Education KPIs": 345,
+    "Agriculture KPIs": 345,
+    "Maritime KPIs": 345,
+    "Sports KPIs": 345,
+    "Theme Park KPIs": 345,
+    "Media & Entertainment KPIs": 336,
+    "Aerospace & Defense KPIs": 336,
+    "Automotive OEM KPIs": 322,
+    "Tourism KPIs": 322,
+    "Consumer Packaged Goods KPIs": 112,
+    "ISO 27002 (IEC 27002) (72 KPIs)\nRisk Assessment Frequency\nPhishing Simulation Click-Through Rate\nDigital Identity Verification Success Rate": 62,
+    "ISO 45001 (56 KPIs)\nLost Time Injury Frequency Rate (LTIFR)\nTotal Recordable Incident Rate (TRIR)\nPersonal Protective Equipment (PPE) Compliance Rate": 51,
+    "Compliance Monitoring (45 KPIs)\nCompliance Training Completion Rate\nCorrective Action Closure Rate\nAnti-Money Laundering (AML) Compliance Rate": 42,
+    "ISO 18001 (41 KPIs)\nLost Time Injury Frequency Rate (LTIFR)\nEmployee Assistance Program (EAP) Utilization Rate\nPersonal Protective Equipment (PPE) Compliance Rate": 41,
+    "ISO 19600 (39 KPIs)\nCompliance Training Completion Rate\nCorrective Action Closure Rate\nAverage Time to Resolve Legal Issues": 41,
+    "Supply Chain Optimization (42 KPIs)\nInventory Turnover Ratio\nOn-time Delivery Rate\nTransportation Cost as a Percentage of Net Sales": 39
+  },
+  "samples": {
+    "corporate-finance": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_1703",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_1706",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_1707",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34038_BENCHMARKS_890",
+        "name": "34,038 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_1598",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "corporate-marketing": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_6129",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_6132",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_6133",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34038_BENCHMARKS_5316",
+        "name": "34,038 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_6024",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "corporate-strategy": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_10555",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_10558",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_10559",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34038_BENCHMARKS_9742",
+        "name": "34,038 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_10450",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "customer-service": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_15753",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_15756",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_15757",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34038_BENCHMARKS_14940",
+        "name": "34,038 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_15648",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "data-management": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_20179",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_20182",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_20183",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34047_BENCHMARKS_19366",
+        "name": "34,047 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_20074",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "general-council": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_24605",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_24608",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_24609",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34050_BENCHMARKS_23792",
+        "name": "34,050 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_24500",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "human-resources": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_30413",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_30416",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_30417",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "10_PRINCIPLES_OF_CULTURE_27364",
+        "name": "10 Principles of Culture",
+        "description": "4 Types of Corporate Culture "
+      },
+      {
+        "code": "360_DEGREE_FEEDBACK_COMPLETION_RATE_27794",
+        "name": "360-Degree Feedback Completion Rate",
+        "description": "The percentage of completed 360-degree feedback assessments, reflecting the organization's commitmen"
+      }
+    ],
+    "information-technology": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_35988",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_35991",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_35992",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34050_BENCHMARKS_35175",
+        "name": "34,050 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_35883",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "innovation-management": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_40325",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_40328",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_40329",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34050_BENCHMARKS_39601",
+        "name": "34,050 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      },
+      {
+        "code": "AARRR_GROWTH_FUNNEL_40220",
+        "name": "AARRR Growth Funnel",
+        "description": "E-Commerce Startup Financial Model - 5 Year Business Plan "
+      }
+    ],
+    "legal": [
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_45716",
+        "name": "100+ Chief Financial Officer (CFO) SOPS",
+        "description": "Corporate Finance Management "
+      },
+      {
+        "code": "100_CHIEF_FINANCIAL_OFFICER_CFO_SOPS_BOOKLET_FORMAT_45719",
+        "name": "100+ Chief Financial Officer (CFO) SOPs (Booklet Format)",
+        "description": "100 Financial Advisor SOPs "
+      },
+      {
+        "code": "100_CORPORATE_GOVERNANCE_SOPS_43099",
+        "name": "100+ Corporate Governance SOPs",
+        "description": "IT Governance Framework "
+      },
+      {
+        "code": "100_FINANCIAL_ADVISOR_SOPS_45720",
+        "name": "100 Financial Advisor SOPs",
+        "description": "100+ Finance Manager SOPs"
+      },
+      {
+        "code": "34050_BENCHMARKS_44903",
+        "name": "34,050 benchmarks",
+        "description": ", KPI Depot is the most comprehensive KPI database available."
+      }
+    ]
+  }
+}

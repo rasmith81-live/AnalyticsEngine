@@ -39,7 +39,8 @@ from .business_agents import (
     MarketingManagerAgent,
     UIDesignerAgent,
     BusinessStrategistAgent,
-    OperationsManagerAgent
+    OperationsManagerAgent,
+    ProcessScenarioModelerAgent
 )
 
 # Import MCP client manager
@@ -150,7 +151,8 @@ class AgentOrchestrator:
             "ui_designer": UIDesignerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
             "business_strategist": BusinessStrategistAgent(api_key=api_key, mcp_manager=self._mcp_manager),
             "operations_manager": OperationsManagerAgent(api_key=api_key, mcp_manager=self._mcp_manager),
-            "librarian_curator": LibrarianCuratorAgent(api_key=api_key, mcp_manager=self._mcp_manager)
+            "librarian_curator": LibrarianCuratorAgent(api_key=api_key, mcp_manager=self._mcp_manager),
+            "process_scenario_modeler": ProcessScenarioModelerAgent(api_key=api_key, mcp_manager=self._mcp_manager)
         }
         
         # Initialize each sub-agent

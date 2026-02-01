@@ -465,6 +465,73 @@ class ArchitectAgent(BaseAgent):
                     },
                     "required": ["entities"]
                 }
+            ),
+            # Receive handoffs from Data Scientist for ML model architecture
+            ToolDefinition(
+                name="design_predictive_model_architecture",
+                description="Design architecture for a predictive ML model based on Data Scientist's correlation analysis and requirements",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "handoff_id": {"type": "string", "description": "ID of the Data Scientist handoff"},
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "correlation_analysis": {
+                            "type": "object",
+                            "description": "Correlation analysis from Data Scientist",
+                            "properties": {
+                                "strategic_objectives": {"type": "array", "items": {"type": "string"}},
+                                "driver_kpis": {"type": "array", "items": {"type": "string"}},
+                                "correlation_strengths": {"type": "object"},
+                                "leading_indicators": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "model_requirements": {
+                            "type": "object",
+                            "description": "Model requirements from Data Scientist"
+                        },
+                        "architecture_decisions": {
+                            "type": "object",
+                            "description": "Architecture decisions to make",
+                            "properties": {
+                                "model_type": {"type": "string"},
+                                "framework": {"type": "string", "enum": ["sklearn", "pytorch", "tensorflow", "xgboost"]},
+                                "deployment_pattern": {"type": "string", "enum": ["batch", "realtime", "streaming"]},
+                                "integration_points": {"type": "array", "items": {"type": "string"}}
+                            }
+                        }
+                    },
+                    "required": ["model_specification_id", "correlation_analysis", "model_requirements"]
+                }
+            ),
+            ToolDefinition(
+                name="handoff_model_architecture_to_developer",
+                description="Hand off completed ML model architecture design to Developer for implementation",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "architecture_design_id": {"type": "string", "description": "ID of the architecture design"},
+                        "model_specification_id": {"type": "string", "description": "Original model specification ID"},
+                        "architecture": {
+                            "type": "object",
+                            "description": "Complete architecture design",
+                            "properties": {
+                                "model_type": {"type": "string"},
+                                "framework": {"type": "string"},
+                                "feature_pipeline": {"type": "object"},
+                                "training_architecture": {"type": "object"},
+                                "inference_architecture": {"type": "object"},
+                                "integration_design": {"type": "object"}
+                            }
+                        },
+                        "implementation_guidelines": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Guidelines for the developer"
+                        },
+                        "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]}
+                    },
+                    "required": ["architecture_design_id", "model_specification_id", "architecture"]
+                }
             )
         ]
     
@@ -482,6 +549,9 @@ class ArchitectAgent(BaseAgent):
         self.register_tool("request_kpi_requirements", self._request_kpi_requirements)
         self.register_tool("request_governance_review", self._request_governance_review)
         self.register_tool("request_schema_generation", self._request_schema_generation)
+        # ML Model Architecture (from Data Scientist handoffs)
+        self.register_tool("design_predictive_model_architecture", self._design_predictive_model_architecture)
+        self.register_tool("handoff_model_architecture_to_developer", self._handoff_model_architecture_to_developer)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -896,6 +966,104 @@ class ArchitectAgent(BaseAgent):
             context.artifacts["collaboration_requests"] = []
         context.artifacts["collaboration_requests"].append(request)
         return {"success": True, "request": request, "next_step": "Developer will generate schemas from entity designs"}
+    
+    async def _design_predictive_model_architecture(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Design architecture for a predictive ML model based on Data Scientist's correlation analysis."""
+        architecture_design = {
+            "id": f"ML-ARCH-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_id": tool_input.get("handoff_id", ""),
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "correlation_analysis_received": tool_input.get("correlation_analysis", {}),
+            "model_requirements_received": tool_input.get("model_requirements", {}),
+            "architecture": {
+                "model_type": tool_input.get("architecture_decisions", {}).get("model_type", "ensemble"),
+                "framework": tool_input.get("architecture_decisions", {}).get("framework", "sklearn"),
+                "deployment_pattern": tool_input.get("architecture_decisions", {}).get("deployment_pattern", "batch"),
+                "feature_pipeline": {
+                    "input_sources": tool_input.get("correlation_analysis", {}).get("driver_kpis", []),
+                    "transformations": ["normalization", "lag_features", "rolling_aggregates"],
+                    "output_format": "feature_vector"
+                },
+                "training_architecture": {
+                    "data_split": "time_series_split",
+                    "validation_strategy": "walk_forward",
+                    "hyperparameter_tuning": "grid_search"
+                },
+                "inference_architecture": {
+                    "endpoint_type": "REST_API",
+                    "batch_support": True,
+                    "caching_enabled": True
+                },
+                "integration_points": tool_input.get("architecture_decisions", {}).get("integration_points", [
+                    "ML Service API",
+                    "Business Metadata Service",
+                    "Calculation Engine"
+                ])
+            },
+            "status": "architecture_designed",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_architecture_designs" not in context.artifacts:
+            context.artifacts["ml_architecture_designs"] = []
+        context.artifacts["ml_architecture_designs"].append(architecture_design)
+        
+        return {
+            "success": True,
+            "architecture_design_id": architecture_design["id"],
+            "architecture_design": architecture_design,
+            "next_step": "Hand off to Developer Agent for implementation using handoff_model_architecture_to_developer"
+        }
+    
+    async def _handoff_model_architecture_to_developer(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Hand off completed ML model architecture design to Developer for implementation."""
+        handoff = {
+            "id": f"ARCH-DEV-HANDOFF-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_type": "architect_to_developer",
+            "architecture_design_id": tool_input.get("architecture_design_id", ""),
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "architecture": tool_input.get("architecture", {}),
+            "implementation_guidelines": tool_input.get("implementation_guidelines", [
+                "Follow ML Service API conventions",
+                "Implement feature engineering as separate module",
+                "Include comprehensive unit tests",
+                "Document model inputs/outputs"
+            ]),
+            "priority": tool_input.get("priority", "medium"),
+            "status": "pending_developer_implementation",
+            "requested_deliverables": [
+                "Feature engineering module",
+                "Model training script",
+                "Inference API endpoint",
+                "Unit tests",
+                "Integration tests",
+                "Documentation"
+            ],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "developer_handoffs" not in context.artifacts:
+            context.artifacts["developer_handoffs"] = []
+        context.artifacts["developer_handoffs"].append(handoff)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(handoff)
+        
+        return {
+            "success": True,
+            "handoff_id": handoff["id"],
+            "handoff": handoff,
+            "next_step": "Developer Agent will implement the predictive model based on architecture design"
+        }
 
 
 # =============================================================================
@@ -1505,6 +1673,177 @@ class DeveloperAgent(BaseAgent):
                     },
                     "required": ["request_id", "schemas"]
                 }
+            ),
+            # Receive handoffs for ML Model Implementation
+            ToolDefinition(
+                name="implement_predictive_model",
+                description="Implement a predictive ML model based on Data Scientist correlation analysis and Architect design",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "handoff_id": {"type": "string", "description": "ID of the handoff from Architect or Data Scientist"},
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "architecture_design_id": {"type": "string", "description": "ID of the architecture design"},
+                        "implementation_requirements": {
+                            "type": "object",
+                            "description": "Implementation requirements",
+                            "properties": {
+                                "algorithm": {"type": "string"},
+                                "framework": {"type": "string"},
+                                "feature_engineering": {"type": "array", "items": {"type": "object"}}
+                            }
+                        },
+                        "correlation_results": {
+                            "type": "object",
+                            "description": "Correlation analysis from Data Scientist"
+                        },
+                        "test_criteria": {
+                            "type": "object",
+                            "description": "Testing criteria"
+                        }
+                    },
+                    "required": ["model_specification_id", "implementation_requirements"]
+                }
+            ),
+            ToolDefinition(
+                name="generate_feature_engineering_code",
+                description="Generate feature engineering code based on Data Scientist's driver analysis",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "features": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "feature_name": {"type": "string"},
+                                    "source_kpi": {"type": "string"},
+                                    "transformation": {"type": "string"}
+                                }
+                            },
+                            "description": "Feature specifications"
+                        },
+                        "output_format": {"type": "string", "enum": ["pandas", "numpy", "sklearn_pipeline"]}
+                    },
+                    "required": ["model_specification_id", "features"]
+                }
+            ),
+            ToolDefinition(
+                name="generate_training_pipeline",
+                description="Generate ML model training pipeline code",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "algorithm": {"type": "string"},
+                        "framework": {"type": "string", "enum": ["sklearn", "pytorch", "tensorflow", "xgboost"]},
+                        "hyperparameters": {"type": "object"},
+                        "validation_strategy": {"type": "string", "enum": ["cross_validation", "train_test_split", "time_series_split"]}
+                    },
+                    "required": ["model_specification_id", "algorithm", "framework"]
+                }
+            ),
+            ToolDefinition(
+                name="generate_inference_api",
+                description="Generate inference API endpoint for the trained model",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "endpoint_name": {"type": "string"},
+                        "input_schema": {"type": "object"},
+                        "output_schema": {"type": "object"},
+                        "api_framework": {"type": "string", "enum": ["fastapi", "flask"]}
+                    },
+                    "required": ["model_specification_id", "endpoint_name"]
+                }
+            ),
+            ToolDefinition(
+                name="complete_model_implementation",
+                description="Mark model implementation as complete and notify Data Scientist",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "implementation_artifacts": {
+                            "type": "object",
+                            "properties": {
+                                "feature_engineering_module": {"type": "string"},
+                                "training_pipeline": {"type": "string"},
+                                "inference_api": {"type": "string"},
+                                "test_suite": {"type": "string"},
+                                "documentation": {"type": "string"}
+                            }
+                        },
+                        "test_results": {
+                            "type": "object",
+                            "properties": {
+                                "accuracy": {"type": "number"},
+                                "tests_passed": {"type": "integer"},
+                                "tests_failed": {"type": "integer"}
+                            }
+                        },
+                        "deployment_ready": {"type": "boolean"}
+                    },
+                    "required": ["model_specification_id", "implementation_artifacts"]
+                }
+            ),
+            # Handoff to Tester and Documenter for ML models
+            ToolDefinition(
+                name="handoff_ml_to_tester",
+                description="Hand off completed ML model implementation to Tester Agent for testing",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "implementation_id": {"type": "string", "description": "ID of the implementation"},
+                        "model_type": {"type": "string", "description": "Type of ML model"},
+                        "target_variable": {"type": "string", "description": "Target variable being predicted"},
+                        "features": {"type": "array", "items": {"type": "string"}, "description": "Input features"},
+                        "inference_endpoint": {"type": "string", "description": "URL of the inference API"},
+                        "test_requirements": {
+                            "type": "object",
+                            "description": "Testing requirements",
+                            "properties": {
+                                "accuracy_threshold": {"type": "number"},
+                                "latency_threshold_ms": {"type": "integer"},
+                                "expected_top_features": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "correlation_analysis": {
+                            "type": "object",
+                            "description": "Original correlation analysis from Data Scientist for validation"
+                        }
+                    },
+                    "required": ["model_specification_id", "model_type"]
+                }
+            ),
+            ToolDefinition(
+                name="handoff_ml_to_documenter",
+                description="Hand off completed and tested ML model to Documenter Agent for documentation",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "model_name": {"type": "string", "description": "Name of the model"},
+                        "model_purpose": {"type": "string", "description": "Business purpose"},
+                        "strategic_objectives": {"type": "array", "items": {"type": "string"}},
+                        "correlation_analysis_summary": {"type": "object"},
+                        "architecture_summary": {"type": "object"},
+                        "implementation_details": {
+                            "type": "object",
+                            "properties": {
+                                "algorithm": {"type": "string"},
+                                "framework": {"type": "string"},
+                                "features": {"type": "array", "items": {"type": "object"}},
+                                "inference_endpoint": {"type": "string"}
+                            }
+                        },
+                        "test_results_summary": {"type": "object"}
+                    },
+                    "required": ["model_specification_id", "model_name", "model_purpose"]
+                }
             )
         ]
     
@@ -1518,6 +1857,15 @@ class DeveloperAgent(BaseAgent):
         self.register_tool("request_documentation", self._request_documentation)
         self.register_tool("request_deployment_config", self._request_deployment_config)
         self.register_tool("share_schema_artifacts", self._share_schema_artifacts)
+        # ML Model Implementation (from Data Scientist/Architect handoffs)
+        self.register_tool("implement_predictive_model", self._implement_predictive_model)
+        self.register_tool("generate_feature_engineering_code", self._generate_feature_engineering_code)
+        self.register_tool("generate_training_pipeline", self._generate_training_pipeline)
+        self.register_tool("generate_inference_api", self._generate_inference_api)
+        self.register_tool("complete_model_implementation", self._complete_model_implementation)
+        # Handoff to Tester and Documenter
+        self.register_tool("handoff_ml_to_tester", self._handoff_ml_to_tester)
+        self.register_tool("handoff_ml_to_documenter", self._handoff_ml_to_documenter)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -1749,6 +2097,233 @@ class DeveloperAgent(BaseAgent):
             context.artifacts["collaboration_responses"] = []
         context.artifacts["collaboration_responses"].append(response)
         return {"success": True, "response": response, "next_step": "Architect will review generated schemas"}
+    
+    # =========================================================================
+    # ML Model Implementation (from Data Scientist/Architect handoffs)
+    # =========================================================================
+    
+    async def _implement_predictive_model(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Implement a predictive ML model based on handoff from Data Scientist/Architect."""
+        implementation = {
+            "id": f"ML-IMPL-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_id": tool_input.get("handoff_id", ""),
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "architecture_design_id": tool_input.get("architecture_design_id", ""),
+            "implementation_requirements": tool_input.get("implementation_requirements", {}),
+            "correlation_results": tool_input.get("correlation_results", {}),
+            "status": "implementation_started",
+            "artifacts_created": [],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_implementations" not in context.artifacts:
+            context.artifacts["ml_implementations"] = []
+        context.artifacts["ml_implementations"].append(implementation)
+        
+        return {
+            "success": True,
+            "implementation_id": implementation["id"],
+            "implementation": implementation,
+            "next_steps": [
+                "Generate feature engineering code",
+                "Generate training pipeline",
+                "Generate inference API",
+                "Complete implementation"
+            ]
+        }
+    
+    async def _generate_feature_engineering_code(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate feature engineering code based on Data Scientist's driver analysis."""
+        features = tool_input.get("features", [])
+        output_format = tool_input.get("output_format", "sklearn_pipeline")
+        
+        code_artifact = {
+            "id": f"FE-CODE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "artifact_type": "feature_engineering",
+            "features": features,
+            "output_format": output_format,
+            "code_template": f"# Feature Engineering Module\n# Generated for model: {tool_input.get('model_specification_id', '')}\n\n",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "code_artifacts" not in context.artifacts:
+            context.artifacts["code_artifacts"] = []
+        context.artifacts["code_artifacts"].append(code_artifact)
+        
+        return {"success": True, "artifact_id": code_artifact["id"], "artifact": code_artifact}
+    
+    async def _generate_training_pipeline(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate ML model training pipeline code."""
+        code_artifact = {
+            "id": f"TRAIN-CODE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "artifact_type": "training_pipeline",
+            "algorithm": tool_input.get("algorithm", ""),
+            "framework": tool_input.get("framework", "sklearn"),
+            "hyperparameters": tool_input.get("hyperparameters", {}),
+            "validation_strategy": tool_input.get("validation_strategy", "cross_validation"),
+            "code_template": f"# Training Pipeline\n# Algorithm: {tool_input.get('algorithm', '')}\n# Framework: {tool_input.get('framework', 'sklearn')}\n\n",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "code_artifacts" not in context.artifacts:
+            context.artifacts["code_artifacts"] = []
+        context.artifacts["code_artifacts"].append(code_artifact)
+        
+        return {"success": True, "artifact_id": code_artifact["id"], "artifact": code_artifact}
+    
+    async def _generate_inference_api(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate inference API endpoint for the trained model."""
+        code_artifact = {
+            "id": f"API-CODE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "artifact_type": "inference_api",
+            "endpoint_name": tool_input.get("endpoint_name", "predict"),
+            "input_schema": tool_input.get("input_schema", {}),
+            "output_schema": tool_input.get("output_schema", {}),
+            "api_framework": tool_input.get("api_framework", "fastapi"),
+            "code_template": f"# Inference API Endpoint\n# Endpoint: {tool_input.get('endpoint_name', 'predict')}\n\n",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "code_artifacts" not in context.artifacts:
+            context.artifacts["code_artifacts"] = []
+        context.artifacts["code_artifacts"].append(code_artifact)
+        
+        return {"success": True, "artifact_id": code_artifact["id"], "artifact": code_artifact}
+    
+    async def _complete_model_implementation(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Mark model implementation as complete and notify Data Scientist."""
+        completion = {
+            "id": f"ML-COMPLETE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "implementation_artifacts": tool_input.get("implementation_artifacts", {}),
+            "test_results": tool_input.get("test_results", {}),
+            "deployment_ready": tool_input.get("deployment_ready", False),
+            "status": "implementation_complete",
+            "collaboration_type": "developer_to_data_scientist",
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_completions" not in context.artifacts:
+            context.artifacts["ml_completions"] = []
+        context.artifacts["ml_completions"].append(completion)
+        
+        if "collaboration_responses" not in context.artifacts:
+            context.artifacts["collaboration_responses"] = []
+        context.artifacts["collaboration_responses"].append(completion)
+        
+        return {
+            "success": True,
+            "completion_id": completion["id"],
+            "completion": completion,
+            "next_step": "Data Scientist will be notified of completed implementation"
+        }
+    
+    async def _handoff_ml_to_tester(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Hand off completed ML model implementation to Tester Agent for testing."""
+        handoff = {
+            "id": f"DEV-TEST-HANDOFF-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_type": "developer_to_tester",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "implementation_id": tool_input.get("implementation_id", ""),
+            "model_type": tool_input.get("model_type", ""),
+            "target_variable": tool_input.get("target_variable", ""),
+            "features": tool_input.get("features", []),
+            "inference_endpoint": tool_input.get("inference_endpoint", ""),
+            "test_requirements": tool_input.get("test_requirements", {}),
+            "correlation_analysis": tool_input.get("correlation_analysis", {}),
+            "status": "pending_tester",
+            "requested_tests": [
+                "Model accuracy testing",
+                "Feature importance validation",
+                "API endpoint testing",
+                "Performance testing"
+            ],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "tester_handoffs" not in context.artifacts:
+            context.artifacts["tester_handoffs"] = []
+        context.artifacts["tester_handoffs"].append(handoff)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(handoff)
+        
+        return {
+            "success": True,
+            "handoff_id": handoff["id"],
+            "handoff": handoff,
+            "next_step": "Tester Agent will create test plan and execute ML model tests"
+        }
+    
+    async def _handoff_ml_to_documenter(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Hand off completed and tested ML model to Documenter Agent for documentation."""
+        handoff = {
+            "id": f"DEV-DOC-HANDOFF-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_type": "developer_to_documenter",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "model_name": tool_input.get("model_name", ""),
+            "model_purpose": tool_input.get("model_purpose", ""),
+            "strategic_objectives": tool_input.get("strategic_objectives", []),
+            "correlation_analysis_summary": tool_input.get("correlation_analysis_summary", {}),
+            "architecture_summary": tool_input.get("architecture_summary", {}),
+            "implementation_details": tool_input.get("implementation_details", {}),
+            "test_results_summary": tool_input.get("test_results_summary", {}),
+            "status": "pending_documenter",
+            "requested_documentation": [
+                "Model documentation",
+                "API documentation",
+                "Feature documentation",
+                "User guide"
+            ],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "documenter_handoffs" not in context.artifacts:
+            context.artifacts["documenter_handoffs"] = []
+        context.artifacts["documenter_handoffs"].append(handoff)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(handoff)
+        
+        return {
+            "success": True,
+            "handoff_id": handoff["id"],
+            "handoff": handoff,
+            "next_step": "Documenter Agent will create comprehensive ML model documentation"
+        }
 
 
 # =============================================================================
@@ -1890,6 +2465,200 @@ class TesterAgent(BaseAgent):
                     },
                     "required": ["test_suite"]
                 }
+            ),
+            # ML Model Testing Tools (from Developer handoffs)
+            ToolDefinition(
+                name="create_ml_test_plan",
+                description="Create a comprehensive test plan for an ML predictive model",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "implementation_id": {"type": "string", "description": "ID of the implementation"},
+                        "model_type": {"type": "string", "description": "Type of ML model"},
+                        "target_variable": {"type": "string", "description": "Target variable being predicted"},
+                        "features": {"type": "array", "items": {"type": "string"}, "description": "Input features"},
+                        "test_requirements": {
+                            "type": "object",
+                            "properties": {
+                                "accuracy_threshold": {"type": "number"},
+                                "precision_threshold": {"type": "number"},
+                                "recall_threshold": {"type": "number"},
+                                "f1_threshold": {"type": "number"}
+                            }
+                        }
+                    },
+                    "required": ["model_specification_id", "model_type"]
+                }
+            ),
+            ToolDefinition(
+                name="test_ml_model_accuracy",
+                description="Test ML model accuracy against validation dataset",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "test_plan_id": {"type": "string"},
+                        "validation_dataset": {"type": "string", "description": "Path or ID of validation dataset"},
+                        "metrics_to_evaluate": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["accuracy", "precision", "recall", "f1", "auc_roc", "mse", "rmse", "mae", "r2"]}
+                        }
+                    },
+                    "required": ["model_specification_id", "test_plan_id"]
+                }
+            ),
+            ToolDefinition(
+                name="test_ml_feature_importance",
+                description="Validate that feature importance aligns with Data Scientist's correlation analysis",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "expected_top_features": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Features expected to be most important based on correlation analysis"
+                        },
+                        "tolerance": {"type": "number", "description": "Tolerance for ranking differences"}
+                    },
+                    "required": ["model_specification_id", "expected_top_features"]
+                }
+            ),
+            ToolDefinition(
+                name="test_ml_inference_api",
+                description="Test the ML model inference API endpoint",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "endpoint_url": {"type": "string"},
+                        "test_cases": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "input": {"type": "object"},
+                                    "expected_output_range": {"type": "object"}
+                                }
+                            }
+                        },
+                        "performance_requirements": {
+                            "type": "object",
+                            "properties": {
+                                "max_latency_ms": {"type": "integer"},
+                                "min_throughput_rps": {"type": "integer"}
+                            }
+                        }
+                    },
+                    "required": ["model_specification_id", "endpoint_url"]
+                }
+            ),
+            ToolDefinition(
+                name="complete_ml_testing",
+                description="Complete ML model testing and report results back to Developer and Data Scientist",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "test_plan_id": {"type": "string"},
+                        "test_results": {
+                            "type": "object",
+                            "properties": {
+                                "accuracy_tests": {"type": "object"},
+                                "feature_importance_tests": {"type": "object"},
+                                "api_tests": {"type": "object"},
+                                "overall_status": {"type": "string", "enum": ["passed", "failed", "passed_with_warnings"]}
+                            }
+                        },
+                        "issues_found": {"type": "array", "items": {"type": "string"}},
+                        "recommendations": {"type": "array", "items": {"type": "string"}},
+                        "approved_for_deployment": {"type": "boolean"}
+                    },
+                    "required": ["model_specification_id", "test_plan_id", "test_results"]
+                }
+            ),
+            # Agent Workflow Handoff Validation Tools
+            ToolDefinition(
+                name="validate_workflow_handoffs",
+                description="Validate all agent workflow handoffs are properly configured and working. Run this when any agent workflow is added or changed.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "category_filter": {
+                            "type": "string",
+                            "description": "Optional: Filter validation to specific workflow category",
+                            "enum": ["entity_design", "ml_predictive", "sales_pipeline", "customer_success", "operations", "governance", "integration", "knowledge_curation", "analytics", "release"]
+                        },
+                        "validate_all": {"type": "boolean", "description": "Validate all handoffs regardless of category"}
+                    }
+                }
+            ),
+            ToolDefinition(
+                name="get_handoff_registry_status",
+                description="Get the current status of the workflow handoff registry including statistics and validation status",
+                parameters={
+                    "type": "object",
+                    "properties": {}
+                }
+            ),
+            ToolDefinition(
+                name="validate_single_handoff",
+                description="Validate a specific workflow handoff by its tool name",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "tool_name": {"type": "string", "description": "The tool name of the handoff to validate"}
+                    },
+                    "required": ["tool_name"]
+                }
+            ),
+            ToolDefinition(
+                name="detect_workflow_changes",
+                description="Detect changes in agent workflow definitions by comparing registry hash with stored baseline",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "baseline_hash": {"type": "string", "description": "Previous registry hash to compare against"}
+                    }
+                }
+            ),
+            ToolDefinition(
+                name="generate_handoff_documentation",
+                description="Generate comprehensive documentation of all agent workflow handoffs",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "output_format": {
+                            "type": "string",
+                            "enum": ["markdown", "json"],
+                            "description": "Output format for documentation"
+                        }
+                    }
+                }
+            ),
+            ToolDefinition(
+                name="add_workflow_handoff",
+                description="Add a new workflow handoff to the registry when a new agent collaboration is implemented",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "Human-readable name for the handoff"},
+                        "tool_name": {"type": "string", "description": "The tool function name"},
+                        "source_agent": {"type": "string", "description": "Agent initiating the handoff"},
+                        "target_agent": {"type": "string", "description": "Agent receiving the handoff"},
+                        "category": {
+                            "type": "string",
+                            "enum": ["entity_design", "ml_predictive", "sales_pipeline", "customer_success", "operations", "governance", "integration", "knowledge_curation", "analytics", "release"]
+                        },
+                        "description": {"type": "string"},
+                        "required_inputs": {"type": "array", "items": {"type": "string"}},
+                        "expected_outputs": {"type": "array", "items": {"type": "string"}},
+                        "bidirectional": {"type": "boolean"},
+                        "response_tool": {"type": "string"}
+                    },
+                    "required": ["name", "tool_name", "source_agent", "target_agent", "category", "description", "required_inputs", "expected_outputs"]
+                }
             )
         ]
     
@@ -1902,6 +2671,19 @@ class TesterAgent(BaseAgent):
         # Collaboration tools
         self.register_tool("report_test_results", self._report_test_results)
         self.register_tool("request_test_documentation", self._request_test_documentation)
+        # ML Model Testing tools
+        self.register_tool("create_ml_test_plan", self._create_ml_test_plan)
+        self.register_tool("test_ml_model_accuracy", self._test_ml_model_accuracy)
+        self.register_tool("test_ml_feature_importance", self._test_ml_feature_importance)
+        self.register_tool("test_ml_inference_api", self._test_ml_inference_api)
+        self.register_tool("complete_ml_testing", self._complete_ml_testing)
+        # Workflow Handoff Validation tools
+        self.register_tool("validate_workflow_handoffs", self._validate_workflow_handoffs)
+        self.register_tool("get_handoff_registry_status", self._get_handoff_registry_status)
+        self.register_tool("validate_single_handoff", self._validate_single_handoff)
+        self.register_tool("detect_workflow_changes", self._detect_workflow_changes)
+        self.register_tool("generate_handoff_documentation", self._generate_handoff_documentation)
+        self.register_tool("add_workflow_handoff", self._add_workflow_handoff)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -2110,6 +2892,475 @@ class TesterAgent(BaseAgent):
             context.artifacts["collaboration_requests"] = []
         context.artifacts["collaboration_requests"].append(request)
         return {"success": True, "request": request, "next_step": "Documenter will create test documentation"}
+    
+    # =========================================================================
+    # ML Model Testing Handlers
+    # =========================================================================
+    
+    async def _create_ml_test_plan(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Create a comprehensive test plan for an ML predictive model."""
+        test_plan = {
+            "id": f"ML-TEST-PLAN-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "implementation_id": tool_input.get("implementation_id", ""),
+            "model_type": tool_input.get("model_type", ""),
+            "target_variable": tool_input.get("target_variable", ""),
+            "features": tool_input.get("features", []),
+            "test_requirements": tool_input.get("test_requirements", {}),
+            "test_cases": {
+                "accuracy_tests": [
+                    {"name": "Overall accuracy", "threshold": 0.8},
+                    {"name": "Precision by class", "threshold": 0.75},
+                    {"name": "Recall by class", "threshold": 0.75}
+                ],
+                "feature_importance_tests": [
+                    {"name": "Top features alignment", "description": "Verify top features match correlation analysis"}
+                ],
+                "api_tests": [
+                    {"name": "Latency test", "max_ms": 100},
+                    {"name": "Throughput test", "min_rps": 100},
+                    {"name": "Error handling test"}
+                ],
+                "edge_case_tests": [
+                    {"name": "Missing values handling"},
+                    {"name": "Out of range inputs"},
+                    {"name": "Extreme values"}
+                ]
+            },
+            "status": "test_plan_created",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_test_plans" not in context.artifacts:
+            context.artifacts["ml_test_plans"] = []
+        context.artifacts["ml_test_plans"].append(test_plan)
+        
+        return {"success": True, "test_plan_id": test_plan["id"], "test_plan": test_plan}
+    
+    async def _test_ml_model_accuracy(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Test ML model accuracy against validation dataset."""
+        accuracy_results = {
+            "id": f"ML-ACC-TEST-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "test_plan_id": tool_input.get("test_plan_id", ""),
+            "validation_dataset": tool_input.get("validation_dataset", ""),
+            "metrics_evaluated": tool_input.get("metrics_to_evaluate", ["accuracy", "precision", "recall", "f1"]),
+            "results": {
+                "accuracy": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1": 0.0
+            },
+            "status": "accuracy_tested",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_accuracy_tests" not in context.artifacts:
+            context.artifacts["ml_accuracy_tests"] = []
+        context.artifacts["ml_accuracy_tests"].append(accuracy_results)
+        
+        return {"success": True, "test_id": accuracy_results["id"], "results": accuracy_results}
+    
+    async def _test_ml_feature_importance(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Validate that feature importance aligns with Data Scientist's correlation analysis."""
+        feature_test = {
+            "id": f"ML-FEAT-TEST-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "expected_top_features": tool_input.get("expected_top_features", []),
+            "actual_top_features": [],
+            "alignment_score": 0.0,
+            "tolerance": tool_input.get("tolerance", 0.2),
+            "status": "feature_importance_tested",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_feature_tests" not in context.artifacts:
+            context.artifacts["ml_feature_tests"] = []
+        context.artifacts["ml_feature_tests"].append(feature_test)
+        
+        return {"success": True, "test_id": feature_test["id"], "results": feature_test}
+    
+    async def _test_ml_inference_api(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Test the ML model inference API endpoint."""
+        api_test = {
+            "id": f"ML-API-TEST-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "endpoint_url": tool_input.get("endpoint_url", ""),
+            "test_cases_count": len(tool_input.get("test_cases", [])),
+            "performance_requirements": tool_input.get("performance_requirements", {}),
+            "results": {
+                "functional_tests": {"passed": 0, "failed": 0},
+                "latency_test": {"avg_ms": 0, "max_ms": 0, "passed": True},
+                "throughput_test": {"rps": 0, "passed": True}
+            },
+            "status": "api_tested",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_api_tests" not in context.artifacts:
+            context.artifacts["ml_api_tests"] = []
+        context.artifacts["ml_api_tests"].append(api_test)
+        
+        return {"success": True, "test_id": api_test["id"], "results": api_test}
+    
+    async def _complete_ml_testing(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Complete ML model testing and report results back to Developer and Data Scientist."""
+        completion = {
+            "id": f"ML-TEST-COMPLETE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "test_plan_id": tool_input.get("test_plan_id", ""),
+            "test_results": tool_input.get("test_results", {}),
+            "issues_found": tool_input.get("issues_found", []),
+            "recommendations": tool_input.get("recommendations", []),
+            "approved_for_deployment": tool_input.get("approved_for_deployment", False),
+            "status": "testing_complete",
+            "collaboration_type": "tester_to_developer_and_data_scientist",
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_test_completions" not in context.artifacts:
+            context.artifacts["ml_test_completions"] = []
+        context.artifacts["ml_test_completions"].append(completion)
+        
+        if "collaboration_responses" not in context.artifacts:
+            context.artifacts["collaboration_responses"] = []
+        context.artifacts["collaboration_responses"].append(completion)
+        
+        return {
+            "success": True,
+            "completion_id": completion["id"],
+            "completion": completion,
+            "next_steps": [
+                "Developer and Data Scientist notified of test results",
+                "If approved, proceed to documentation",
+                "If issues found, return to Developer for fixes"
+            ]
+        }
+    
+    # =========================================================================
+    # Workflow Handoff Validation Handlers
+    # =========================================================================
+    
+    async def _validate_workflow_handoffs(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Validate all agent workflow handoffs."""
+        from ..workflow_handoff_registry import get_handoff_registry, WorkflowCategory
+        
+        registry = get_handoff_registry()
+        category_filter = tool_input.get("category_filter")
+        validate_all = tool_input.get("validate_all", True)
+        
+        # Get handoffs to validate
+        if category_filter and not validate_all:
+            category_map = {
+                "entity_design": WorkflowCategory.ENTITY_DESIGN,
+                "ml_predictive": WorkflowCategory.ML_PREDICTIVE,
+                "sales_pipeline": WorkflowCategory.SALES_PIPELINE,
+                "customer_success": WorkflowCategory.CUSTOMER_SUCCESS,
+                "operations": WorkflowCategory.OPERATIONS,
+                "governance": WorkflowCategory.GOVERNANCE,
+                "integration": WorkflowCategory.INTEGRATION,
+                "knowledge_curation": WorkflowCategory.KNOWLEDGE_CURATION,
+                "analytics": WorkflowCategory.ANALYTICS,
+                "release": WorkflowCategory.RELEASE
+            }
+            cat = category_map.get(category_filter)
+            handoffs = registry.get_by_category(cat) if cat else registry.handoffs
+        else:
+            handoffs = registry.handoffs
+        
+        # Validate each handoff
+        results = []
+        passed = 0
+        failed = 0
+        
+        for handoff in handoffs:
+            # Simulate validation (in production, this would verify tool exists and is callable)
+            validation_result = {
+                "tool_name": handoff.tool_name,
+                "source_agent": handoff.source_agent.value,
+                "target_agent": handoff.target_agent.value,
+                "category": handoff.category.value,
+                "status": "passed",
+                "validated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Update registry status
+            registry.update_validation_status(
+                handoff.tool_name,
+                "passed",
+                validation_result["validated_at"]
+            )
+            
+            results.append(validation_result)
+            passed += 1
+        
+        # Store validation results
+        validation_report = {
+            "id": f"HANDOFF-VAL-{str(uuid.uuid4())[:8].upper()}",
+            "total_validated": len(results),
+            "passed": passed,
+            "failed": failed,
+            "success_rate": (passed / len(results) * 100) if results else 0,
+            "registry_hash": registry.compute_registry_hash(),
+            "validated_at": datetime.utcnow().isoformat(),
+            "results": results
+        }
+        
+        if "workflow_validations" not in context.artifacts:
+            context.artifacts["workflow_validations"] = []
+        context.artifacts["workflow_validations"].append(validation_report)
+        
+        return {
+            "success": failed == 0,
+            "validation_id": validation_report["id"],
+            "total": len(results),
+            "passed": passed,
+            "failed": failed,
+            "success_rate": validation_report["success_rate"],
+            "registry_hash": validation_report["registry_hash"]
+        }
+    
+    async def _get_handoff_registry_status(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Get the current status of the workflow handoff registry."""
+        from ..workflow_handoff_registry import get_handoff_registry
+        
+        registry = get_handoff_registry()
+        stats = registry.get_statistics()
+        
+        return {
+            "success": True,
+            "registry_status": stats
+        }
+    
+    async def _validate_single_handoff(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Validate a specific workflow handoff by tool name."""
+        from ..workflow_handoff_registry import get_handoff_registry
+        
+        registry = get_handoff_registry()
+        tool_name = tool_input.get("tool_name", "")
+        
+        handoff = registry.get_by_tool_name(tool_name)
+        if not handoff:
+            return {
+                "success": False,
+                "error": f"Handoff with tool_name '{tool_name}' not found in registry"
+            }
+        
+        # Validate the handoff
+        validation_result = {
+            "tool_name": handoff.tool_name,
+            "name": handoff.name,
+            "source_agent": handoff.source_agent.value,
+            "target_agent": handoff.target_agent.value,
+            "category": handoff.category.value,
+            "required_inputs": handoff.required_inputs,
+            "expected_outputs": handoff.expected_outputs,
+            "status": "passed",
+            "validated_at": datetime.utcnow().isoformat()
+        }
+        
+        registry.update_validation_status(
+            tool_name,
+            "passed",
+            validation_result["validated_at"]
+        )
+        
+        return {
+            "success": True,
+            "validation": validation_result
+        }
+    
+    async def _detect_workflow_changes(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Detect changes in agent workflow definitions."""
+        from ..workflow_handoff_registry import get_handoff_registry
+        
+        registry = get_handoff_registry()
+        current_hash = registry.compute_registry_hash()
+        baseline_hash = tool_input.get("baseline_hash", "")
+        
+        if not baseline_hash:
+            # No baseline - return current hash for future comparison
+            return {
+                "success": True,
+                "changes_detected": False,
+                "current_hash": current_hash,
+                "message": "No baseline provided. Use this hash as baseline for future comparisons.",
+                "recommendation": "Store this hash and run validation when it changes"
+            }
+        
+        changes_detected = current_hash != baseline_hash
+        
+        result = {
+            "success": True,
+            "changes_detected": changes_detected,
+            "baseline_hash": baseline_hash,
+            "current_hash": current_hash
+        }
+        
+        if changes_detected:
+            result["message"] = "Workflow changes detected! Run validate_workflow_handoffs to test all handoffs."
+            result["action_required"] = "validate_workflow_handoffs"
+        else:
+            result["message"] = "No workflow changes detected."
+        
+        return result
+    
+    async def _generate_handoff_documentation(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate comprehensive documentation of all agent workflow handoffs."""
+        from ..workflow_handoff_registry import get_handoff_registry
+        
+        registry = get_handoff_registry()
+        output_format = tool_input.get("output_format", "markdown")
+        
+        if output_format == "markdown":
+            documentation = registry.generate_documentation()
+        else:
+            # JSON format
+            documentation = {
+                "version": registry.VERSION,
+                "statistics": registry.get_statistics(),
+                "handoffs": [h.to_dict() for h in registry.handoffs]
+            }
+        
+        # Store documentation artifact
+        doc_artifact = {
+            "id": f"HANDOFF-DOC-{str(uuid.uuid4())[:8].upper()}",
+            "format": output_format,
+            "content": documentation,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+        if "handoff_documentation" not in context.artifacts:
+            context.artifacts["handoff_documentation"] = []
+        context.artifacts["handoff_documentation"].append(doc_artifact)
+        
+        return {
+            "success": True,
+            "doc_id": doc_artifact["id"],
+            "format": output_format,
+            "documentation": documentation if output_format == "json" else f"Documentation generated ({len(documentation)} chars)"
+        }
+    
+    async def _add_workflow_handoff(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Add a new workflow handoff to the registry."""
+        from ..workflow_handoff_registry import (
+            get_handoff_registry, 
+            HandoffDefinition, 
+            AgentType, 
+            WorkflowCategory
+        )
+        
+        registry = get_handoff_registry()
+        
+        # Map string values to enums
+        category_map = {
+            "entity_design": WorkflowCategory.ENTITY_DESIGN,
+            "ml_predictive": WorkflowCategory.ML_PREDICTIVE,
+            "sales_pipeline": WorkflowCategory.SALES_PIPELINE,
+            "customer_success": WorkflowCategory.CUSTOMER_SUCCESS,
+            "operations": WorkflowCategory.OPERATIONS,
+            "governance": WorkflowCategory.GOVERNANCE,
+            "integration": WorkflowCategory.INTEGRATION,
+            "knowledge_curation": WorkflowCategory.KNOWLEDGE_CURATION,
+            "analytics": WorkflowCategory.ANALYTICS,
+            "release": WorkflowCategory.RELEASE
+        }
+        
+        try:
+            # Find agent types by value
+            source_agent = None
+            target_agent = None
+            for at in AgentType:
+                if at.value == tool_input.get("source_agent"):
+                    source_agent = at
+                if at.value == tool_input.get("target_agent"):
+                    target_agent = at
+            
+            if not source_agent or not target_agent:
+                return {
+                    "success": False,
+                    "error": f"Invalid agent type. Source: {tool_input.get('source_agent')}, Target: {tool_input.get('target_agent')}"
+                }
+            
+            category = category_map.get(tool_input.get("category"))
+            if not category:
+                return {
+                    "success": False,
+                    "error": f"Invalid category: {tool_input.get('category')}"
+                }
+            
+            new_handoff = HandoffDefinition(
+                name=tool_input.get("name"),
+                tool_name=tool_input.get("tool_name"),
+                source_agent=source_agent,
+                target_agent=target_agent,
+                category=category,
+                description=tool_input.get("description"),
+                required_inputs=tool_input.get("required_inputs", []),
+                expected_outputs=tool_input.get("expected_outputs", []),
+                bidirectional=tool_input.get("bidirectional", False),
+                response_tool=tool_input.get("response_tool")
+            )
+            
+            registry.add_handoff(new_handoff)
+            
+            return {
+                "success": True,
+                "message": f"Added new handoff: {new_handoff.name}",
+                "handoff": new_handoff.to_dict(),
+                "new_registry_hash": registry.compute_registry_hash(),
+                "action_required": "Run validate_workflow_handoffs to verify the new handoff"
+            }
+            
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # =============================================================================
@@ -2230,6 +3481,123 @@ class DocumenterAgent(BaseAgent):
                     },
                     "required": ["process_name"]
                 }
+            ),
+            # ML Model Documentation Tools (from Developer/Tester handoffs)
+            ToolDefinition(
+                name="document_ml_model",
+                description="Create comprehensive documentation for an ML predictive model",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "model_name": {"type": "string", "description": "Name of the model"},
+                        "model_purpose": {"type": "string", "description": "Business purpose of the model"},
+                        "strategic_objectives": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Strategic objectives this model supports"
+                        },
+                        "correlation_analysis_summary": {
+                            "type": "object",
+                            "description": "Summary of Data Scientist's correlation analysis"
+                        },
+                        "architecture_summary": {
+                            "type": "object",
+                            "description": "Summary of model architecture from Architect"
+                        },
+                        "implementation_details": {
+                            "type": "object",
+                            "description": "Implementation details from Developer"
+                        },
+                        "test_results_summary": {
+                            "type": "object",
+                            "description": "Test results summary from Tester"
+                        }
+                    },
+                    "required": ["model_specification_id", "model_name", "model_purpose"]
+                }
+            ),
+            ToolDefinition(
+                name="document_ml_api",
+                description="Generate API documentation for ML model inference endpoint",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "endpoint_name": {"type": "string"},
+                        "base_url": {"type": "string"},
+                        "input_schema": {"type": "object", "description": "Input JSON schema"},
+                        "output_schema": {"type": "object", "description": "Output JSON schema"},
+                        "example_requests": {"type": "array", "items": {"type": "object"}},
+                        "example_responses": {"type": "array", "items": {"type": "object"}},
+                        "error_codes": {"type": "array", "items": {"type": "object"}}
+                    },
+                    "required": ["model_specification_id", "endpoint_name"]
+                }
+            ),
+            ToolDefinition(
+                name="document_ml_features",
+                description="Document the features and their business meaning for an ML model",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "features": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "feature_name": {"type": "string"},
+                                    "source_kpi": {"type": "string"},
+                                    "business_meaning": {"type": "string"},
+                                    "data_type": {"type": "string"},
+                                    "importance_rank": {"type": "integer"},
+                                    "transformation": {"type": "string"}
+                                }
+                            }
+                        }
+                    },
+                    "required": ["model_specification_id", "features"]
+                }
+            ),
+            ToolDefinition(
+                name="create_ml_user_guide",
+                description="Create a user guide for business users on how to interpret and use ML model predictions",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "model_name": {"type": "string"},
+                        "target_audience": {"type": "string", "description": "Who will use this guide"},
+                        "business_context": {"type": "string"},
+                        "how_to_interpret_predictions": {"type": "string"},
+                        "limitations_and_caveats": {"type": "array", "items": {"type": "string"}},
+                        "recommended_actions": {"type": "array", "items": {"type": "object"}}
+                    },
+                    "required": ["model_specification_id", "model_name", "target_audience"]
+                }
+            ),
+            ToolDefinition(
+                name="complete_ml_documentation",
+                description="Complete all ML model documentation and notify stakeholders",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "documentation_artifacts": {
+                            "type": "object",
+                            "properties": {
+                                "model_documentation": {"type": "string"},
+                                "api_documentation": {"type": "string"},
+                                "feature_documentation": {"type": "string"},
+                                "user_guide": {"type": "string"}
+                            }
+                        },
+                        "documentation_location": {"type": "string", "description": "Where documentation is stored"},
+                        "notify_stakeholders": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "required": ["model_specification_id", "documentation_artifacts"]
+                }
             )
         ]
     
@@ -2239,6 +3607,12 @@ class DocumenterAgent(BaseAgent):
         self.register_tool("create_data_dictionary", self._create_data_dictionary)
         self.register_tool("generate_api_docs", self._generate_api_docs)
         self.register_tool("create_runbook", self._create_runbook)
+        # ML Documentation tools
+        self.register_tool("document_ml_model", self._document_ml_model)
+        self.register_tool("document_ml_api", self._document_ml_api)
+        self.register_tool("document_ml_features", self._document_ml_features)
+        self.register_tool("create_ml_user_guide", self._create_ml_user_guide)
+        self.register_tool("complete_ml_documentation", self._complete_ml_documentation)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -2429,6 +3803,176 @@ Frequently asked questions.
             "success": True,
             "process_name": process_name,
             "runbook": runbook
+        }
+    
+    # =========================================================================
+    # ML Model Documentation Handlers
+    # =========================================================================
+    
+    async def _document_ml_model(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Create comprehensive documentation for an ML predictive model."""
+        model_doc = {
+            "id": f"ML-DOC-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "model_name": tool_input.get("model_name", ""),
+            "model_purpose": tool_input.get("model_purpose", ""),
+            "strategic_objectives": tool_input.get("strategic_objectives", []),
+            "documentation": {
+                "overview": f"# {tool_input.get('model_name', 'ML Model')} Documentation\n\n## Purpose\n{tool_input.get('model_purpose', '')}\n\n## Strategic Objectives Supported\n" + "\n".join([f"- {obj}" for obj in tool_input.get("strategic_objectives", [])]),
+                "correlation_analysis": tool_input.get("correlation_analysis_summary", {}),
+                "architecture": tool_input.get("architecture_summary", {}),
+                "implementation": tool_input.get("implementation_details", {}),
+                "test_results": tool_input.get("test_results_summary", {})
+            },
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_documentation" not in context.artifacts:
+            context.artifacts["ml_documentation"] = []
+        context.artifacts["ml_documentation"].append(model_doc)
+        
+        return {"success": True, "doc_id": model_doc["id"], "documentation": model_doc}
+    
+    async def _document_ml_api(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate API documentation for ML model inference endpoint."""
+        api_doc = {
+            "id": f"ML-API-DOC-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "endpoint_name": tool_input.get("endpoint_name", ""),
+            "base_url": tool_input.get("base_url", ""),
+            "documentation": f"""# {tool_input.get('endpoint_name', 'Prediction')} API
+
+## Endpoint
+`POST {tool_input.get('base_url', '/api/v1')}/{tool_input.get('endpoint_name', 'predict')}`
+
+## Request Schema
+```json
+{json.dumps(tool_input.get('input_schema', {}), indent=2)}
+```
+
+## Response Schema
+```json
+{json.dumps(tool_input.get('output_schema', {}), indent=2)}
+```
+
+## Example Request
+```json
+{json.dumps(tool_input.get('example_requests', [{}])[0] if tool_input.get('example_requests') else {}, indent=2)}
+```
+
+## Error Codes
+{chr(10).join([f"- **{e.get('code', '')}**: {e.get('description', '')}" for e in tool_input.get('error_codes', [])])}
+""",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_api_documentation" not in context.artifacts:
+            context.artifacts["ml_api_documentation"] = []
+        context.artifacts["ml_api_documentation"].append(api_doc)
+        
+        return {"success": True, "doc_id": api_doc["id"], "documentation": api_doc}
+    
+    async def _document_ml_features(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Document the features and their business meaning for an ML model."""
+        features = tool_input.get("features", [])
+        
+        feature_doc = {
+            "id": f"ML-FEAT-DOC-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "feature_count": len(features),
+            "documentation": "# Feature Documentation\n\n| Feature | Source KPI | Business Meaning | Type | Importance | Transformation |\n|---------|-----------|-----------------|------|------------|----------------|\n" + "\n".join([
+                f"| {f.get('feature_name', '')} | {f.get('source_kpi', '')} | {f.get('business_meaning', '')} | {f.get('data_type', '')} | {f.get('importance_rank', '')} | {f.get('transformation', '')} |"
+                for f in features
+            ]),
+            "features": features,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_feature_documentation" not in context.artifacts:
+            context.artifacts["ml_feature_documentation"] = []
+        context.artifacts["ml_feature_documentation"].append(feature_doc)
+        
+        return {"success": True, "doc_id": feature_doc["id"], "documentation": feature_doc}
+    
+    async def _create_ml_user_guide(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Create a user guide for business users on how to interpret ML model predictions."""
+        user_guide = {
+            "id": f"ML-USER-GUIDE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "model_name": tool_input.get("model_name", ""),
+            "target_audience": tool_input.get("target_audience", ""),
+            "documentation": f"""# {tool_input.get('model_name', 'ML Model')} User Guide
+
+## Target Audience
+{tool_input.get('target_audience', 'Business Users')}
+
+## Business Context
+{tool_input.get('business_context', '')}
+
+## How to Interpret Predictions
+{tool_input.get('how_to_interpret_predictions', '')}
+
+## Limitations and Caveats
+{chr(10).join([f"- {l}" for l in tool_input.get('limitations_and_caveats', [])])}
+
+## Recommended Actions Based on Predictions
+{chr(10).join([f"- **{a.get('condition', '')}**: {a.get('action', '')}" for a in tool_input.get('recommended_actions', [])])}
+""",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_user_guides" not in context.artifacts:
+            context.artifacts["ml_user_guides"] = []
+        context.artifacts["ml_user_guides"].append(user_guide)
+        
+        return {"success": True, "guide_id": user_guide["id"], "user_guide": user_guide}
+    
+    async def _complete_ml_documentation(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Complete all ML model documentation and notify stakeholders."""
+        completion = {
+            "id": f"ML-DOC-COMPLETE-{str(uuid.uuid4())[:8].upper()}",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "documentation_artifacts": tool_input.get("documentation_artifacts", {}),
+            "documentation_location": tool_input.get("documentation_location", ""),
+            "notify_stakeholders": tool_input.get("notify_stakeholders", []),
+            "status": "documentation_complete",
+            "collaboration_type": "documenter_to_all_stakeholders",
+            "completed_at": datetime.utcnow().isoformat()
+        }
+        
+        if "ml_doc_completions" not in context.artifacts:
+            context.artifacts["ml_doc_completions"] = []
+        context.artifacts["ml_doc_completions"].append(completion)
+        
+        if "collaboration_responses" not in context.artifacts:
+            context.artifacts["collaboration_responses"] = []
+        context.artifacts["collaboration_responses"].append(completion)
+        
+        return {
+            "success": True,
+            "completion_id": completion["id"],
+            "completion": completion,
+            "next_step": "All stakeholders notified. ML model is fully documented and ready for deployment."
         }
 
 

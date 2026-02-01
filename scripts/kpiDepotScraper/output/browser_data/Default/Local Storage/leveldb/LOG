@@ -1,9 +1,0 @@
-2026/01/27-20:22:34.465 12a0c Reusing MANIFEST D:\CascadeProjects\AnalyticsEngine\scripts\kpiDepotScraper\output\browser_data\Default\Local Storage\leveldb/MANIFEST-000001
-2026/01/27-20:22:34.470 12a0c Recovering log #3
-2026/01/27-20:22:34.471 12a0c Reusing old log D:\CascadeProjects\AnalyticsEngine\scripts\kpiDepotScraper\output\browser_data\Default\Local Storage\leveldb/000003.log 
-2026/01/27-23:51:34.707 12a0c Level-0 table #5: started
-2026/01/27-23:51:34.764 12a0c Level-0 table #5: 9105 bytes OK
-2026/01/27-23:51:34.789 12a0c Delete type=0 #3
-2026/01/28-03:44:34.573 124a4 Level-0 table #7: started
-2026/01/28-03:44:34.590 124a4 Level-0 table #7: 8485 bytes OK
-2026/01/28-03:44:34.615 124a4 Delete type=0 #4

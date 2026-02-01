@@ -202,9 +202,9 @@ export default function ConversationServicePage() {
   const [designProgress, setDesignProgress] = useState<DesignProgress>({});
 
   // Phase 17: Contract event state
-  const [contractViolations, setContractViolations] = useState<any[]>([]);
-  const [struggleSignals, setStruggleSignals] = useState<any[]>([]);
-  const [degradedMode, setDegradedMode] = useState<{active: boolean; reason: string} | null>(null);
+  const [, setContractViolations] = useState<any[]>([]);
+  const [, setStruggleSignals] = useState<any[]>([]);
+  const [, setDegradedMode] = useState<{active: boolean; reason: string} | null>(null);
 
   // Artifacts state
   const [entities, setEntities] = useState<string[]>([]);

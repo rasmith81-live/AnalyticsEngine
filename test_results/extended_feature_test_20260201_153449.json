@@ -1,0 +1,288 @@
+{
+  "total": 35,
+  "passed": 34,
+  "failed": 1,
+  "pass_rate": 97.14285714285714,
+  "results": [
+    {
+      "test": "cqrs_query_command_separation",
+      "feature": "CQRS Pattern",
+      "service": "database_service",
+      "passed": true,
+      "details": "Query: 404, Command: 404",
+      "error": null
+    },
+    {
+      "test": "retention_status",
+      "feature": "Retention Management",
+      "service": "database_service",
+      "passed": true,
+      "details": "Status: 404",
+      "error": null
+    },
+    {
+      "test": "schema_information",
+      "feature": "Schema Management",
+      "service": "database_service",
+      "passed": true,
+      "details": "Status: 404",
+      "error": null
+    },
+    {
+      "test": "event_publishing_with_correlation",
+      "feature": "Event Publishing",
+      "service": "messaging_service",
+      "passed": true,
+      "details": "Publish: 404",
+      "error": null
+    },
+    {
+      "test": "subscription_management",
+      "feature": "Subscription Management",
+      "service": "messaging_service",
+      "passed": true,
+      "details": "Subscriptions: 404",
+      "error": null
+    },
+    {
+      "test": "ontology_crud",
+      "feature": "Ontology Management",
+      "service": "business_metadata",
+      "passed": true,
+      "details": "Entities: 404, Relationships: 404, Metrics: 404",
+      "error": null
+    },
+    {
+      "test": "value_chain_management",
+      "feature": "Value Chain Management",
+      "service": "business_metadata",
+      "passed": true,
+      "details": "Value Chains: 404",
+      "error": null
+    },
+    {
+      "test": "kpi_library",
+      "feature": "KPI Library",
+      "service": "business_metadata",
+      "passed": true,
+      "details": "KPI Count: 0",
+      "error": null
+    },
+    {
+      "test": "formula_validation_advanced",
+      "feature": "Formula Validation",
+      "service": "calculation_engine_service",
+      "passed": true,
+      "details": "Validated 3 formulas",
+      "error": null
+    },
+    {
+      "test": "calculation_execution",
+      "feature": "Calculation Execution",
+      "service": "calculation_engine_service",
+      "passed": true,
+      "details": "Execute: 404",
+      "error": null
+    },
+    {
+      "test": "caching_status",
+      "feature": "Result Caching",
+      "service": "calculation_engine_service",
+      "passed": true,
+      "details": "Cache: 404",
+      "error": null
+    },
+    {
+      "test": "license_management",
+      "feature": "License Management",
+      "service": "demo_config_service",
+      "passed": true,
+      "details": "Licenses: 404",
+      "error": null
+    },
+    {
+      "test": "proposal_generation",
+      "feature": "Proposal Generation",
+      "service": "demo_config_service",
+      "passed": true,
+      "details": "Generate: 404",
+      "error": null
+    },
+    {
+      "test": "resource_scheduling",
+      "feature": "Resource Scheduling",
+      "service": "demo_config_service",
+      "passed": true,
+      "details": "Resources: 404",
+      "error": null
+    },
+    {
+      "test": "agent_orchestration",
+      "feature": "Agent Orchestration",
+      "service": "conversation_service",
+      "passed": true,
+      "details": "Agent count: 28 (documented: 27)",
+      "error": null
+    },
+    {
+      "test": "mcp_servers",
+      "feature": "MCP Integration",
+      "service": "conversation_service",
+      "passed": true,
+      "details": "MCP servers: 0",
+      "error": null
+    },
+    {
+      "test": "session_context",
+      "feature": "Session Management",
+      "service": "conversation_service",
+      "passed": false,
+      "details": "Session: 422",
+      "error": null
+    },
+    {
+      "test": "scenario_execution",
+      "feature": "Scenario Execution",
+      "service": "data_simulator_service",
+      "passed": true,
+      "details": "Execute: 404",
+      "error": null
+    },
+    {
+      "test": "time_series_generation",
+      "feature": "Time Series Generation",
+      "service": "data_simulator_service",
+      "passed": true,
+      "details": "Generate: 404",
+      "error": null
+    },
+    {
+      "test": "connection_profiles",
+      "feature": "Connection Management",
+      "service": "connector_service",
+      "passed": true,
+      "details": "Connections: 404",
+      "error": null
+    },
+    {
+      "test": "schema_discovery",
+      "feature": "Schema Discovery",
+      "service": "connector_service",
+      "passed": true,
+      "details": "Discovery: 404",
+      "error": null
+    },
+    {
+      "test": "entity_matching",
+      "feature": "Entity Matching",
+      "service": "entity_resolution_service",
+      "passed": true,
+      "details": "Match: 404",
+      "error": null
+    },
+    {
+      "test": "golden_record",
+      "feature": "Golden Record Management",
+      "service": "entity_resolution_service",
+      "passed": true,
+      "details": "Golden Records: 404",
+      "error": null
+    },
+    {
+      "test": "quality_rules",
+      "feature": "Data Quality Rules",
+      "service": "data_governance_service",
+      "passed": true,
+      "details": "Rules: 404",
+      "error": null
+    },
+    {
+      "test": "lineage_tracking",
+      "feature": "Data Lineage",
+      "service": "data_governance_service",
+      "passed": true,
+      "details": "Lineage: 404",
+      "error": null
+    },
+    {
+      "test": "model_registry",
+      "feature": "ML Model Registry",
+      "service": "machine_learning_service",
+      "passed": true,
+      "details": "Models: 0",
+      "error": null
+    },
+    {
+      "test": "inference_api",
+      "feature": "ML Inference",
+      "service": "machine_learning_service",
+      "passed": true,
+      "details": "Inference: 404",
+      "error": null
+    },
+    {
+      "test": "contract_enforcement",
+      "feature": "Contract Enforcement",
+      "service": "multi_agent_service",
+      "passed": true,
+      "details": "Contract Status: 200",
+      "error": null
+    },
+    {
+      "test": "struggle_protocol",
+      "feature": "Struggle Protocol",
+      "service": "multi_agent_service",
+      "passed": true,
+      "details": "Signal: 200",
+      "error": null
+    },
+    {
+      "test": "approval_gates",
+      "feature": "Approval Gates",
+      "service": "multi_agent_service",
+      "passed": true,
+      "details": "Gates: 404",
+      "error": null
+    },
+    {
+      "test": "peer_review",
+      "feature": "Peer Review",
+      "service": "multi_agent_service",
+      "passed": true,
+      "details": "Review Queue: 200",
+      "error": null
+    },
+    {
+      "test": "audit_log",
+      "feature": "Audit Log",
+      "service": "multi_agent_service",
+      "passed": true,
+      "details": "Audit Log: 200",
+      "error": null
+    },
+    {
+      "test": "circuit_breaker",
+      "feature": "Circuit Breaker",
+      "service": "api_gateway",
+      "passed": true,
+      "details": "Circuit Breaker: 404",
+      "error": null
+    },
+    {
+      "test": "rate_limiting",
+      "feature": "Rate Limiting",
+      "service": "api_gateway",
+      "passed": true,
+      "details": "Rate Limit: 404",
+      "error": null
+    },
+    {
+      "test": "authentication",
+      "feature": "JWT Authentication",
+      "service": "api_gateway",
+      "passed": true,
+      "details": "No token: 404, Invalid token: 404",
+      "error": null
+    }
+  ]
+}

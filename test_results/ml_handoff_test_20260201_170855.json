@@ -1,0 +1,91 @@
+{
+  "summary": {
+    "test_run_id": "ML-HANDOFF-TEST-20260201-170855",
+    "total_tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "success_rate": 100.0,
+    "handoff_types_tested": [
+      "data_scientist_to_architect",
+      "tester_completion",
+      "architect_to_developer",
+      "developer_to_documenter",
+      "full_workflow",
+      "developer_to_tester",
+      "documenter_completion"
+    ],
+    "avg_duration_ms": 0.0
+  },
+  "results": [
+    {
+      "test_name": "DataScientist_to_Architect_Handoff",
+      "agent_source": "DataScientist",
+      "agent_target": "Architect",
+      "handoff_type": "data_scientist_to_architect",
+      "success": true,
+      "artifact_id": "DS-ARCH-3DA368B3",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Architect_to_Developer_Handoff",
+      "agent_source": "Architect",
+      "agent_target": "Developer",
+      "handoff_type": "architect_to_developer",
+      "success": true,
+      "artifact_id": "ARCH-DEV-1430D377",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Developer_to_Tester_Handoff",
+      "agent_source": "Developer",
+      "agent_target": "Tester",
+      "handoff_type": "developer_to_tester",
+      "success": true,
+      "artifact_id": "DEV-TEST-B25D343D",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Developer_to_Documenter_Handoff",
+      "agent_source": "Developer",
+      "agent_target": "Documenter",
+      "handoff_type": "developer_to_documenter",
+      "success": true,
+      "artifact_id": "DEV-DOC-61F1EDC0",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Tester_ML_Workflow",
+      "agent_source": "Tester",
+      "agent_target": "Stakeholders",
+      "handoff_type": "tester_completion",
+      "success": true,
+      "artifact_id": "ML-TEST-COMPLETE-F29D2C01",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Documenter_ML_Workflow",
+      "agent_source": "Documenter",
+      "agent_target": "Stakeholders",
+      "handoff_type": "documenter_completion",
+      "success": true,
+      "artifact_id": "ML-DOC-FE816BF6",
+      "error": null,
+      "duration_ms": 0.0
+    },
+    {
+      "test_name": "Full_ML_Handoff_Workflow",
+      "agent_source": "All Agents",
+      "agent_target": "All Agents",
+      "handoff_type": "full_workflow",
+      "success": true,
+      "artifact_id": "FULL-WORKFLOW",
+      "error": null,
+      "duration_ms": 0.0
+    }
+  ]
+}

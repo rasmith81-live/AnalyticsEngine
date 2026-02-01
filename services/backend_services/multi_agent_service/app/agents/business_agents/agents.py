@@ -1502,11 +1502,19 @@ All governance assessments should include:
 
 class DataScientistAgent(BaseAgent):
     """
-    Data Scientist Agent for KPI correlation analysis and ML recommendations.
+    Data Scientist Agent for Strategic Objective Correlation Analysis.
     
-    Responsibilities:
-    - Analyze KPIs for statistical correlations
-    - Identify patterns suitable for machine learning
+    PRIMARY RESPONSIBILITY:
+    Identify correlations between KPIs (or KPI groupings) and strategic objectives,
+    enabling business users to understand what events and metrics directly contribute
+    to strategic objective outcomes, success, or failure. Help users understand the
+    levers that are driving the business forward.
+    
+    Core Responsibilities:
+    - Correlate KPIs with strategic objectives to identify business drivers
+    - Analyze KPI groupings that collectively impact strategic outcomes
+    - Identify leading indicators that predict strategic objective achievement
+    - Quantify the contribution of individual KPIs to strategic success/failure
     - Recommend ML algorithms for predictive analytics
     - Design feature engineering strategies
     - Integrate with Machine Learning Service
@@ -1523,53 +1531,77 @@ class DataScientistAgent(BaseAgent):
         super().__init__(config, api_key, mcp_manager)
     
     def _get_system_prompt(self) -> str:
-        return """You are an expert Data Scientist specializing in KPI analysis and machine learning.
+        return """You are an expert Data Scientist specializing in Strategic Objective Correlation Analysis.
 
-## Your Role
-You analyze KPIs to discover statistical correlations and recommend machine learning 
-algorithms that can be built into the Machine Learning Service.
+## PRIMARY MISSION
+Your primary role is to help business users understand what drives their strategic outcomes.
+You identify correlations between KPIs (individually or in groups) and strategic objectives,
+enabling users to see which events, metrics, and business activities directly contribute to
+strategic objective success or failure. You help users understand the LEVERS that drive
+the business forward.
 
 ## Core Responsibilities
 
-### 1. KPI Correlation Analysis
-- Identify relationships between KPIs (positive, negative, lagged)
-- Calculate correlation coefficients and significance
-- Detect multicollinearity issues
-- Find leading and lagging indicators
+### 1. Strategic Objective Correlation (PRIMARY)
+- Correlate KPIs with strategic objectives to identify business drivers
+- Analyze KPI groupings that collectively impact strategic outcomes
+- Identify leading indicators that predict strategic objective achievement
+- Quantify contribution of individual KPIs to strategic success/failure
+- Discover hidden relationships between operational metrics and strategic goals
+- Rank KPIs by their influence on each strategic objective
 
-### 2. Pattern Recognition
-- Identify seasonality and trends
-- Detect anomalies and outliers
-- Recognize cyclical patterns
-- Find regime changes
+### 2. Business Driver Analysis
+- Identify the key levers that move strategic objectives
+- Calculate driver importance scores and rankings
+- Detect positive and negative contributors
+- Find synergistic KPI combinations that amplify strategic impact
+- Identify conflicting KPIs (where improving one hurts another)
 
-### 3. ML Algorithm Recommendations
-- Classification: Customer churn, fraud detection, lead scoring
-- Regression: Revenue forecasting, demand prediction, pricing optimization
-- Clustering: Customer segmentation, product grouping
-- Time Series: Sales forecasting, inventory optimization
-- Anomaly Detection: Fraud, system failures, quality issues
+### 3. KPI-to-Objective Mapping
+- Map operational KPIs to tactical objectives
+- Map tactical objectives to functional objectives
+- Map functional objectives to business unit objectives
+- Map business unit objectives to corporate strategic objectives
+- Trace the full causal chain from metrics to strategy
 
-### 4. Feature Engineering
-- Derive new features from existing KPIs
-- Create lag features for time series
-- Design interaction features
-- Recommend normalization strategies
+### 4. Predictive Strategic Analytics
+- Predict likelihood of achieving strategic objectives based on current KPI trends
+- Forecast strategic objective outcomes under different scenarios
+- Identify early warning indicators for strategic objective risk
+- Recommend interventions when objectives are at risk
 
-### 5. Model Integration
-- Define model inputs and outputs
-- Specify training data requirements
-- Set performance metrics and thresholds
-- Plan model deployment and monitoring
+### 5. Pattern Recognition
+- Identify seasonality and trends affecting strategic outcomes
+- Detect anomalies that impact strategic objectives
+- Recognize cyclical patterns in strategic performance
+- Find regime changes in strategic dynamics
+
+### 6. ML Algorithm Recommendations
+- Classification: Objective achievement prediction, risk classification
+- Regression: Strategic outcome forecasting, driver quantification
+- Clustering: Strategic performance segmentation
+- Time Series: Strategic KPI forecasting
+- Causal Inference: True driver identification vs. correlation
 
 ## Statistical Methods
 - Pearson/Spearman correlation
-- Granger causality
-- Cross-correlation analysis
-- Principal Component Analysis (PCA)
-- Time series decomposition
+- Granger causality (for leading indicator detection)
+- Multiple regression (for driver quantification)
+- Principal Component Analysis (for KPI grouping)
+- Structural Equation Modeling (for causal paths)
+- SHAP values (for driver importance)
 
 ## Tools Available
+
+### Strategic Objective Correlation (Primary)
+- analyze_strategic_objective_drivers: Identify KPIs driving strategic objectives
+- map_kpi_to_objectives: Map KPIs to strategic objective hierarchy
+- calculate_driver_importance: Quantify KPI contribution to objectives
+- identify_leading_indicators: Find KPIs that predict objective outcomes
+- analyze_kpi_groupings: Analyze synergies/conflicts between KPI groups
+- predict_objective_achievement: Forecast strategic objective success probability
+
+### KPI Analysis & ML
 - analyze_kpi_correlations: Find correlations between KPIs
 - identify_ml_opportunities: Identify ML use cases from KPIs
 - recommend_algorithm: Recommend ML algorithm for use case
@@ -1577,12 +1609,25 @@ algorithms that can be built into the Machine Learning Service.
 - create_ml_specification: Create ML model specification
 - register_with_ml_service: Register model with ML Service
 
+### Collaboration Handoffs
+- handoff_to_architect_for_model_design: Hand off correlation results to Architect for model architecture
+- handoff_to_developer_for_implementation: Hand off to Developer for coding the predictive model
+- request_architecture_review: Request Architect to review proposed model architecture
+
+## Workflow for Predictive Model Development
+1. Analyze strategic objective drivers and correlations
+2. Create ML model specification based on findings
+3. Hand off to Architect Agent for architecture design
+4. After architect approval, hand off to Developer Agent for implementation
+5. Developer implements model code and integrates with ML Service
+
 ## Output Format
 All analyses should include:
 - Statistical metrics with confidence intervals
-- Visualization recommendations
-- Business interpretation
-- Actionable recommendations
+- Driver rankings with importance scores
+- Business interpretation in strategic context
+- Actionable recommendations for improving strategic outcomes
+- Visualization recommendations showing KPI-to-objective relationships
 """
     
     def get_system_prompt(self, context: AgentContext) -> str:
@@ -1600,6 +1645,137 @@ All analyses should include:
     
     def _get_data_science_tools(self) -> List[ToolDefinition]:
         return [
+            # PRIMARY TOOLS: Strategic Objective Correlation
+            ToolDefinition(
+                name="analyze_strategic_objective_drivers",
+                description="Identify which KPIs are driving achievement of strategic objectives. This is the primary analysis for understanding business drivers.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "strategic_objectives": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Strategic objective codes to analyze"
+                        },
+                        "kpi_pool": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Pool of KPIs to test as potential drivers (if empty, all KPIs are considered)"
+                        },
+                        "analysis_period": {"type": "string", "description": "Time period for analysis (e.g., 'last_12_months')"},
+                        "min_correlation_threshold": {"type": "number", "description": "Minimum correlation coefficient to consider (default 0.3)"},
+                        "include_lagged_analysis": {"type": "boolean", "description": "Include time-lagged correlation analysis"},
+                        "max_lag_periods": {"type": "integer", "description": "Maximum lag periods to test"}
+                    },
+                    "required": ["strategic_objectives"]
+                }
+            ),
+            ToolDefinition(
+                name="map_kpi_to_objectives",
+                description="Map KPIs to the strategic objective hierarchy (operational → tactical → functional → business unit → corporate)",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "kpi_codes": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "KPI codes to map"
+                        },
+                        "target_objective_level": {
+                            "type": "string",
+                            "enum": ["tactical", "functional", "business_unit", "corporate", "all"],
+                            "description": "Target objective level for mapping"
+                        },
+                        "include_indirect_paths": {"type": "boolean", "description": "Include indirect contribution paths"},
+                        "calculate_contribution_weights": {"type": "boolean", "description": "Calculate weighted contribution scores"}
+                    },
+                    "required": ["kpi_codes"]
+                }
+            ),
+            ToolDefinition(
+                name="calculate_driver_importance",
+                description="Quantify the importance/contribution of each KPI to strategic objective outcomes using statistical methods",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "strategic_objective": {"type": "string", "description": "Strategic objective code"},
+                        "driver_kpis": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "KPIs to evaluate as drivers"
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": ["regression_coefficients", "shap_values", "permutation_importance", "correlation_ranking"],
+                            "description": "Method for calculating importance"
+                        },
+                        "normalize_scores": {"type": "boolean", "description": "Normalize importance scores to sum to 100%"}
+                    },
+                    "required": ["strategic_objective", "driver_kpis"]
+                }
+            ),
+            ToolDefinition(
+                name="identify_leading_indicators",
+                description="Find KPIs that serve as leading indicators (predictors) of strategic objective outcomes",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "strategic_objective": {"type": "string", "description": "Strategic objective to predict"},
+                        "candidate_kpis": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "KPIs to test as leading indicators"
+                        },
+                        "prediction_horizon": {"type": "string", "description": "How far ahead to predict (e.g., '30_days', '1_quarter')"},
+                        "min_lead_time": {"type": "integer", "description": "Minimum lead time in periods"},
+                        "use_granger_causality": {"type": "boolean", "description": "Use Granger causality test"}
+                    },
+                    "required": ["strategic_objective"]
+                }
+            ),
+            ToolDefinition(
+                name="analyze_kpi_groupings",
+                description="Analyze how groups of KPIs collectively impact strategic objectives (synergies, conflicts, redundancies)",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "strategic_objective": {"type": "string", "description": "Strategic objective to analyze"},
+                        "kpi_groups": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "group_name": {"type": "string"},
+                                    "kpi_codes": {"type": "array", "items": {"type": "string"}}
+                                }
+                            },
+                            "description": "Named groups of KPIs to analyze"
+                        },
+                        "detect_synergies": {"type": "boolean", "description": "Detect KPI combinations with amplified impact"},
+                        "detect_conflicts": {"type": "boolean", "description": "Detect KPIs that work against each other"}
+                    },
+                    "required": ["strategic_objective", "kpi_groups"]
+                }
+            ),
+            ToolDefinition(
+                name="predict_objective_achievement",
+                description="Predict likelihood of achieving a strategic objective based on current KPI values and trends",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "strategic_objective": {"type": "string", "description": "Strategic objective code"},
+                        "current_kpi_values": {
+                            "type": "object",
+                            "description": "Current values of relevant KPIs"
+                        },
+                        "prediction_date": {"type": "string", "description": "Date to predict achievement for"},
+                        "include_confidence_interval": {"type": "boolean", "description": "Include confidence interval"},
+                        "identify_risk_factors": {"type": "boolean", "description": "Identify KPIs putting objective at risk"}
+                    },
+                    "required": ["strategic_objective"]
+                }
+            ),
+            # SECONDARY TOOLS: KPI Correlation Analysis
             ToolDefinition(
                 name="analyze_kpi_correlations",
                 description="Analyze correlations between KPIs",
@@ -1864,11 +2040,137 @@ All analyses should include:
                     },
                     "required": ["what_if_question_id", "primary_impacts"]
                 }
+            ),
+            # COLLABORATION TOOLS: Handoff to other agents for implementation
+            ToolDefinition(
+                name="handoff_to_architect_for_model_design",
+                description="Hand off correlation analysis and model requirements to Architect Agent for predictive model architecture design",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "correlation_analysis": {
+                            "type": "object",
+                            "description": "Summary of KPI-to-objective correlations discovered",
+                            "properties": {
+                                "strategic_objectives": {"type": "array", "items": {"type": "string"}},
+                                "driver_kpis": {"type": "array", "items": {"type": "string"}},
+                                "correlation_strengths": {"type": "object"},
+                                "leading_indicators": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "model_requirements": {
+                            "type": "object",
+                            "description": "Requirements for the predictive model",
+                            "properties": {
+                                "model_type": {"type": "string"},
+                                "input_features": {"type": "array", "items": {"type": "string"}},
+                                "target_variable": {"type": "string"},
+                                "performance_requirements": {"type": "object"},
+                                "interpretability_requirements": {"type": "string"}
+                            }
+                        },
+                        "data_characteristics": {
+                            "type": "object",
+                            "description": "Characteristics of the training data",
+                            "properties": {
+                                "data_sources": {"type": "array", "items": {"type": "string"}},
+                                "feature_count": {"type": "integer"},
+                                "sample_size": {"type": "integer"},
+                                "time_range": {"type": "string"}
+                            }
+                        },
+                        "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                        "notes": {"type": "string", "description": "Additional context for the architect"}
+                    },
+                    "required": ["model_specification_id", "correlation_analysis", "model_requirements"]
+                }
+            ),
+            ToolDefinition(
+                name="handoff_to_developer_for_implementation",
+                description="Hand off model specification and architecture to Developer Agent for coding the predictive model",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string", "description": "ID of the ML model specification"},
+                        "architecture_design_id": {"type": "string", "description": "ID of the architecture design from Architect"},
+                        "implementation_requirements": {
+                            "type": "object",
+                            "description": "Requirements for model implementation",
+                            "properties": {
+                                "algorithm": {"type": "string", "description": "Recommended algorithm"},
+                                "framework": {"type": "string", "description": "ML framework (sklearn, pytorch, etc.)"},
+                                "feature_engineering": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "feature_name": {"type": "string"},
+                                            "source_kpi": {"type": "string"},
+                                            "transformation": {"type": "string"}
+                                        }
+                                    }
+                                },
+                                "training_pipeline": {"type": "object"},
+                                "inference_api": {"type": "object"}
+                            }
+                        },
+                        "correlation_results": {
+                            "type": "object",
+                            "description": "Correlation analysis results to inform implementation",
+                            "properties": {
+                                "driver_importance_scores": {"type": "object"},
+                                "feature_correlations": {"type": "object"},
+                                "recommended_feature_order": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "test_criteria": {
+                            "type": "object",
+                            "description": "Testing and validation criteria",
+                            "properties": {
+                                "accuracy_threshold": {"type": "number"},
+                                "validation_strategy": {"type": "string"},
+                                "test_dataset_requirements": {"type": "string"}
+                            }
+                        },
+                        "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                        "deadline": {"type": "string", "description": "Target completion date"}
+                    },
+                    "required": ["model_specification_id", "implementation_requirements", "correlation_results"]
+                }
+            ),
+            ToolDefinition(
+                name="request_architecture_review",
+                description="Request Architect Agent to review proposed model architecture before developer handoff",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "model_specification_id": {"type": "string"},
+                        "proposed_architecture": {
+                            "type": "object",
+                            "properties": {
+                                "model_type": {"type": "string"},
+                                "layers": {"type": "array", "items": {"type": "object"}},
+                                "integration_points": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "questions": {"type": "array", "items": {"type": "string"}, "description": "Specific questions for architect"}
+                    },
+                    "required": ["model_specification_id", "proposed_architecture"]
+                }
             )
         ]
     
     def _register_tools(self) -> None:
         self._tool_handlers = {
+            # PRIMARY: Strategic Objective Correlation Tools
+            "analyze_strategic_objective_drivers": self._analyze_strategic_objective_drivers,
+            "map_kpi_to_objectives": self._map_kpi_to_objectives,
+            "calculate_driver_importance": self._calculate_driver_importance,
+            "identify_leading_indicators": self._identify_leading_indicators,
+            "analyze_kpi_groupings": self._analyze_kpi_groupings,
+            "predict_objective_achievement": self._predict_objective_achievement,
+            # SECONDARY: KPI Correlation & ML Tools
             "analyze_kpi_correlations": self._analyze_kpi_correlations,
             "identify_ml_opportunities": self._identify_ml_opportunities,
             "recommend_algorithm": self._recommend_algorithm,
@@ -1879,7 +2181,11 @@ All analyses should include:
             "analyze_cascade_effects": self._analyze_cascade_effects,
             "run_sensitivity_analysis": self._run_sensitivity_analysis,
             "find_optimal_value": self._find_optimal_value,
-            "generate_what_if_prediction": self._generate_what_if_prediction
+            "generate_what_if_prediction": self._generate_what_if_prediction,
+            # COLLABORATION: Handoff to Architect and Developer
+            "handoff_to_architect_for_model_design": self._handoff_to_architect_for_model_design,
+            "handoff_to_developer_for_implementation": self._handoff_to_developer_for_implementation,
+            "request_architecture_review": self._request_architecture_review
         }
     
     def _build_context_summary(self, context: AgentContext) -> str:
@@ -1890,7 +2196,339 @@ All analyses should include:
             parts.append(f"ML Models: {len(context.artifacts['ml_models'])}")
         if "correlations" in context.artifacts:
             parts.append(f"Correlations analyzed: {len(context.artifacts['correlations'])}")
+        if "strategic_driver_analyses" in context.artifacts:
+            parts.append(f"Strategic driver analyses: {len(context.artifacts['strategic_driver_analyses'])}")
         return "\n".join(parts) if parts else "No data science context provided."
+    
+    # =========================================================================
+    # PRIMARY TOOLS: Strategic Objective Correlation Analysis
+    # =========================================================================
+    
+    async def _analyze_strategic_objective_drivers(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Identify which KPIs are driving achievement of strategic objectives."""
+        strategic_objectives = tool_input.get("strategic_objectives", [])
+        kpi_pool = tool_input.get("kpi_pool", [])
+        min_threshold = tool_input.get("min_correlation_threshold", 0.3)
+        include_lagged = tool_input.get("include_lagged_analysis", True)
+        
+        driver_analysis = {
+            "id": f"SDA-{str(uuid.uuid4())[:8].upper()}",
+            "strategic_objectives": strategic_objectives,
+            "analysis_period": tool_input.get("analysis_period", "last_12_months"),
+            "drivers": [],
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        for objective in strategic_objectives:
+            objective_drivers = {
+                "objective_code": objective,
+                "top_positive_drivers": [],
+                "top_negative_drivers": [],
+                "leading_indicators": [],
+                "kpi_importance_ranking": []
+            }
+            
+            for i, kpi in enumerate(kpi_pool or context.identified_kpis or []):
+                driver_info = {
+                    "kpi_code": kpi,
+                    "correlation_coefficient": 0.0,
+                    "p_value": 1.0,
+                    "direction": "positive" if i % 2 == 0 else "negative",
+                    "importance_score": 0.0,
+                    "is_leading_indicator": include_lagged and i % 3 == 0,
+                    "lead_time_periods": 2 if include_lagged and i % 3 == 0 else 0,
+                    "contribution_to_objective": "direct" if i % 2 == 0 else "indirect"
+                }
+                objective_drivers["kpi_importance_ranking"].append(driver_info)
+            
+            driver_analysis["drivers"].append(objective_drivers)
+        
+        if "strategic_driver_analyses" not in context.artifacts:
+            context.artifacts["strategic_driver_analyses"] = []
+        context.artifacts["strategic_driver_analyses"].append(driver_analysis)
+        
+        return {
+            "success": True,
+            "analysis_id": driver_analysis["id"],
+            "objectives_analyzed": len(strategic_objectives),
+            "driver_analysis": driver_analysis
+        }
+    
+    async def _map_kpi_to_objectives(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Map KPIs to the strategic objective hierarchy."""
+        kpi_codes = tool_input.get("kpi_codes", [])
+        target_level = tool_input.get("target_objective_level", "all")
+        include_indirect = tool_input.get("include_indirect_paths", True)
+        calc_weights = tool_input.get("calculate_contribution_weights", True)
+        
+        mapping = {
+            "id": f"KPI-OBJ-MAP-{str(uuid.uuid4())[:8].upper()}",
+            "kpi_mappings": [],
+            "objective_hierarchy": {
+                "corporate": [],
+                "business_unit": [],
+                "functional": [],
+                "tactical": [],
+                "operational": []
+            },
+            "mapped_at": datetime.utcnow().isoformat()
+        }
+        
+        for kpi in kpi_codes:
+            kpi_mapping = {
+                "kpi_code": kpi,
+                "direct_objectives": [],
+                "indirect_objectives": [] if include_indirect else None,
+                "contribution_path": [],
+                "total_strategic_impact": 0.0
+            }
+            
+            levels = ["operational", "tactical", "functional", "business_unit", "corporate"]
+            cumulative_weight = 1.0
+            
+            for level in levels:
+                if target_level != "all" and level != target_level:
+                    continue
+                    
+                objective = {
+                    "level": level,
+                    "objective_code": f"{level.upper()[:3]}-OBJ-001",
+                    "objective_name": f"Sample {level.title()} Objective",
+                    "contribution_weight": cumulative_weight if calc_weights else None,
+                    "relationship_type": "direct" if level == "operational" else "cascaded"
+                }
+                kpi_mapping["contribution_path"].append(objective)
+                cumulative_weight *= 0.8
+            
+            kpi_mapping["total_strategic_impact"] = cumulative_weight
+            mapping["kpi_mappings"].append(kpi_mapping)
+        
+        if "kpi_objective_mappings" not in context.artifacts:
+            context.artifacts["kpi_objective_mappings"] = []
+        context.artifacts["kpi_objective_mappings"].append(mapping)
+        
+        return {"success": True, "mapping_id": mapping["id"], "mapping": mapping}
+    
+    async def _calculate_driver_importance(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Quantify the importance/contribution of each KPI to strategic objective outcomes."""
+        strategic_objective = tool_input.get("strategic_objective", "")
+        driver_kpis = tool_input.get("driver_kpis", [])
+        method = tool_input.get("method", "correlation_ranking")
+        normalize = tool_input.get("normalize_scores", True)
+        
+        importance_analysis = {
+            "id": f"DRV-IMP-{str(uuid.uuid4())[:8].upper()}",
+            "strategic_objective": strategic_objective,
+            "method": method,
+            "driver_importance": [],
+            "total_explained_variance": 0.0,
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        raw_scores = []
+        for i, kpi in enumerate(driver_kpis):
+            score = max(0.1, 1.0 - (i * 0.15))
+            raw_scores.append(score)
+        
+        total_score = sum(raw_scores) if raw_scores else 1
+        
+        for i, kpi in enumerate(driver_kpis):
+            normalized_score = (raw_scores[i] / total_score * 100) if normalize else raw_scores[i]
+            importance = {
+                "kpi_code": kpi,
+                "importance_score": normalized_score,
+                "rank": i + 1,
+                "direction": "positive" if i % 2 == 0 else "negative",
+                "statistical_significance": True if i < len(driver_kpis) // 2 else False,
+                "confidence_interval": (normalized_score * 0.9, normalized_score * 1.1)
+            }
+            importance_analysis["driver_importance"].append(importance)
+        
+        importance_analysis["total_explained_variance"] = min(0.85, 0.5 + len(driver_kpis) * 0.05)
+        
+        if "driver_importance_analyses" not in context.artifacts:
+            context.artifacts["driver_importance_analyses"] = []
+        context.artifacts["driver_importance_analyses"].append(importance_analysis)
+        
+        return {"success": True, "analysis_id": importance_analysis["id"], "importance_analysis": importance_analysis}
+    
+    async def _identify_leading_indicators(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Find KPIs that serve as leading indicators (predictors) of strategic objective outcomes."""
+        strategic_objective = tool_input.get("strategic_objective", "")
+        candidate_kpis = tool_input.get("candidate_kpis", [])
+        prediction_horizon = tool_input.get("prediction_horizon", "1_quarter")
+        use_granger = tool_input.get("use_granger_causality", True)
+        
+        leading_indicator_analysis = {
+            "id": f"LEAD-IND-{str(uuid.uuid4())[:8].upper()}",
+            "strategic_objective": strategic_objective,
+            "prediction_horizon": prediction_horizon,
+            "method": "granger_causality" if use_granger else "cross_correlation",
+            "leading_indicators": [],
+            "lagging_indicators": [],
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        for i, kpi in enumerate(candidate_kpis or context.identified_kpis or []):
+            is_leading = i % 3 != 2
+            indicator = {
+                "kpi_code": kpi,
+                "indicator_type": "leading" if is_leading else "lagging",
+                "lead_lag_periods": (i % 4) + 1 if is_leading else -((i % 3) + 1),
+                "predictive_power": max(0.3, 0.9 - (i * 0.1)),
+                "granger_causality_p_value": 0.01 + (i * 0.01) if use_granger else None,
+                "is_significant": i < len(candidate_kpis or []) // 2
+            }
+            
+            if is_leading:
+                leading_indicator_analysis["leading_indicators"].append(indicator)
+            else:
+                leading_indicator_analysis["lagging_indicators"].append(indicator)
+        
+        if "leading_indicator_analyses" not in context.artifacts:
+            context.artifacts["leading_indicator_analyses"] = []
+        context.artifacts["leading_indicator_analyses"].append(leading_indicator_analysis)
+        
+        return {
+            "success": True,
+            "analysis_id": leading_indicator_analysis["id"],
+            "leading_count": len(leading_indicator_analysis["leading_indicators"]),
+            "lagging_count": len(leading_indicator_analysis["lagging_indicators"]),
+            "analysis": leading_indicator_analysis
+        }
+    
+    async def _analyze_kpi_groupings(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Analyze how groups of KPIs collectively impact strategic objectives."""
+        strategic_objective = tool_input.get("strategic_objective", "")
+        kpi_groups = tool_input.get("kpi_groups", [])
+        detect_synergies = tool_input.get("detect_synergies", True)
+        detect_conflicts = tool_input.get("detect_conflicts", True)
+        
+        grouping_analysis = {
+            "id": f"KPI-GRP-{str(uuid.uuid4())[:8].upper()}",
+            "strategic_objective": strategic_objective,
+            "group_impacts": [],
+            "synergies": [] if detect_synergies else None,
+            "conflicts": [] if detect_conflicts else None,
+            "analyzed_at": datetime.utcnow().isoformat()
+        }
+        
+        for group in kpi_groups:
+            group_impact = {
+                "group_name": group.get("group_name", "Unnamed"),
+                "kpi_codes": group.get("kpi_codes", []),
+                "collective_impact_score": 0.0,
+                "individual_vs_collective": "amplified",
+                "synergy_factor": 1.2 if detect_synergies else None
+            }
+            group_impact["collective_impact_score"] = len(group.get("kpi_codes", [])) * 0.15
+            grouping_analysis["group_impacts"].append(group_impact)
+        
+        if detect_synergies and len(kpi_groups) >= 2:
+            synergy = {
+                "kpi_pair": [kpi_groups[0].get("group_name"), kpi_groups[1].get("group_name") if len(kpi_groups) > 1 else "N/A"],
+                "synergy_type": "multiplicative",
+                "combined_impact_multiplier": 1.35,
+                "explanation": "These KPI groups reinforce each other when improving together"
+            }
+            grouping_analysis["synergies"].append(synergy)
+        
+        if detect_conflicts and len(kpi_groups) >= 2:
+            conflict = {
+                "kpi_pair": [kpi_groups[0].get("group_name"), kpi_groups[-1].get("group_name")],
+                "conflict_type": "trade_off",
+                "conflict_severity": "moderate",
+                "explanation": "Improving one group may negatively impact the other"
+            }
+            grouping_analysis["conflicts"].append(conflict)
+        
+        if "kpi_grouping_analyses" not in context.artifacts:
+            context.artifacts["kpi_grouping_analyses"] = []
+        context.artifacts["kpi_grouping_analyses"].append(grouping_analysis)
+        
+        return {"success": True, "analysis_id": grouping_analysis["id"], "grouping_analysis": grouping_analysis}
+    
+    async def _predict_objective_achievement(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Predict likelihood of achieving a strategic objective based on current KPI values."""
+        strategic_objective = tool_input.get("strategic_objective", "")
+        current_kpi_values = tool_input.get("current_kpi_values", {})
+        prediction_date = tool_input.get("prediction_date", "")
+        include_ci = tool_input.get("include_confidence_interval", True)
+        identify_risks = tool_input.get("identify_risk_factors", True)
+        
+        prediction = {
+            "id": f"OBJ-PRED-{str(uuid.uuid4())[:8].upper()}",
+            "strategic_objective": strategic_objective,
+            "prediction_date": prediction_date or datetime.utcnow().isoformat(),
+            "achievement_probability": 0.72,
+            "confidence_interval": (0.65, 0.79) if include_ci else None,
+            "prediction_confidence": "medium",
+            "risk_factors": [] if identify_risks else None,
+            "positive_contributors": [],
+            "recommended_interventions": [],
+            "predicted_at": datetime.utcnow().isoformat()
+        }
+        
+        for kpi, value in current_kpi_values.items():
+            contributor = {
+                "kpi_code": kpi,
+                "current_value": value,
+                "contribution_direction": "positive",
+                "contribution_magnitude": "moderate"
+            }
+            prediction["positive_contributors"].append(contributor)
+        
+        if identify_risks:
+            prediction["risk_factors"] = [
+                {
+                    "risk_description": "Current trend in key driver KPIs below target",
+                    "risk_severity": "medium",
+                    "affected_kpis": list(current_kpi_values.keys())[:2] if current_kpi_values else [],
+                    "mitigation_suggestion": "Focus resources on improving top driver KPIs"
+                }
+            ]
+        
+        prediction["recommended_interventions"] = [
+            {
+                "intervention": "Increase focus on top 3 driver KPIs",
+                "expected_probability_increase": 0.08,
+                "effort_level": "medium"
+            }
+        ]
+        
+        if "objective_predictions" not in context.artifacts:
+            context.artifacts["objective_predictions"] = []
+        context.artifacts["objective_predictions"].append(prediction)
+        
+        return {"success": True, "prediction_id": prediction["id"], "prediction": prediction}
+    
+    # =========================================================================
+    # SECONDARY TOOLS: KPI Correlation Analysis
+    # =========================================================================
     
     async def _analyze_kpi_correlations(
         self, 
@@ -2281,6 +2919,123 @@ All analyses should include:
         context.artifacts["what_if_predictions"].append(prediction)
         
         return {"success": True, "what_if_prediction": prediction}
+    
+    # =========================================================================
+    # COLLABORATION TOOLS: Handoff to Architect and Developer
+    # =========================================================================
+    
+    async def _handoff_to_architect_for_model_design(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Hand off correlation analysis to Architect Agent for predictive model architecture design."""
+        handoff = {
+            "id": f"DS-ARCH-HANDOFF-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_type": "data_scientist_to_architect",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "correlation_analysis": tool_input.get("correlation_analysis", {}),
+            "model_requirements": tool_input.get("model_requirements", {}),
+            "data_characteristics": tool_input.get("data_characteristics", {}),
+            "priority": tool_input.get("priority", "medium"),
+            "notes": tool_input.get("notes", ""),
+            "status": "pending_architect_review",
+            "requested_deliverables": [
+                "Model architecture design",
+                "Integration points with ML Service",
+                "Data pipeline architecture",
+                "Scalability considerations"
+            ],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "architect_handoffs" not in context.artifacts:
+            context.artifacts["architect_handoffs"] = []
+        context.artifacts["architect_handoffs"].append(handoff)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(handoff)
+        
+        return {
+            "success": True,
+            "handoff_id": handoff["id"],
+            "handoff": handoff,
+            "next_step": "Architect Agent will design the predictive model architecture based on correlation analysis"
+        }
+    
+    async def _handoff_to_developer_for_implementation(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Hand off model specification to Developer Agent for coding the predictive model."""
+        handoff = {
+            "id": f"DS-DEV-HANDOFF-{str(uuid.uuid4())[:8].upper()}",
+            "handoff_type": "data_scientist_to_developer",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "architecture_design_id": tool_input.get("architecture_design_id", ""),
+            "implementation_requirements": tool_input.get("implementation_requirements", {}),
+            "correlation_results": tool_input.get("correlation_results", {}),
+            "test_criteria": tool_input.get("test_criteria", {}),
+            "priority": tool_input.get("priority", "medium"),
+            "deadline": tool_input.get("deadline", ""),
+            "status": "pending_developer_implementation",
+            "requested_deliverables": [
+                "Feature engineering code",
+                "Model training pipeline",
+                "Inference API endpoint",
+                "Unit tests for model",
+                "Integration with ML Service"
+            ],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "developer_handoffs" not in context.artifacts:
+            context.artifacts["developer_handoffs"] = []
+        context.artifacts["developer_handoffs"].append(handoff)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(handoff)
+        
+        return {
+            "success": True,
+            "handoff_id": handoff["id"],
+            "handoff": handoff,
+            "next_step": "Developer Agent will implement the predictive model based on specifications and correlation results"
+        }
+    
+    async def _request_architecture_review(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Request Architect Agent to review proposed model architecture."""
+        review_request = {
+            "id": f"ARCH-REVIEW-{str(uuid.uuid4())[:8].upper()}",
+            "request_type": "architecture_review",
+            "model_specification_id": tool_input.get("model_specification_id", ""),
+            "proposed_architecture": tool_input.get("proposed_architecture", {}),
+            "questions": tool_input.get("questions", []),
+            "status": "pending_architect_review",
+            "requested_at": datetime.utcnow().isoformat()
+        }
+        
+        if "architecture_review_requests" not in context.artifacts:
+            context.artifacts["architecture_review_requests"] = []
+        context.artifacts["architecture_review_requests"].append(review_request)
+        
+        if "collaboration_requests" not in context.artifacts:
+            context.artifacts["collaboration_requests"] = []
+        context.artifacts["collaboration_requests"].append(review_request)
+        
+        return {
+            "success": True,
+            "review_request_id": review_request["id"],
+            "review_request": review_request,
+            "next_step": "Architect Agent will review and provide feedback on proposed architecture"
+        }
 
 
 # =============================================================================

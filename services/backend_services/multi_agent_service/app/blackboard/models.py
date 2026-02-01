@@ -204,6 +204,9 @@ class AgentBlackboard(BaseModel):
     approval_gates: Dict[str, ApprovalGate] = Field(default_factory=dict)
     struggle_signals: Dict[str, StruggleSignalEntry] = Field(default_factory=dict)
     
+    # Agent state tracking (for state machine)
+    agent_states: Dict[str, str] = Field(default_factory=dict)  # agent_role -> current_state
+    
     # Review queue
     review_queue: List[str] = Field(default_factory=list)  # artifact_ids awaiting review
     

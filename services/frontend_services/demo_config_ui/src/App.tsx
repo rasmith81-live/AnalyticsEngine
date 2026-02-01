@@ -16,6 +16,26 @@ import InsightsFeedPage from './pages/InsightsFeedPage';
 import StrategyDocumentsPage from './pages/StrategyDocumentsPage';
 import { ProcessScenarioModelerPage, PredictiveWhatIfPage } from './pages/analytics';
 
+// Demo Section Pages
+import {
+  ValueChainExplorerPage,
+  TrainingVideoPage,
+  DemoInterviewPage,
+  DataSimulatorPage,
+  SampleAnalyticsPage,
+  ExecutiveSummaryPage,
+} from './pages/demo';
+
+// Admin Section Pages
+import {
+  AgentProfilesPage,
+  AgentProfileDetailPage,
+  NewAgentPage,
+  ContractRulesPage,
+  AdminSettingsPage,
+  AgentWorkflowsPage,
+} from './pages/admin';
+
 // Legacy Pages (to be migrated)
 import ConfigPage from './pages/ConfigPage';
 import KPIDetailPage from './pages/KPIDetailPage';
@@ -62,6 +82,15 @@ function App() {
             <BrowserRouter>
               <AppLayout>
                 <Routes>
+                  {/* Demo Section */}
+                  <Route path="/demo" element={<Navigate to="/demo/value-chains" replace />} />
+                  <Route path="/demo/value-chains" element={<ValueChainExplorerPage />} />
+                  <Route path="/demo/training" element={<TrainingVideoPage />} />
+                  <Route path="/demo/interview" element={<DemoInterviewPage />} />
+                  <Route path="/demo/simulator" element={<DataSimulatorPage />} />
+                  <Route path="/demo/analytics" element={<SampleAnalyticsPage />} />
+                  <Route path="/demo/summary" element={<ExecutiveSummaryPage />} />
+                  
                   {/* Strategy Center (Home) */}
                   <Route path="/" element={<StrategyCenterPage />} />
                   
@@ -103,6 +132,15 @@ function App() {
                   <Route path="/proposal/estimate" element={<ServiceProposal />} />
                   <Route path="/proposal/contract" element={<ServiceProposal />} />
                   <Route path="/proposal/project" element={<ServiceProposal />} />
+                  
+                  {/* Admin Section */}
+                  <Route path="/admin" element={<Navigate to="/admin/agents" replace />} />
+                  <Route path="/admin/agents" element={<AgentProfilesPage />} />
+                  <Route path="/admin/agents/new" element={<NewAgentPage />} />
+                  <Route path="/admin/agents/:agentId" element={<AgentProfileDetailPage />} />
+                  <Route path="/admin/workflows" element={<AgentWorkflowsPage />} />
+                  <Route path="/admin/contracts" element={<ContractRulesPage />} />
+                  <Route path="/admin/settings" element={<AdminSettingsPage />} />
                   
                   {/* Legacy Routes (redirects) */}
                   <Route path="/demo" element={<Navigate to="/" replace />} />

@@ -29,10 +29,11 @@ Remote components (via multi_agent_service):
 
 from .config import (
     should_use_blackboard,
-    get_multi_agent_config,
-    is_contract_enforcement_enabled,
+    get_agent_settings,
+    should_enforce_contracts,
+    get_multi_agent_service_url,
 )
-from .circuit_breaker import CircuitBreaker, CircuitState
+from .circuit_breaker import CircuitBreaker
 from .multi_agent_client import MultiAgentServiceClient
 from .redis_agent_client import RedisAgentClient, get_redis_agent_client
 
@@ -46,10 +47,10 @@ __all__ = [
     
     # Resilience
     "CircuitBreaker",
-    "CircuitState",
     
     # Configuration
     "should_use_blackboard",
-    "get_multi_agent_config",
-    "is_contract_enforcement_enabled",
+    "get_agent_settings",
+    "should_enforce_contracts",
+    "get_multi_agent_service_url",
 ]

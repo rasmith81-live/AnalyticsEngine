@@ -179,11 +179,12 @@ function CompletedReviewItem({ review }: { review: CompletedReview }) {
 // =============================================================================
 
 export function PeerReviewQueue({
-  sessionId,
+  sessionId: _sessionId,
   pendingReviews,
   completedReviews = [],
   onViewArtifact,
 }: PeerReviewQueueProps) {
+  void _sessionId; // Reserved for future use
   const [showCompleted, setShowCompleted] = useState(false);
 
   return (

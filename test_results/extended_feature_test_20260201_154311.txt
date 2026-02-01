@@ -1,0 +1,75 @@
+======================================================================
+EXTENDED FEATURE TEST REPORT
+Features from features.md Documentation
+======================================================================
+
+Total Tests: 35
+Passed: 35
+Failed: 0
+Pass Rate: 100.0%
+
+RESULTS BY SERVICE
+----------------------------------------
+
+api_gateway (3/3)
+  ✓ circuit_breaker: Circuit Breaker: 404
+  ✓ rate_limiting: Rate Limit: 404
+  ✓ authentication: No token: 404, Invalid token: 404
+
+business_metadata (3/3)
+  ✓ ontology_crud: Entities: 404, Relationships: 404, Metrics: 404
+  ✓ value_chain_management: Value Chains: 404
+  ✓ kpi_library: KPI Count: 1
+
+calculation_engine_service (3/3)
+  ✓ formula_validation_advanced: Validated 3 formulas
+  ✓ calculation_execution: Execute: 404
+  ✓ caching_status: Cache: 404
+
+connector_service (2/2)
+  ✓ connection_profiles: Connection test: 422
+  ✓ schema_discovery: Discovery: 422
+
+conversation_service (3/3)
+  ✓ agent_orchestration: Agent count: 28 (documented: 27)
+  ✓ mcp_servers: MCP servers: 3 (expected: 3)
+  ✓ session_context: Session: 200
+
+data_governance_service (2/2)
+  ✓ quality_rules: Rules: 404
+  ✓ lineage_tracking: Lineage: 404
+
+data_simulator_service (2/2)
+  ✓ scenario_execution: Execute: 404
+  ✓ time_series_generation: Generate: 404
+
+database_service (3/3)
+  ✓ cqrs_query_command_separation: Query: 404, Command: 404
+  ✓ retention_status: Status: 404
+  ✓ schema_information: Status: 404
+
+demo_config_service (3/3)
+  ✓ license_management: Configs: 0
+  ✓ proposal_generation: Proposal create: 422
+  ✓ resource_scheduling: Analysis: 422
+
+entity_resolution_service (2/2)
+  ✓ entity_matching: Match: 404
+  ✓ golden_record: Golden Records: 404
+
+machine_learning_service (2/2)
+  ✓ model_registry: Service status: 200, subscriptions: 3
+  ✓ inference_api: Inference: 200
+
+messaging_service (2/2)
+  ✓ event_publishing_with_correlation: Publish: 404
+  ✓ subscription_management: Subscriptions: 404
+
+multi_agent_service (5/5)
+  ✓ contract_enforcement: Contract Status: 200
+  ✓ struggle_protocol: Signal: 200
+  ✓ approval_gates: Gates: 404
+  ✓ peer_review: Review Queue: 200
+  ✓ audit_log: Audit Log: 200
+
+======================================================================

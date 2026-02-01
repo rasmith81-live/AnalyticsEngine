@@ -1,0 +1,594 @@
+{
+  "summary": {
+    "services_tested": 18,
+    "services_healthy": 17,
+    "services_unhealthy": 1,
+    "total_tests": 70,
+    "passed": 65,
+    "failed": 5,
+    "pass_rate": 92.85714285714286,
+    "duration_seconds": 2.285935,
+    "start_time": "2026-02-01T15:15:55.880275",
+    "end_time": "2026-02-01T15:15:58.166210"
+  },
+  "services": {
+    "database_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 56.643,
+          "error": null
+        },
+        {
+          "name": "list_tables",
+          "passed": true,
+          "duration_ms": 30.439999999999998,
+          "error": null
+        },
+        {
+          "name": "query_endpoint",
+          "passed": true,
+          "duration_ms": 1.047,
+          "error": null
+        },
+        {
+          "name": "schema_info",
+          "passed": true,
+          "duration_ms": 3.5460000000000003,
+          "error": null
+        }
+      ]
+    },
+    "messaging_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 20.383,
+          "error": null
+        },
+        {
+          "name": "list_channels",
+          "passed": true,
+          "duration_ms": 7.405,
+          "error": null
+        },
+        {
+          "name": "publish_message",
+          "passed": true,
+          "duration_ms": 1.5150000000000001,
+          "error": null
+        },
+        {
+          "name": "stream_info",
+          "passed": true,
+          "duration_ms": 38.748,
+          "error": null
+        }
+      ]
+    },
+    "archival_service": {
+      "healthy": true,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 172.87800000000001,
+          "error": null
+        },
+        {
+          "name": "archive_status",
+          "passed": true,
+          "duration_ms": 28.301,
+          "error": null
+        },
+        {
+          "name": "list_archived",
+          "passed": true,
+          "duration_ms": 4.678,
+          "error": null
+        }
+      ]
+    },
+    "observability_service": {
+      "healthy": false,
+      "tests_passed": 0,
+      "tests_failed": 1,
+      "pass_rate": 0.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": false,
+          "duration_ms": 45.065,
+          "error": "Service unhealthy: {'service': 'observability_service', 'status': 'unhealthy', 'version': '0.1.0', 'uptime_seconds': 1324.369574546814, 'components': {'database': {'status': 'healthy', 'details': {'connection': 'established'}, 'last_check': '2026-02-01T15:15:56.180226'}, 'messaging': {'status': 'healthy', 'details': {'connection': 'established'}, 'last_check': '2026-02-01T15:15:56.180780'}, 'redis': {'status': 'unhealthy', 'details': {'connection': 'failed'}, 'last_check': '2026-02-01T15:15:56.180790'}}}"
+        }
+      ]
+    },
+    "multi_agent_service": {
+      "healthy": true,
+      "tests_passed": 3,
+      "tests_failed": 1,
+      "pass_rate": 75.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 12.996,
+          "error": null
+        },
+        {
+          "name": "list_agents",
+          "passed": true,
+          "duration_ms": 53.263999999999996,
+          "error": null
+        },
+        {
+          "name": "dashboard_metrics",
+          "passed": true,
+          "duration_ms": 4.708,
+          "error": null
+        },
+        {
+          "name": "create_session",
+          "passed": null,
+          "duration_ms": 0,
+          "error": null
+        }
+      ]
+    },
+    "business_metadata": {
+      "healthy": true,
+      "tests_passed": 5,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 20.567999999999998,
+          "error": null
+        },
+        {
+          "name": "list_kpis",
+          "passed": true,
+          "duration_ms": 29.002,
+          "error": null
+        },
+        {
+          "name": "list_dimensions",
+          "passed": true,
+          "duration_ms": 13.661,
+          "error": null
+        },
+        {
+          "name": "list_entities",
+          "passed": true,
+          "duration_ms": 9.265,
+          "error": null
+        },
+        {
+          "name": "scor_mappings",
+          "passed": true,
+          "duration_ms": 7.486,
+          "error": null
+        }
+      ]
+    },
+    "calculation_engine_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 16.635,
+          "error": null
+        },
+        {
+          "name": "list_calculations",
+          "passed": true,
+          "duration_ms": 63.168,
+          "error": null
+        },
+        {
+          "name": "validate_expression",
+          "passed": true,
+          "duration_ms": 130.21099999999998,
+          "error": null
+        },
+        {
+          "name": "engine_status",
+          "passed": true,
+          "duration_ms": 2.678,
+          "error": null
+        }
+      ]
+    },
+    "demo_config_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 14.642000000000001,
+          "error": null
+        },
+        {
+          "name": "list_clients",
+          "passed": true,
+          "duration_ms": 44.864000000000004,
+          "error": null
+        },
+        {
+          "name": "list_demos",
+          "passed": true,
+          "duration_ms": 4.418,
+          "error": null
+        },
+        {
+          "name": "pricing_calculator",
+          "passed": true,
+          "duration_ms": 5.182,
+          "error": null
+        }
+      ]
+    },
+    "connector_service": {
+      "healthy": true,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 18.932000000000002,
+          "error": null
+        },
+        {
+          "name": "list_connectors",
+          "passed": true,
+          "duration_ms": 49.825,
+          "error": null
+        },
+        {
+          "name": "connector_types",
+          "passed": true,
+          "duration_ms": 3.294,
+          "error": null
+        }
+      ]
+    },
+    "ingestion_service": {
+      "healthy": true,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 13.336,
+          "error": null
+        },
+        {
+          "name": "list_jobs",
+          "passed": true,
+          "duration_ms": 34.556999999999995,
+          "error": null
+        },
+        {
+          "name": "job_status",
+          "passed": true,
+          "duration_ms": 3.074,
+          "error": null
+        }
+      ]
+    },
+    "metadata_ingestion_service": {
+      "healthy": true,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 14.571000000000002,
+          "error": null
+        },
+        {
+          "name": "nlp_status",
+          "passed": true,
+          "duration_ms": 40.518,
+          "error": null
+        },
+        {
+          "name": "extract_entities",
+          "passed": true,
+          "duration_ms": 9.544,
+          "error": null
+        }
+      ]
+    },
+    "conversation_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 14.753,
+          "error": null
+        },
+        {
+          "name": "list_agents",
+          "passed": true,
+          "duration_ms": 31.333,
+          "error": null
+        },
+        {
+          "name": "agent_status",
+          "passed": true,
+          "duration_ms": 3.733,
+          "error": null
+        },
+        {
+          "name": "mcp_servers",
+          "passed": true,
+          "duration_ms": 0.0,
+          "error": null
+        }
+      ]
+    },
+    "data_simulator_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 18.362,
+          "error": null
+        },
+        {
+          "name": "list_scenarios",
+          "passed": true,
+          "duration_ms": 46.089999999999996,
+          "error": null
+        },
+        {
+          "name": "generate_data",
+          "passed": true,
+          "duration_ms": 3.701,
+          "error": null
+        },
+        {
+          "name": "simulator_status",
+          "passed": true,
+          "duration_ms": 5.612,
+          "error": null
+        }
+      ]
+    },
+    "systems_monitor": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 31.482999999999997,
+          "error": null
+        },
+        {
+          "name": "system_status",
+          "passed": true,
+          "duration_ms": 45.149,
+          "error": null
+        },
+        {
+          "name": "service_health",
+          "passed": true,
+          "duration_ms": 6.276000000000001,
+          "error": null
+        },
+        {
+          "name": "alerts",
+          "passed": true,
+          "duration_ms": 2.742,
+          "error": null
+        }
+      ]
+    },
+    "entity_resolution_service": {
+      "healthy": true,
+      "tests_passed": 2,
+      "tests_failed": 1,
+      "pass_rate": 66.66666666666666,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 17.732999999999997,
+          "error": null
+        },
+        {
+          "name": "resolve_entity",
+          "passed": false,
+          "duration_ms": 189.453,
+          "error": "{'detail': [{'type': 'missing', 'loc': ['body', 'record_id'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'source_system'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'entity_type'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'attributes'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]}"
+        },
+        {
+          "name": "entity_types",
+          "passed": true,
+          "duration_ms": 11.793,
+          "error": null
+        }
+      ]
+    },
+    "data_governance_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 14.520999999999999,
+          "error": null
+        },
+        {
+          "name": "list_policies",
+          "passed": true,
+          "duration_ms": 42.437999999999995,
+          "error": null
+        },
+        {
+          "name": "data_lineage",
+          "passed": true,
+          "duration_ms": 5.335,
+          "error": null
+        },
+        {
+          "name": "quality_rules",
+          "passed": true,
+          "duration_ms": 4.973,
+          "error": null
+        }
+      ]
+    },
+    "machine_learning_service": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 18.914,
+          "error": null
+        },
+        {
+          "name": "list_models",
+          "passed": true,
+          "duration_ms": 61.61,
+          "error": null
+        },
+        {
+          "name": "model_status",
+          "passed": true,
+          "duration_ms": 2.818,
+          "error": null
+        },
+        {
+          "name": "predictions_status",
+          "passed": true,
+          "duration_ms": 6.355,
+          "error": null
+        }
+      ]
+    },
+    "api_gateway": {
+      "healthy": true,
+      "tests_passed": 4,
+      "tests_failed": 2,
+      "pass_rate": 66.66666666666666,
+      "tests": [
+        {
+          "name": "health_check",
+          "passed": true,
+          "duration_ms": 20.728,
+          "error": null
+        },
+        {
+          "name": "gateway_health",
+          "passed": true,
+          "duration_ms": 11.844000000000001,
+          "error": null
+        },
+        {
+          "name": "service_registry",
+          "passed": true,
+          "duration_ms": 109.435,
+          "error": null
+        },
+        {
+          "name": "rate_limit_status",
+          "passed": true,
+          "duration_ms": 7.746,
+          "error": null
+        },
+        {
+          "name": "proxy_metadata",
+          "passed": false,
+          "duration_ms": 219.251,
+          "error": "Internal Server Error"
+        },
+        {
+          "name": "proxy_conversation",
+          "passed": false,
+          "duration_ms": 8.691,
+          "error": "Internal Server Error"
+        }
+      ]
+    },
+    "integration": {
+      "healthy": false,
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "pass_rate": 100.0,
+      "tests": [
+        {
+          "name": "db_messaging_integration",
+          "passed": true,
+          "duration_ms": 31.401,
+          "error": null
+        },
+        {
+          "name": "metadata_calculation_integration",
+          "passed": true,
+          "duration_ms": 29.38,
+          "error": null
+        },
+        {
+          "name": "agent_conversation_integration",
+          "passed": true,
+          "duration_ms": 26.785,
+          "error": null
+        }
+      ]
+    }
+  },
+  "issues": [
+    "[observability_service] health_check: Service unhealthy: {'service': 'observability_service', 'status': 'unhealthy', 'version': '0.1.0', 'uptime_seconds': 1324.369574546814, 'components': {'database': {'status': 'healthy', 'details': {'connection': 'established'}, 'last_check': '2026-02-01T15:15:56.180226'}, 'messaging': {'status': 'healthy', 'details': {'connection': 'established'}, 'last_check': '2026-02-01T15:15:56.180780'}, 'redis': {'status': 'unhealthy', 'details': {'connection': 'failed'}, 'last_check': '2026-02-01T15:15:56.180790'}}}",
+    "[entity_resolution_service] resolve_entity: {'detail': [{'type': 'missing', 'loc': ['body', 'record_id'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'source_system'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'entity_type'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}, {'type': 'missing', 'loc': ['body', 'attributes'], 'msg': 'Field required', 'input': {'text': 'revenue', 'context': 'financial'}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]}",
+    "[api_gateway] proxy_metadata: Internal Server Error",
+    "[api_gateway] proxy_conversation: Internal Server Error"
+  ]
+}

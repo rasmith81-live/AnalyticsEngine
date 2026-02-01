@@ -1,0 +1,1126 @@
+{
+  "summary": {
+    "test_run_id": "HANDOFF-TEST-20260201-171143",
+    "timestamp": "2026-02-01T17:11:43.723914",
+    "total_handoffs": 37,
+    "passed": 37,
+    "failed": 0,
+    "success_rate": 100.0,
+    "unique_agent_pairs": 31,
+    "workflow_categories": 10,
+    "category_breakdown": {
+      "Entity Design Workflow": {
+        "total": 6,
+        "passed": 6
+      },
+      "ML/Predictive Model Workflow": {
+        "total": 6,
+        "passed": 6
+      },
+      "Analytics Workflow": {
+        "total": 5,
+        "passed": 5
+      },
+      "Sales Pipeline Workflow": {
+        "total": 6,
+        "passed": 6
+      },
+      "Customer Success Workflow": {
+        "total": 2,
+        "passed": 2
+      },
+      "Operations Workflow": {
+        "total": 2,
+        "passed": 2
+      },
+      "Governance Workflow": {
+        "total": 1,
+        "passed": 1
+      },
+      "Integration Workflow": {
+        "total": 3,
+        "passed": 3
+      },
+      "Knowledge Curation Workflow": {
+        "total": 4,
+        "passed": 4
+      },
+      "Release Management Workflow": {
+        "total": 2,
+        "passed": 2
+      }
+    },
+    "agents_as_source": {
+      "ArchitectAgent": 5,
+      "DeveloperAgent": 5,
+      "DataScientistAgent": 3,
+      "SalesManagerAgent": 3,
+      "MarketingManagerAgent": 3,
+      "BusinessAnalystAgent": 2,
+      "DataStewardAgent": 2,
+      "CustomerSuccessManagerAgent": 2,
+      "IntegrationSpecialistAgent": 2,
+      "LibrarianCuratorAgent": 2,
+      "TesterAgent": 1,
+      "FormulaBuilderAgent": 1,
+      "OperationsManagerAgent": 1,
+      "ProcessEngineerAgent": 1,
+      "DataQualityAnalystAgent": 1,
+      "BusinessStrategistAgent": 1,
+      "CompetitiveAnalystAgent": 1,
+      "ReleaseManagerAgent": 1
+    },
+    "agents_as_target": {
+      "DataScientistAgent": 6,
+      "DeveloperAgent": 4,
+      "BusinessAnalystAgent": 3,
+      "DocumenterAgent": 3,
+      "ArchitectAgent": 3,
+      "DataAnalystAgent": 3,
+      "TesterAgent": 2,
+      "SalesManagerAgent": 2,
+      "DeploymentSpecialistAgent": 2,
+      "MarketingManagerAgent": 1,
+      "AccountantAgent": 1,
+      "ProjectManagerAgent": 1,
+      "UIDesignerAgent": 1,
+      "OperationsManagerAgent": 1,
+      "DataGovernanceSpecialistAgent": 1,
+      "MappingSpecialistAgent": 1,
+      "CompetitiveAnalystAgent": 1,
+      "BusinessStrategistAgent": 1
+    }
+  },
+  "handoff_registry": [
+    {
+      "name": "Architect requests entity validation",
+      "tool_name": "request_entity_validation",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Entity Design Workflow",
+      "description": "Architect requests Business Analyst to validate entity design against industry best practices",
+      "required_inputs": [
+        "entity_name",
+        "entity_type",
+        "proposed_attributes"
+      ],
+      "expected_outputs": [
+        "validation_status",
+        "recommendations"
+      ],
+      "bidirectional": true,
+      "response_tool": "share_entity_validation"
+    },
+    {
+      "name": "Architect requests KPI requirements",
+      "tool_name": "request_kpi_requirements",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Entity Design Workflow",
+      "description": "Architect requests Business Analyst to identify KPIs for designed entities",
+      "required_inputs": [
+        "entity_name",
+        "business_context"
+      ],
+      "expected_outputs": [
+        "kpi_list",
+        "measurement_requirements"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Architect requests schema generation",
+      "tool_name": "request_schema_generation",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "Entity Design Workflow",
+      "description": "Architect requests Developer to generate schemas from entity designs",
+      "required_inputs": [
+        "entity_definitions",
+        "schema_type"
+      ],
+      "expected_outputs": [
+        "schema_artifacts"
+      ],
+      "bidirectional": true,
+      "response_tool": "share_schema_artifacts"
+    },
+    {
+      "name": "Developer requests test specification",
+      "tool_name": "request_test_specification",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "TesterAgent",
+      "category": "Entity Design Workflow",
+      "description": "Developer requests Tester to create test specifications for generated code",
+      "required_inputs": [
+        "code_artifact",
+        "test_requirements"
+      ],
+      "expected_outputs": [
+        "test_specification",
+        "test_cases"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Developer requests documentation",
+      "tool_name": "request_documentation",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "Entity Design Workflow",
+      "description": "Developer requests Documenter to create documentation for generated code",
+      "required_inputs": [
+        "code_artifact",
+        "doc_type"
+      ],
+      "expected_outputs": [
+        "documentation"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Tester requests test documentation",
+      "tool_name": "request_test_documentation",
+      "source_agent": "TesterAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "Entity Design Workflow",
+      "description": "Tester requests Documenter to create test documentation",
+      "required_inputs": [
+        "test_suite",
+        "test_cases"
+      ],
+      "expected_outputs": [
+        "test_documentation"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Scientist handoff to Architect for model design",
+      "tool_name": "handoff_to_architect_for_model_design",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Data Scientist hands off correlation analysis to Architect for ML model architecture design",
+      "required_inputs": [
+        "correlation_analysis_id",
+        "model_type",
+        "target_variable",
+        "features"
+      ],
+      "expected_outputs": [
+        "model_architecture"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Scientist handoff to Developer for implementation",
+      "tool_name": "handoff_to_developer_for_implementation",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Data Scientist hands off model specification to Developer for implementation",
+      "required_inputs": [
+        "model_specification_id",
+        "architecture_id"
+      ],
+      "expected_outputs": [
+        "implementation_artifacts"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Scientist requests architecture review",
+      "tool_name": "request_architecture_review",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Data Scientist requests Architect to review proposed model architecture",
+      "required_inputs": [
+        "model_specification",
+        "architecture_proposal"
+      ],
+      "expected_outputs": [
+        "review_feedback",
+        "approval_status"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Architect handoff ML architecture to Developer",
+      "tool_name": "handoff_model_architecture_to_developer",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Architect hands off ML model architecture to Developer for implementation",
+      "required_inputs": [
+        "architecture_id",
+        "model_specification_id"
+      ],
+      "expected_outputs": [
+        "implementation_plan"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Developer handoff ML to Tester",
+      "tool_name": "handoff_ml_to_tester",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "TesterAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Developer hands off ML model implementation to Tester for testing",
+      "required_inputs": [
+        "model_specification_id",
+        "implementation_id",
+        "model_type"
+      ],
+      "expected_outputs": [
+        "test_plan",
+        "test_results"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Developer handoff ML to Documenter",
+      "tool_name": "handoff_ml_to_documenter",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "ML/Predictive Model Workflow",
+      "description": "Developer hands off ML model to Documenter for documentation",
+      "required_inputs": [
+        "model_specification_id",
+        "model_name",
+        "model_purpose"
+      ],
+      "expected_outputs": [
+        "model_documentation",
+        "api_documentation",
+        "user_guide"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Business Analyst requests KPI calculation design",
+      "tool_name": "request_kpi_calculation_design",
+      "source_agent": "BusinessAnalystAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Analytics Workflow",
+      "description": "Business Analyst requests Data Analyst to design calculation logic for KPIs",
+      "required_inputs": [
+        "kpi_list",
+        "calculation_requirements"
+      ],
+      "expected_outputs": [
+        "calculation_definitions"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Business Analyst requests predictive analysis",
+      "tool_name": "request_predictive_analysis",
+      "source_agent": "BusinessAnalystAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "description": "Business Analyst requests Data Scientist to analyze KPIs for predictive opportunities",
+      "required_inputs": [
+        "kpi_ids"
+      ],
+      "expected_outputs": [
+        "predictive_opportunities",
+        "correlation_analysis"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Steward requests statistical validation",
+      "tool_name": "request_statistical_validation",
+      "source_agent": "DataStewardAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "description": "Data Steward requests Data Scientist to validate KPI correlations statistically",
+      "required_inputs": [
+        "kpi_pairs",
+        "suspected_correlations"
+      ],
+      "expected_outputs": [
+        "statistical_validation",
+        "p_values"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Steward requests ML model design",
+      "tool_name": "request_ml_model_design",
+      "source_agent": "DataStewardAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "description": "Data Steward collaborates with Data Scientist on predictive ML models",
+      "required_inputs": [
+        "target_kpi",
+        "feature_kpis"
+      ],
+      "expected_outputs": [
+        "model_design",
+        "feature_importance"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Formula Builder requests Data Analyst review",
+      "tool_name": "request_data_analyst_review",
+      "source_agent": "FormulaBuilderAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Analytics Workflow",
+      "description": "Formula Builder requests Data Analyst to review calculation logic",
+      "required_inputs": [
+        "formula_definition",
+        "calculation_steps"
+      ],
+      "expected_outputs": [
+        "review_feedback",
+        "optimization_suggestions"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Sales Manager requests MQL from Marketing",
+      "tool_name": "request_mql_from_marketing",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "MarketingManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Sales Manager requests Marketing Qualified Leads from Marketing",
+      "required_inputs": [
+        "lead_criteria",
+        "quantity_needed"
+      ],
+      "expected_outputs": [
+        "mql_list"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Sales Manager requests deal pricing",
+      "tool_name": "request_deal_pricing",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "AccountantAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Sales Manager requests deal pricing from Accountant",
+      "required_inputs": [
+        "deal_id",
+        "pricing_requirements"
+      ],
+      "expected_outputs": [
+        "pricing_proposal",
+        "financial_terms"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Sales Manager handoff to Project Manager",
+      "tool_name": "handoff_to_project_manager",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "ProjectManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Sales Manager hands off won deal to Project Manager for onboarding",
+      "required_inputs": [
+        "deal_id",
+        "client_info",
+        "contract_terms"
+      ],
+      "expected_outputs": [
+        "onboarding_plan"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Marketing Manager handoff MQL to Sales",
+      "tool_name": "handoff_mql_to_sales",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "SalesManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Marketing Manager hands off qualified leads to Sales Manager",
+      "required_inputs": [
+        "lead_list",
+        "qualification_criteria"
+      ],
+      "expected_outputs": [
+        "acceptance_status"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Marketing Manager requests campaign analytics",
+      "tool_name": "request_campaign_analytics",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Marketing Manager requests campaign performance analysis",
+      "required_inputs": [
+        "campaign_id"
+      ],
+      "expected_outputs": [
+        "performance_analysis",
+        "recommendations"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Marketing Manager requests design assets",
+      "tool_name": "request_design_assets",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "UIDesignerAgent",
+      "category": "Sales Pipeline Workflow",
+      "description": "Marketing Manager requests design assets for campaigns",
+      "required_inputs": [
+        "campaign_brief",
+        "asset_requirements"
+      ],
+      "expected_outputs": [
+        "design_assets"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Customer Success requests churn prediction model",
+      "tool_name": "request_churn_prediction_model",
+      "source_agent": "CustomerSuccessManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Customer Success Workflow",
+      "description": "Customer Success requests churn prediction model from Data Scientist",
+      "required_inputs": [
+        "customer_segment",
+        "prediction_requirements"
+      ],
+      "expected_outputs": [
+        "churn_model",
+        "risk_scores"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Customer Success handoff expansion to Sales",
+      "tool_name": "handoff_expansion_to_sales",
+      "source_agent": "CustomerSuccessManagerAgent",
+      "target_agent": "SalesManagerAgent",
+      "category": "Customer Success Workflow",
+      "description": "Customer Success hands off expansion opportunity to Sales",
+      "required_inputs": [
+        "customer_id",
+        "expansion_opportunity"
+      ],
+      "expected_outputs": [
+        "sales_engagement_plan"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Operations Manager requests demand forecast model",
+      "tool_name": "request_demand_forecast_model",
+      "source_agent": "OperationsManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Operations Workflow",
+      "description": "Operations Manager requests demand forecasting model",
+      "required_inputs": [
+        "forecast_horizon",
+        "product_categories"
+      ],
+      "expected_outputs": [
+        "forecast_model",
+        "predictions"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Process Engineer requests operations review",
+      "tool_name": "request_operations_review",
+      "source_agent": "ProcessEngineerAgent",
+      "target_agent": "OperationsManagerAgent",
+      "category": "Operations Workflow",
+      "description": "Process Engineer requests Operations Manager to review simulation results",
+      "required_inputs": [
+        "simulation_id",
+        "process_changes"
+      ],
+      "expected_outputs": [
+        "review_feedback",
+        "approval_status"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Architect requests governance review",
+      "tool_name": "request_governance_review",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DataGovernanceSpecialistAgent",
+      "category": "Governance Workflow",
+      "description": "Architect requests Data Governance Specialist to review entity design for compliance",
+      "required_inputs": [
+        "entity_definition",
+        "compliance_requirements"
+      ],
+      "expected_outputs": [
+        "compliance_status",
+        "recommendations"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Integration Specialist requests mapping assistance",
+      "tool_name": "request_mapping_assistance",
+      "source_agent": "IntegrationSpecialistAgent",
+      "target_agent": "MappingSpecialistAgent",
+      "category": "Integration Workflow",
+      "description": "Integration Specialist requests help with field mappings",
+      "required_inputs": [
+        "source_schema",
+        "target_schema"
+      ],
+      "expected_outputs": [
+        "field_mappings",
+        "transformation_rules"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Integration Specialist requests custom development",
+      "tool_name": "request_custom_development",
+      "source_agent": "IntegrationSpecialistAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "Integration Workflow",
+      "description": "Integration Specialist requests custom integration code",
+      "required_inputs": [
+        "integration_requirements",
+        "api_specifications"
+      ],
+      "expected_outputs": [
+        "integration_code"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Data Quality Analyst requests data profiling",
+      "tool_name": "request_data_profiling",
+      "source_agent": "DataQualityAnalystAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Integration Workflow",
+      "description": "Data Quality Analyst requests Data Analyst to profile source data",
+      "required_inputs": [
+        "data_source",
+        "profiling_requirements"
+      ],
+      "expected_outputs": [
+        "data_profile",
+        "quality_metrics"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Librarian Curator requests Architect review",
+      "tool_name": "request_architect_review",
+      "source_agent": "LibrarianCuratorAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "Knowledge Curation Workflow",
+      "description": "Librarian Curator requests Architect to review extracted entities for DDD design",
+      "required_inputs": [
+        "extracted_entities",
+        "domain_context"
+      ],
+      "expected_outputs": [
+        "design_feedback",
+        "entity_refinements"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Librarian Curator requests Business Analyst review",
+      "tool_name": "request_business_analyst_review",
+      "source_agent": "LibrarianCuratorAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Knowledge Curation Workflow",
+      "description": "Librarian Curator requests Business Analyst to review extracted KPIs",
+      "required_inputs": [
+        "extracted_kpis",
+        "business_context"
+      ],
+      "expected_outputs": [
+        "kpi_validation",
+        "business_alignment"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Business Strategist requests competitive analysis",
+      "tool_name": "request_competitive_analysis",
+      "source_agent": "BusinessStrategistAgent",
+      "target_agent": "CompetitiveAnalystAgent",
+      "category": "Knowledge Curation Workflow",
+      "description": "Business Strategist requests competitive analysis after business model elicitation",
+      "required_inputs": [
+        "business_model",
+        "market_segment"
+      ],
+      "expected_outputs": [
+        "competitive_landscape",
+        "peer_analysis"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Competitive Analyst requests Strategist review",
+      "tool_name": "request_strategist_review",
+      "source_agent": "CompetitiveAnalystAgent",
+      "target_agent": "BusinessStrategistAgent",
+      "category": "Knowledge Curation Workflow",
+      "description": "Competitive Analyst requests Business Strategist to review findings",
+      "required_inputs": [
+        "competitive_findings",
+        "market_analysis"
+      ],
+      "expected_outputs": [
+        "strategic_implications",
+        "recommendations"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Developer requests deployment config",
+      "tool_name": "request_deployment_config",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DeploymentSpecialistAgent",
+      "category": "Release Management Workflow",
+      "description": "Developer requests deployment configuration from Deployment Specialist",
+      "required_inputs": [
+        "artifact_id",
+        "deployment_target"
+      ],
+      "expected_outputs": [
+        "deployment_config",
+        "infrastructure_requirements"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    },
+    {
+      "name": "Release Manager requests deployment review",
+      "tool_name": "request_deployment_review",
+      "source_agent": "ReleaseManagerAgent",
+      "target_agent": "DeploymentSpecialistAgent",
+      "category": "Release Management Workflow",
+      "description": "Release Manager requests Deployment Specialist to review release plan",
+      "required_inputs": [
+        "release_plan",
+        "deployment_schedule"
+      ],
+      "expected_outputs": [
+        "review_feedback",
+        "approval_status"
+      ],
+      "bidirectional": false,
+      "response_tool": null
+    }
+  ],
+  "test_results": [
+    {
+      "handoff_name": "Architect requests entity validation",
+      "tool_name": "request_entity_validation",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_ENTITY_VALIDATION-1002A9B6",
+      "error": null
+    },
+    {
+      "handoff_name": "Architect requests KPI requirements",
+      "tool_name": "request_kpi_requirements",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_KPI_REQUIREMENTS-7BAC30EC",
+      "error": null
+    },
+    {
+      "handoff_name": "Architect requests schema generation",
+      "tool_name": "request_schema_generation",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_SCHEMA_GENERATION-64BB3E3B",
+      "error": null
+    },
+    {
+      "handoff_name": "Developer requests test specification",
+      "tool_name": "request_test_specification",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "TesterAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_TEST_SPECIFICATION-7766F7DD",
+      "error": null
+    },
+    {
+      "handoff_name": "Developer requests documentation",
+      "tool_name": "request_documentation",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DOCUMENTATION-03200CCE",
+      "error": null
+    },
+    {
+      "handoff_name": "Tester requests test documentation",
+      "tool_name": "request_test_documentation",
+      "source_agent": "TesterAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "Entity Design Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_TEST_DOCUMENTATION-C3C5DE4D",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Scientist handoff to Architect for model design",
+      "tool_name": "handoff_to_architect_for_model_design",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_TO_ARCHITECT_FOR_MODEL_DESIGN-D388CA12",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Scientist handoff to Developer for implementation",
+      "tool_name": "handoff_to_developer_for_implementation",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_TO_DEVELOPER_FOR_IMPLEMENTATION-524E99F1",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Scientist requests architecture review",
+      "tool_name": "request_architecture_review",
+      "source_agent": "DataScientistAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_ARCHITECTURE_REVIEW-4D8C50B9",
+      "error": null
+    },
+    {
+      "handoff_name": "Architect handoff ML architecture to Developer",
+      "tool_name": "handoff_model_architecture_to_developer",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_MODEL_ARCHITECTURE_TO_DEVELOPER-3B0C1B6C",
+      "error": null
+    },
+    {
+      "handoff_name": "Developer handoff ML to Tester",
+      "tool_name": "handoff_ml_to_tester",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "TesterAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_ML_TO_TESTER-C09ED476",
+      "error": null
+    },
+    {
+      "handoff_name": "Developer handoff ML to Documenter",
+      "tool_name": "handoff_ml_to_documenter",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DocumenterAgent",
+      "category": "ML/Predictive Model Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_ML_TO_DOCUMENTER-7F2AECF5",
+      "error": null
+    },
+    {
+      "handoff_name": "Business Analyst requests KPI calculation design",
+      "tool_name": "request_kpi_calculation_design",
+      "source_agent": "BusinessAnalystAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Analytics Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_KPI_CALCULATION_DESIGN-17B419C4",
+      "error": null
+    },
+    {
+      "handoff_name": "Business Analyst requests predictive analysis",
+      "tool_name": "request_predictive_analysis",
+      "source_agent": "BusinessAnalystAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_PREDICTIVE_ANALYSIS-398E6F95",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Steward requests statistical validation",
+      "tool_name": "request_statistical_validation",
+      "source_agent": "DataStewardAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_STATISTICAL_VALIDATION-59524544",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Steward requests ML model design",
+      "tool_name": "request_ml_model_design",
+      "source_agent": "DataStewardAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Analytics Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_ML_MODEL_DESIGN-AB1B2D12",
+      "error": null
+    },
+    {
+      "handoff_name": "Formula Builder requests Data Analyst review",
+      "tool_name": "request_data_analyst_review",
+      "source_agent": "FormulaBuilderAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Analytics Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DATA_ANALYST_REVIEW-04719466",
+      "error": null
+    },
+    {
+      "handoff_name": "Sales Manager requests MQL from Marketing",
+      "tool_name": "request_mql_from_marketing",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "MarketingManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_MQL_FROM_MARKETING-CB38EC16",
+      "error": null
+    },
+    {
+      "handoff_name": "Sales Manager requests deal pricing",
+      "tool_name": "request_deal_pricing",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "AccountantAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DEAL_PRICING-BFCC787E",
+      "error": null
+    },
+    {
+      "handoff_name": "Sales Manager handoff to Project Manager",
+      "tool_name": "handoff_to_project_manager",
+      "source_agent": "SalesManagerAgent",
+      "target_agent": "ProjectManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_TO_PROJECT_MANAGER-002ABDDB",
+      "error": null
+    },
+    {
+      "handoff_name": "Marketing Manager handoff MQL to Sales",
+      "tool_name": "handoff_mql_to_sales",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "SalesManagerAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_MQL_TO_SALES-D1F5CA93",
+      "error": null
+    },
+    {
+      "handoff_name": "Marketing Manager requests campaign analytics",
+      "tool_name": "request_campaign_analytics",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_CAMPAIGN_ANALYTICS-65D874C6",
+      "error": null
+    },
+    {
+      "handoff_name": "Marketing Manager requests design assets",
+      "tool_name": "request_design_assets",
+      "source_agent": "MarketingManagerAgent",
+      "target_agent": "UIDesignerAgent",
+      "category": "Sales Pipeline Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DESIGN_ASSETS-70782963",
+      "error": null
+    },
+    {
+      "handoff_name": "Customer Success requests churn prediction model",
+      "tool_name": "request_churn_prediction_model",
+      "source_agent": "CustomerSuccessManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Customer Success Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_CHURN_PREDICTION_MODEL-DBFA63CD",
+      "error": null
+    },
+    {
+      "handoff_name": "Customer Success handoff expansion to Sales",
+      "tool_name": "handoff_expansion_to_sales",
+      "source_agent": "CustomerSuccessManagerAgent",
+      "target_agent": "SalesManagerAgent",
+      "category": "Customer Success Workflow",
+      "success": true,
+      "artifact_id": "HANDOFF_EXPANSION_TO_SALES-D3C3BBE6",
+      "error": null
+    },
+    {
+      "handoff_name": "Operations Manager requests demand forecast model",
+      "tool_name": "request_demand_forecast_model",
+      "source_agent": "OperationsManagerAgent",
+      "target_agent": "DataScientistAgent",
+      "category": "Operations Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DEMAND_FORECAST_MODEL-2A65D61C",
+      "error": null
+    },
+    {
+      "handoff_name": "Process Engineer requests operations review",
+      "tool_name": "request_operations_review",
+      "source_agent": "ProcessEngineerAgent",
+      "target_agent": "OperationsManagerAgent",
+      "category": "Operations Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_OPERATIONS_REVIEW-ED04EED2",
+      "error": null
+    },
+    {
+      "handoff_name": "Architect requests governance review",
+      "tool_name": "request_governance_review",
+      "source_agent": "ArchitectAgent",
+      "target_agent": "DataGovernanceSpecialistAgent",
+      "category": "Governance Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_GOVERNANCE_REVIEW-35AFA4B9",
+      "error": null
+    },
+    {
+      "handoff_name": "Integration Specialist requests mapping assistance",
+      "tool_name": "request_mapping_assistance",
+      "source_agent": "IntegrationSpecialistAgent",
+      "target_agent": "MappingSpecialistAgent",
+      "category": "Integration Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_MAPPING_ASSISTANCE-244FCB9A",
+      "error": null
+    },
+    {
+      "handoff_name": "Integration Specialist requests custom development",
+      "tool_name": "request_custom_development",
+      "source_agent": "IntegrationSpecialistAgent",
+      "target_agent": "DeveloperAgent",
+      "category": "Integration Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_CUSTOM_DEVELOPMENT-114C47E0",
+      "error": null
+    },
+    {
+      "handoff_name": "Data Quality Analyst requests data profiling",
+      "tool_name": "request_data_profiling",
+      "source_agent": "DataQualityAnalystAgent",
+      "target_agent": "DataAnalystAgent",
+      "category": "Integration Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DATA_PROFILING-AD1941D3",
+      "error": null
+    },
+    {
+      "handoff_name": "Librarian Curator requests Architect review",
+      "tool_name": "request_architect_review",
+      "source_agent": "LibrarianCuratorAgent",
+      "target_agent": "ArchitectAgent",
+      "category": "Knowledge Curation Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_ARCHITECT_REVIEW-F5E334D0",
+      "error": null
+    },
+    {
+      "handoff_name": "Librarian Curator requests Business Analyst review",
+      "tool_name": "request_business_analyst_review",
+      "source_agent": "LibrarianCuratorAgent",
+      "target_agent": "BusinessAnalystAgent",
+      "category": "Knowledge Curation Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_BUSINESS_ANALYST_REVIEW-FF1B306C",
+      "error": null
+    },
+    {
+      "handoff_name": "Business Strategist requests competitive analysis",
+      "tool_name": "request_competitive_analysis",
+      "source_agent": "BusinessStrategistAgent",
+      "target_agent": "CompetitiveAnalystAgent",
+      "category": "Knowledge Curation Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_COMPETITIVE_ANALYSIS-02A4A41A",
+      "error": null
+    },
+    {
+      "handoff_name": "Competitive Analyst requests Strategist review",
+      "tool_name": "request_strategist_review",
+      "source_agent": "CompetitiveAnalystAgent",
+      "target_agent": "BusinessStrategistAgent",
+      "category": "Knowledge Curation Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_STRATEGIST_REVIEW-F1FBA8CF",
+      "error": null
+    },
+    {
+      "handoff_name": "Developer requests deployment config",
+      "tool_name": "request_deployment_config",
+      "source_agent": "DeveloperAgent",
+      "target_agent": "DeploymentSpecialistAgent",
+      "category": "Release Management Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DEPLOYMENT_CONFIG-0FC319C2",
+      "error": null
+    },
+    {
+      "handoff_name": "Release Manager requests deployment review",
+      "tool_name": "request_deployment_review",
+      "source_agent": "ReleaseManagerAgent",
+      "target_agent": "DeploymentSpecialistAgent",
+      "category": "Release Management Workflow",
+      "success": true,
+      "artifact_id": "REQUEST_DEPLOYMENT_REVIEW-71AC56FE",
+      "error": null
+    }
+  ]
+}

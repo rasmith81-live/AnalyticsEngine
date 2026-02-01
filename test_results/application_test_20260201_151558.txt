@@ -1,0 +1,157 @@
+================================================================================
+COMPREHENSIVE APPLICATION TEST REPORT
+Tester Agent Contract Compliance Report
+================================================================================
+
+Execution Time: 2026-02-01 15:15:55.880275 - 2026-02-01 15:15:58.166210
+Duration: 2.29 seconds
+
+OVERALL SUMMARY
+----------------------------------------
+Services Tested: 18
+Services Healthy: 17
+Services Unhealthy: 1
+Total Tests: 70
+Passed: 65
+Failed: 5
+Pass Rate: 92.9%
+
+
+BACKEND SERVICES
+----------------------------------------
+
+✓ database_service (4/4 passed)
+    ✓ health_check (56.6ms)
+    ✓ list_tables (30.4ms)
+    ✓ query_endpoint (1.0ms)
+    ✓ schema_info (3.5ms)
+
+✓ messaging_service (4/4 passed)
+    ✓ health_check (20.4ms)
+    ✓ list_channels (7.4ms)
+    ✓ publish_message (1.5ms)
+    ✓ stream_info (38.7ms)
+
+✓ archival_service (3/3 passed)
+    ✓ health_check (172.9ms)
+    ✓ archive_status (28.3ms)
+    ✓ list_archived (4.7ms)
+
+✗ observability_service (0/1 passed)
+    ✗ health_check (45.1ms)
+        ERROR: Service unhealthy: {'service': 'observability_service', 'status': 'unhealthy', 'version': '0.1.0', '
+
+✓ multi_agent_service (3/4 passed)
+    ✓ health_check (13.0ms)
+    ✓ list_agents (53.3ms)
+    ✓ dashboard_metrics (4.7ms)
+    ✗ create_session (0.0ms)
+
+BUSINESS SERVICES
+----------------------------------------
+
+✓ business_metadata (5/5 passed)
+    ✓ health_check (20.6ms)
+    ✓ list_kpis (29.0ms)
+    ✓ list_dimensions (13.7ms)
+    ✓ list_entities (9.3ms)
+    ✓ scor_mappings (7.5ms)
+
+✓ calculation_engine_service (4/4 passed)
+    ✓ health_check (16.6ms)
+    ✓ list_calculations (63.2ms)
+    ✓ validate_expression (130.2ms)
+    ✓ engine_status (2.7ms)
+
+✓ demo_config_service (4/4 passed)
+    ✓ health_check (14.6ms)
+    ✓ list_clients (44.9ms)
+    ✓ list_demos (4.4ms)
+    ✓ pricing_calculator (5.2ms)
+
+✓ connector_service (3/3 passed)
+    ✓ health_check (18.9ms)
+    ✓ list_connectors (49.8ms)
+    ✓ connector_types (3.3ms)
+
+✓ ingestion_service (3/3 passed)
+    ✓ health_check (13.3ms)
+    ✓ list_jobs (34.6ms)
+    ✓ job_status (3.1ms)
+
+✓ metadata_ingestion_service (3/3 passed)
+    ✓ health_check (14.6ms)
+    ✓ nlp_status (40.5ms)
+    ✓ extract_entities (9.5ms)
+
+✓ conversation_service (4/4 passed)
+    ✓ health_check (14.8ms)
+    ✓ list_agents (31.3ms)
+    ✓ agent_status (3.7ms)
+    ✓ mcp_servers (0.0ms)
+
+✓ data_simulator_service (4/4 passed)
+    ✓ health_check (18.4ms)
+    ✓ list_scenarios (46.1ms)
+    ✓ generate_data (3.7ms)
+    ✓ simulator_status (5.6ms)
+
+SUPPORT SERVICES
+----------------------------------------
+
+✓ systems_monitor (4/4 passed)
+    ✓ health_check (31.5ms)
+    ✓ system_status (45.1ms)
+    ✓ service_health (6.3ms)
+    ✓ alerts (2.7ms)
+
+✓ entity_resolution_service (2/3 passed)
+    ✓ health_check (17.7ms)
+    ✗ resolve_entity (189.5ms)
+        ERROR: {'detail': [{'type': 'missing', 'loc': ['body', 'record_id'], 'msg': 'Field required', 'input': {'te
+    ✓ entity_types (11.8ms)
+
+✓ data_governance_service (4/4 passed)
+    ✓ health_check (14.5ms)
+    ✓ list_policies (42.4ms)
+    ✓ data_lineage (5.3ms)
+    ✓ quality_rules (5.0ms)
+
+✓ machine_learning_service (4/4 passed)
+    ✓ health_check (18.9ms)
+    ✓ list_models (61.6ms)
+    ✓ model_status (2.8ms)
+    ✓ predictions_status (6.4ms)
+
+FRONTEND SERVICES
+----------------------------------------
+
+✓ api_gateway (4/6 passed)
+    ✓ health_check (20.7ms)
+    ✓ gateway_health (11.8ms)
+    ✓ service_registry (109.4ms)
+    ✓ rate_limit_status (7.7ms)
+    ✗ proxy_metadata (219.3ms)
+        ERROR: Internal Server Error
+    ✗ proxy_conversation (8.7ms)
+        ERROR: Internal Server Error
+
+
+INTEGRATION TESTS
+----------------------------------------
+  ✓ db_messaging_integration
+      Messaging: 404, DB: 200
+  ✓ metadata_calculation_integration
+      Metadata: 404, Calc: 404
+  ✓ agent_conversation_integration
+      Agents: 200, Conversation: 404
+
+
+ISSUES FOUND
+----------------------------------------
+  • [observability_service] health_check: Service unhealthy: {'service': 'observability_service', 'status': 'unhealthy', 'version': '0.1.0', 'uptime_secon
+  • [entity_resolution_service] resolve_entity: {'detail': [{'type': 'missing', 'loc': ['body', 'record_id'], 'msg': 'Field required', 'input': {'text': '
+  • [api_gateway] proxy_metadata: Internal Server Error
+  • [api_gateway] proxy_conversation: Internal Server Error
+
+================================================================================

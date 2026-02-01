@@ -1,0 +1,81 @@
+================================================================================
+MULTI-AGENT ARCHITECTURE TEST REPORT
+================================================================================
+
+Execution Time: 2026-02-01 15:04:39.636019 - 2026-02-01 15:04:40.472953
+Duration: 0.84 seconds
+
+SUMMARY
+----------------------------------------
+Total Tests: 16
+Passed: 5
+Failed: 11
+Skipped: 3
+Pass Rate: 31.2%
+
+RESULTS BY FEATURE
+----------------------------------------
+
+Health (0/1)
+  ✗ health_check (579.9ms)
+      ERROR: Server disconnected without sending a response.
+
+Observability (0/1)
+  ✗ metrics_endpoint (15.7ms)
+      ERROR: Server disconnected without sending a response.
+
+Blackboard (0/3)
+  ✗ task_creation (18.2ms)
+      ERROR: Server disconnected without sending a response.
+  ✗ task_claiming (0.0ms)
+      ERROR: Skipped: No task available from previous test
+  ✗ artifact_submission (0.0ms)
+      ERROR: Skipped: No task available
+
+Peer Review (0/3)
+  ✗ review_queue (21.4ms)
+      ERROR: Server disconnected without sending a response.
+  ✗ review_submission (0.0ms)
+      ERROR: Skipped: No artifact available
+  ✗ adversarial_pairing (12.3ms)
+      ERROR: Server disconnected without sending a response.
+
+State Machine (1/2)
+  ✗ valid_state_transitions (11.5ms)
+      ERROR: Server disconnected without sending a response.
+  ✓ forbidden_state_transitions (30.3ms)
+      Transition properly blocked with exception: RemoteProtocolError
+
+Sessions (0/1)
+  ✗ session_creation (4.8ms)
+      ERROR: Server disconnected without sending a response.
+
+Dashboard (0/1)
+  ✗ dashboard_metrics (4.3ms)
+      ERROR: Server disconnected without sending a response.
+
+Circuit Breaker (4/4)
+  ✓ circuit_breaker_initial_state (0.0ms)
+      Initial state: closed
+  ✓ circuit_breaker_opens_on_threshold (0.0ms)
+      State after 3 failures: open
+  ✓ circuit_breaker_closes_on_success (0.0ms)
+      State after success: closed
+  ✓ circuit_breaker_reset (0.0ms)
+      State after reset: closed
+
+ISSUES FOUND
+----------------------------------------
+  • [Health] health_check: Server disconnected without sending a response.
+  • [Observability] metrics_endpoint: Server disconnected without sending a response.
+  • [Blackboard] task_creation: Server disconnected without sending a response.
+  • [Blackboard] task_claiming: Skipped: No task available from previous test
+  • [Blackboard] artifact_submission: Skipped: No task available
+  • [Peer Review] review_queue: Server disconnected without sending a response.
+  • [Peer Review] review_submission: Skipped: No artifact available
+  • [State Machine] valid_state_transitions: Server disconnected without sending a response.
+  • [Peer Review] adversarial_pairing: Server disconnected without sending a response.
+  • [Sessions] session_creation: Server disconnected without sending a response.
+  • [Dashboard] dashboard_metrics: Server disconnected without sending a response.
+
+================================================================================

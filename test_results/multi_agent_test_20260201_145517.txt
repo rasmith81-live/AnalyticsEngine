@@ -1,0 +1,76 @@
+================================================================================
+MULTI-AGENT ARCHITECTURE TEST REPORT
+================================================================================
+
+Execution Time: 2026-02-01 14:55:16.798594 - 2026-02-01 14:55:17.278182
+Duration: 0.48 seconds
+
+SUMMARY
+----------------------------------------
+Total Tests: 16
+Passed: 10
+Failed: 6
+Skipped: 3
+Pass Rate: 62.5%
+
+RESULTS BY FEATURE
+----------------------------------------
+
+Health (1/1)
+  ✓ health_check (76.3ms)
+      Status: healthy
+
+Observability (1/1)
+  ✓ metrics_endpoint (10.4ms)
+      Metrics length: 4622 chars
+
+Blackboard (0/3)
+  ✗ task_creation (43.5ms)
+  ✗ task_claiming (0.0ms)
+      ERROR: Skipped: No task available from previous test
+  ✗ artifact_submission (0.0ms)
+      ERROR: Skipped: No task available
+
+Peer Review (1/3)
+  ✓ review_queue (8.2ms)
+      Queue items: 0
+  ✗ review_submission (0.0ms)
+      ERROR: Skipped: No artifact available
+  ✗ adversarial_pairing (228.1ms)
+      developer→tester: FAILED; tester→developer: FAILED; architect→data_governance_specialist: FAILED; business_analyst→business_strategist: FAILED; data_analyst→data_scientist: FAILED
+      ERROR: Some pairings failed
+
+State Machine (1/2)
+  ✗ valid_state_transitions (0.0ms)
+      Transition result: {'error': '{"detail":"Not Found"}', 'status': 404}
+      ERROR: {"detail":"Not Found"}
+  ✓ forbidden_state_transitions (52.1ms)
+      Transition blocked: True
+
+Sessions (1/1)
+  ✓ session_creation (43.1ms)
+      Session: c8f156a9-7d67-4681-bf44-0bbfa1b6d8ea
+
+Dashboard (1/1)
+  ✓ dashboard_metrics (3.6ms)
+      Keys: ['error', 'status']
+
+Circuit Breaker (4/4)
+  ✓ circuit_breaker_initial_state (0.0ms)
+      Initial state: closed
+  ✓ circuit_breaker_opens_on_threshold (0.0ms)
+      State after 3 failures: open
+  ✓ circuit_breaker_closes_on_success (0.0ms)
+      State after success: closed
+  ✓ circuit_breaker_reset (0.0ms)
+      State after reset: closed
+
+ISSUES FOUND
+----------------------------------------
+  • [Blackboard] task_claiming: Skipped: No task available from previous test
+  • [Blackboard] artifact_submission: Skipped: No task available
+  • [Peer Review] review_submission: Skipped: No artifact available
+  • [State Machine] valid_state_transitions: {"detail":"Not Found"}
+  • [Peer Review] adversarial_pairing: Some pairings failed
+
+================================================================================

@@ -1,0 +1,72 @@
+================================================================================
+MULTI-AGENT ARCHITECTURE TEST REPORT
+================================================================================
+
+Execution Time: 2026-02-01 15:06:02.767140 - 2026-02-01 15:06:03.360765
+Duration: 0.59 seconds
+
+SUMMARY
+----------------------------------------
+Total Tests: 16
+Passed: 15
+Failed: 1
+Skipped: 0
+Pass Rate: 93.8%
+
+RESULTS BY FEATURE
+----------------------------------------
+
+Health (1/1)
+  ✓ health_check (15.8ms)
+      Status: healthy
+
+Observability (1/1)
+  ✓ metrics_endpoint (3.5ms)
+      Metrics length: 4636 chars
+
+Blackboard (3/3)
+  ✓ task_creation (46.2ms)
+      Task ID: None
+  ✓ task_claiming (43.5ms)
+      Assigned to: data_analyst
+  ✓ artifact_submission (45.2ms)
+      Artifact ID: None
+
+Peer Review (2/3)
+  ✓ review_queue (2.0ms)
+      Queue items: 0
+  ✗ review_submission (64.2ms)
+      Review verdict: None
+      ERROR: {"detail":[{"type":"missing","loc":["body","approved"],"msg":"Field required","input":{"reviewer_role":"data_scientist","verdict":"approved","comments":"KPI analysis looks comprehensive"}},{"type":"missing","loc":["body","notes"],"msg":"Field required","input":{"reviewer_role":"data_scientist","verdict":"approved","comments":"KPI analysis looks comprehensive"}}]}
+  ✓ adversarial_pairing (224.2ms)
+      developer→tester: OK; tester→developer: OK; architect→data_governance_specialist: OK; business_analyst→business_strategist: OK; data_analyst→data_scientist: OK
+
+State Machine (2/2)
+  ✓ valid_state_transitions (45.0ms)
+      Transition result: {'success': True, 'agent_role': 'developer', 'session_id': 'test_session_20260201_150602', 'from_state': 'idle', 'to_state': 'analysis', 'message': 'State transitioned successfully. Rationale: Starting code analysis'}
+  ✓ forbidden_state_transitions (43.9ms)
+      Transition blocked: True
+
+Sessions (1/1)
+  ✓ session_creation (44.2ms)
+      Session: e0076a5b-229d-4646-9634-acf85bb014f9
+
+Dashboard (1/1)
+  ✓ dashboard_metrics (2.4ms)
+      Keys: ['total_sessions', 'active_sessions', 'total_tasks', 'completed_tasks', 'total_artifacts', 'approved_artifacts', 'rejected_artifacts', 'pending_reviews', 'total_struggle_signals', 'unresolved_struggles', 'tier_0_violations', 'tier_1_violations', 'average_task_completion_time_ms', 'timestamp']
+
+Circuit Breaker (4/4)
+  ✓ circuit_breaker_initial_state (0.0ms)
+      Initial state: closed
+  ✓ circuit_breaker_opens_on_threshold (0.0ms)
+      State after 3 failures: open
+  ✓ circuit_breaker_closes_on_success (0.0ms)
+      State after success: closed
+  ✓ circuit_breaker_reset (0.0ms)
+      State after reset: closed
+
+ISSUES FOUND
+----------------------------------------
+  • [Peer Review] review_submission: {"detail":[{"type":"missing","loc":["body","approved"],"msg":"Field required","input":{"reviewer_role":"data_scientist","verdict":"approved","comments":"KPI analysis looks comprehensive"}},{"type":"missing","loc":["body","notes"],"msg":"Field required","input":{"reviewer_role":"data_scientist","verdict":"approved","comments":"KPI analysis looks comprehensive"}}]}
+
+================================================================================

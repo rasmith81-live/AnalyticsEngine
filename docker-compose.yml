@@ -555,6 +555,46 @@ services:
       retries: 3
       start_period: 40s
 
+  # Process Simulation Service - Discrete Event Simulation for What-If Analysis
+  process_simulation_service:
+    build:
+      context: .
+      dockerfile: services/business_services/process_simulation_service/Dockerfile
+    ports:
+      - "8027:8027"
+    environment:
+      - SERVICE_NAME=process_simulation_service
+      - DATABASE_SERVICE_URL=http://database_service:8000
+      - MESSAGING_SERVICE_URL=http://messaging_service:8000
+      - OBSERVABILITY_SERVICE_URL=http://observability_service:8000
+      - BUSINESS_METADATA_URL=http://business_metadata:8000
+      - ML_SERVICE_URL=http://machine_learning_service:8000
+      - REDIS_URL=redis://redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://observability_service:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=false
+      - OTEL_EXPORTER_OTLP_CERTIFICATE=/certs/server.crt
+      - ENABLE_DISTRIBUTED_TRACING=true
+      - ENABLE_PROMETHEUS_METRICS=true
+      - DEFAULT_REPLICATIONS=10
+      - MAX_SIMULATION_HOURS=8760
+      - PYTHONPATH=/app
+    depends_on:
+      database_service:
+        condition: service_healthy
+      messaging_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/business_services/process_simulation_service:/app
+      - ./certs:/certs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8027/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Systems Monitor Service
   systems_monitor:
     build:

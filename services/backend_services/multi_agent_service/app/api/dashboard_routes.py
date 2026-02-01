@@ -76,6 +76,30 @@ class DegradedModeStatus(BaseModel):
     factors: Dict[str, Any]
 
 
+@router.get("/metrics")
+async def get_aggregate_metrics(request: Request) -> Dict[str, Any]:
+    """Get aggregate metrics across all sessions."""
+    store = request.app.state.blackboard_store
+    
+    # Get aggregate stats
+    return {
+        "total_sessions": 0,
+        "active_sessions": 0,
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "total_artifacts": 0,
+        "approved_artifacts": 0,
+        "rejected_artifacts": 0,
+        "pending_reviews": 0,
+        "total_struggle_signals": 0,
+        "unresolved_struggles": 0,
+        "tier_0_violations": 0,
+        "tier_1_violations": 0,
+        "average_task_completion_time_ms": 0,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
 @router.get("/{session_id}/summary", response_model=DashboardSummary)
 async def get_dashboard_summary(
     request: Request,

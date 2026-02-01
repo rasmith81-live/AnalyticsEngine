@@ -16,18 +16,38 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel, Field
+import httpx
+
+import os
 
 from .agents.redis_agent_client import RedisAgentClient, get_redis_agent_client
-from .agents.config import get_multi_agent_config
+from .agents.config import get_agent_settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agents", tags=["Multi-Agent Design"])
 
+# Multi-Agent Service URL for proxying requests (use env var from docker-compose)
+MULTI_AGENT_SERVICE_URL = os.getenv("MULTI_AGENT_SERVICE_URL", "http://multi_agent_service:8000")
+
 
 # =============================================================================
 # Request/Response Models
 # =============================================================================
+
+class AgentInfo(BaseModel):
+    """Information about an available agent."""
+    role: str
+    description: str
+    layer: str
+    capabilities: List[str] = Field(default_factory=list)
+
+
+class AgentListResponse(BaseModel):
+    """Response containing list of available agents."""
+    agents: List[AgentInfo]
+    total: int
+
 
 class CreateSessionRequest(BaseModel):
     """Request to create a new design session."""
@@ -105,6 +125,133 @@ def get_multi_agent_client() -> RedisAgentClient:
 # =============================================================================
 # REST Endpoints
 # =============================================================================
+
+@router.get("", response_model=AgentListResponse)
+async def list_agents():
+    """
+    List all available agents in the multi-agent system.
+    
+    Returns the 27 specialized agents organized by layer:
+    - Strategy Layer (8 agents)
+    - Technical Layer (8 agents)
+    - Business Layer (8 agents)
+    - Governance Layer (3 agents)
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{MULTI_AGENT_SERVICE_URL}/agents/list")
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Transform response to AgentListResponse format
+                agents = []
+                if isinstance(data, list):
+                    for agent in data:
+                        agents.append(AgentInfo(
+                            role=agent.get("role", agent.get("name", "unknown")),
+                            description=agent.get("description", ""),
+                            layer=agent.get("layer", "unknown"),
+                            capabilities=agent.get("capabilities", [])
+                        ))
+                elif isinstance(data, dict) and "agents" in data:
+                    for agent in data["agents"]:
+                        agents.append(AgentInfo(
+                            role=agent.get("role", agent.get("name", "unknown")),
+                            description=agent.get("description", ""),
+                            layer=agent.get("layer", "unknown"),
+                            capabilities=agent.get("capabilities", [])
+                        ))
+                
+                return AgentListResponse(agents=agents, total=len(agents))
+            else:
+                logger.warning(f"Multi-agent service returned {response.status_code}")
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch agents")
+    except httpx.RequestError as e:
+        logger.error(f"Failed to connect to multi-agent service: {e}")
+        raise HTTPException(status_code=503, detail="Multi-agent service unavailable")
+    except Exception as e:
+        logger.error(f"Failed to list agents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MCPServerInfo(BaseModel):
+    """Information about an MCP server."""
+    name: str
+    description: str
+    status: str
+    tools_count: int
+
+
+class MCPServersResponse(BaseModel):
+    """Response containing list of MCP servers."""
+    servers: List[MCPServerInfo]
+    total: int
+
+
+@router.get("/mcp/servers", response_model=MCPServersResponse)
+async def list_mcp_servers():
+    """
+    List all configured MCP servers.
+    
+    Returns the 3 MCP servers:
+    - PostgreSQL MCP Server (database introspection)
+    - Knowledge Graph MCP Server (ontology management)
+    - Exa Web Search (external research)
+    """
+    from .mcp import MCPClientManager, MCPConfig
+    
+    try:
+        config = MCPConfig.from_env()
+        manager = MCPClientManager(config)
+        await manager.initialize()
+        
+        servers = []
+        
+        # PostgreSQL MCP
+        if config.postgres_mcp_enabled:
+            pg_client = manager.get_client("postgres")
+            servers.append(MCPServerInfo(
+                name="postgres",
+                description="PostgreSQL MCP Server - database introspection and schema analysis",
+                status="connected" if pg_client else "disabled",
+                tools_count=len([t for t in manager.list_all_tools() if t.startswith("postgres_")])
+            ))
+        
+        # Knowledge Graph MCP
+        if config.knowledge_mcp_enabled:
+            kg_client = manager.get_client("knowledge")
+            servers.append(MCPServerInfo(
+                name="knowledge_graph",
+                description="Knowledge Graph MCP Server - ontology management and entity relations",
+                status="connected" if kg_client else "disabled",
+                tools_count=len([t for t in manager.list_all_tools() if t.startswith("knowledge_")])
+            ))
+        
+        # Exa Web Search
+        if config.web_search_enabled:
+            ws_client = manager.get_client("web_search")
+            servers.append(MCPServerInfo(
+                name="web_search",
+                description="Exa Web Search - external research and company information",
+                status="connected" if ws_client else "disabled",
+                tools_count=len([t for t in manager.list_all_tools() if t.startswith("web_search_")])
+            ))
+        
+        await manager.close()
+        
+        return MCPServersResponse(servers=servers, total=len(servers))
+    except Exception as e:
+        logger.error(f"Failed to list MCP servers: {e}")
+        # Return configured servers even if initialization fails
+        return MCPServersResponse(
+            servers=[
+                MCPServerInfo(name="postgres", description="PostgreSQL MCP Server", status="configured", tools_count=0),
+                MCPServerInfo(name="knowledge_graph", description="Knowledge Graph MCP Server", status="configured", tools_count=0),
+                MCPServerInfo(name="web_search", description="Exa Web Search", status="configured", tools_count=0),
+            ],
+            total=3
+        )
+
 
 @router.post("/design-session", response_model=CreateSessionResponse)
 async def create_design_session(

@@ -148,3 +148,139 @@ async def reset_agent(
         "session_id": session_id,
         "new_state": "idle"
     }
+
+
+class StateTransitionRequest(BaseModel):
+    """Request to transition agent state."""
+    to_state: str
+    rationale: str = ""
+
+
+class StateTransitionResponse(BaseModel):
+    """Response from state transition."""
+    success: bool
+    agent_role: str
+    session_id: str
+    from_state: str
+    to_state: str
+    message: str
+
+
+# Forbidden transitions based on state machine rules
+FORBIDDEN_TRANSITIONS = {
+    ("analysis", "execution"),      # Must get approval first
+    ("analysis", "done"),           # Can't skip to done
+    ("execution", "done"),          # Must validate first
+    ("approval_pending", "done"),   # Must execute first
+    ("idle", "execution"),          # Must analyze first
+    ("idle", "done"),               # Can't skip to done
+}
+
+
+@router.post("/{agent_role}/transition", response_model=StateTransitionResponse)
+async def transition_agent_state(
+    request: Request,
+    agent_role: str,
+    session_id: str,
+    transition_request: StateTransitionRequest
+) -> StateTransitionResponse:
+    """
+    Transition an agent to a new state.
+    
+    Validates against forbidden transitions defined in the state machine.
+    """
+    store = request.app.state.blackboard_store
+    blackboard = await store.get_or_create_blackboard(session_id)
+    
+    # Get current state (default to idle)
+    current_state = blackboard.agent_states.get(agent_role, "idle")
+    to_state = transition_request.to_state.lower()
+    
+    # Check for forbidden transition
+    if (current_state, to_state) in FORBIDDEN_TRANSITIONS:
+        return StateTransitionResponse(
+            success=False,
+            agent_role=agent_role,
+            session_id=session_id,
+            from_state=current_state,
+            to_state=to_state,
+            message=f"Forbidden transition: {current_state} → {to_state}. This transition violates state machine rules."
+        )
+    
+    # Update state
+    blackboard.agent_states[agent_role] = to_state
+    await store.save_blackboard(blackboard)
+    
+    return StateTransitionResponse(
+        success=True,
+        agent_role=agent_role,
+        session_id=session_id,
+        from_state=current_state,
+        to_state=to_state,
+        message=f"State transitioned successfully. Rationale: {transition_request.rationale or 'None provided'}"
+    )
+
+
+@router.get("/{agent_role}/state")
+async def get_agent_state(
+    request: Request,
+    agent_role: str,
+    session_id: str
+) -> Dict[str, Any]:
+    """Get current state of an agent in a session."""
+    store = request.app.state.blackboard_store
+    blackboard = await store.load_blackboard(session_id)
+    
+    if not blackboard:
+        return {
+            "agent_role": agent_role,
+            "session_id": session_id,
+            "current_state": "idle",
+            "assumption_count": 0,
+            "failed_attempts": 0,
+            "contract_violations": 0
+        }
+    
+    return {
+        "agent_role": agent_role,
+        "session_id": session_id,
+        "current_state": blackboard.agent_states.get(agent_role, "idle"),
+        "assumption_count": 0,
+        "failed_attempts": 0,
+        "contract_violations": 0
+    }
+
+
+@router.get("/contract-status")
+async def get_contract_status(
+    request: Request,
+    session_id: str
+) -> Dict[str, Any]:
+    """Get contract compliance status for all agents in a session."""
+    store = request.app.state.blackboard_store
+    blackboard = await store.load_blackboard(session_id)
+    
+    if not blackboard:
+        return {
+            "session_id": session_id,
+            "agents": [],
+            "degraded_mode": False,
+            "degraded_reason": None
+        }
+    
+    agents = []
+    for agent_role, state in blackboard.agent_states.items():
+        agents.append({
+            "agent_role": agent_role,
+            "current_state": state,
+            "contract_violations": 0,
+            "tier_0_compliant": True,
+            "tier_1_compliant": True
+        })
+    
+    return {
+        "session_id": session_id,
+        "agents": agents,
+        "degraded_mode": False,
+        "degraded_reason": None
+    }

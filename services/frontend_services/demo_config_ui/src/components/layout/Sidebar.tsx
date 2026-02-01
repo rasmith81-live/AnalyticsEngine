@@ -28,6 +28,16 @@ import {
   Network,
   FlaskConical,
   HelpCircle,
+  Play,
+  GitBranch,
+  Video,
+  Workflow,
+  PieChart,
+  ClipboardCheck,
+  ShieldCheck,
+  Users,
+  Plus,
+  ScrollText,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -38,6 +48,18 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  {
+    text: 'Demo',
+    icon: <Play className="w-5 h-5" />,
+    children: [
+      { text: 'Value Chain Explorer', icon: <GitBranch className="w-4 h-4" />, path: '/demo/value-chains' },
+      { text: 'Training Video', icon: <Video className="w-4 h-4" />, path: '/demo/training' },
+      { text: 'AI Interview', icon: <MessageSquare className="w-4 h-4" />, path: '/demo/interview' },
+      { text: 'Data Simulator', icon: <Workflow className="w-4 h-4" />, path: '/demo/simulator' },
+      { text: 'Sample Analytics', icon: <PieChart className="w-4 h-4" />, path: '/demo/analytics' },
+      { text: 'Executive Summary', icon: <ClipboardCheck className="w-4 h-4" />, path: '/demo/summary' },
+    ],
+  },
   {
     text: 'Strategy Center',
     icon: <LayoutDashboard className="w-5 h-5" />,
@@ -97,15 +119,28 @@ const menuItems: MenuItem[] = [
       { text: 'Project Plan', icon: <BarChart3 className="w-4 h-4" />, path: '/proposal/project' },
     ],
   },
+  {
+    text: 'Admin',
+    icon: <ShieldCheck className="w-5 h-5" />,
+    children: [
+      { text: 'Agent Profiles', icon: <Users className="w-4 h-4" />, path: '/admin/agents' },
+      { text: 'Agent Workflows', icon: <Network className="w-4 h-4" />, path: '/admin/workflows' },
+      { text: 'New Agent', icon: <Plus className="w-4 h-4" />, path: '/admin/agents/new' },
+      { text: 'Contract Rules', icon: <ScrollText className="w-4 h-4" />, path: '/admin/contracts' },
+      { text: 'System Settings', icon: <Settings className="w-4 h-4" />, path: '/admin/settings' },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
-    'Design Studio': true,
+    'Demo': true,
+    'Design Studio': false,
     'Analytics Hub': false,
     'Deployment Center': false,
+    'Admin': false,
     'Proposal Center': false,
   });
 

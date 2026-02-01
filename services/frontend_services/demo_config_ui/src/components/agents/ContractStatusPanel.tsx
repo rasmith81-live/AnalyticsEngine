@@ -5,7 +5,7 @@
  * Shows current state, violation count, and state machine transitions.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Shield,
   AlertTriangle,
@@ -148,7 +148,7 @@ function AgentStatusRow({ agent, expanded, onToggle }: {
 // =============================================================================
 
 export function ContractStatusPanel({
-  sessionId,
+  sessionId: _sessionId,
   agents,
   degradedMode,
   degradedReason,

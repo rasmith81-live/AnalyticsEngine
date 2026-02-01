@@ -284,6 +284,5 @@ jobs:
 
 ## References
 
-- [Agent Contracts Build Plan](../architecture/AGENT_CONTRACTS_BUILD_PLAN.md)
-- [Blackboard Migration Runbook](../architecture/BLACKBOARD_MIGRATION_RUNBOOK.md)
+- [Multi-Agent Service Architecture](../architecture/MULTI_AGENT_SERVICE_ARCHITECTURE.md)
 - [Playwright Documentation](https://playwright.dev/docs/intro)

@@ -14,6 +14,7 @@
 6. [Security Architecture](#security-architecture)
 7. [Technology Stack](#technology-stack)
 8. [Design Patterns](#design-patterns)
+9. [Related Documents](#related-documents)
 
 ---
 
@@ -486,13 +487,13 @@ Automatic retry with exponential backoff.
 
 ---
 
-## Related Documentation
+## Related Documents
 
-- **[Microservices Architecture](./microservices.md)** - Detailed service design
-- **[Data Architecture](./data-architecture.md)** - Database and CQRS patterns
-- **[Event-Driven Architecture](./event-driven.md)** - Messaging and events
-- **[Security Architecture](./security.md)** - Authentication and authorization
-- **[CQRS Pattern](./cqrs-pattern.md)** - Command/Query separation
+- **[Feature Architecture](./FEATURE_ARCHITECTURE.md)** - All services, features, and capabilities
+- **[Multi-Agent Service Architecture](./MULTI_AGENT_SERVICE_ARCHITECTURE.md)** - AI agent system
+- **[Event-Driven Architecture](./EVENT_DRIVEN_ARCHITECTURE.md)** - Messaging patterns
+- **[Predictive What-If](./FEATURE_SPEC_PREDICTIVE_WHAT_IF.md)** - AI prediction feature spec
+- **[Process Scenario Modeler](./FEATURE_SPEC_PROCESS_SCENARIO_MODELER.md)** - Simulation feature spec
 
 ---
 
