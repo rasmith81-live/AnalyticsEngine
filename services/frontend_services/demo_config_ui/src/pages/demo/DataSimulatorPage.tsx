@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Workflow, Play, Pause, Settings, Database, Activity, ChevronRight, ChevronLeft, RefreshCw, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Workflow, Play, Pause, Settings, Database, Activity, ChevronRight, ChevronLeft, RefreshCw, Zap, Sparkles } from 'lucide-react';
 
 interface DataEntity {
   id: string;
@@ -8,9 +8,20 @@ interface DataEntity {
   recordsPerMinute: number;
   enabled: boolean;
   status: 'running' | 'paused' | 'stopped';
+  source?: 'interview' | 'default';
 }
 
-const mockEntities: DataEntity[] = [
+interface DesignArtifact {
+  type: string;
+  name: string;
+  details?: {
+    code?: string;
+    category?: string;
+    description?: string;
+  };
+}
+
+const defaultEntities: DataEntity[] = [
   {
     id: 'customers',
     name: 'Customers',
@@ -18,6 +29,7 @@ const mockEntities: DataEntity[] = [
     recordsPerMinute: 50,
     enabled: true,
     status: 'running',
+    source: 'default',
   },
   {
     id: 'orders',
@@ -26,6 +38,7 @@ const mockEntities: DataEntity[] = [
     recordsPerMinute: 200,
     enabled: true,
     status: 'running',
+    source: 'default',
   },
   {
     id: 'products',
@@ -34,6 +47,7 @@ const mockEntities: DataEntity[] = [
     recordsPerMinute: 25,
     enabled: true,
     status: 'paused',
+    source: 'default',
   },
   {
     id: 'suppliers',
@@ -42,12 +56,98 @@ const mockEntities: DataEntity[] = [
     recordsPerMinute: 10,
     enabled: false,
     status: 'stopped',
+    source: 'default',
   },
 ];
 
 export default function DataSimulatorPage() {
-  const [entities, setEntities] = useState<DataEntity[]>(mockEntities);
+  const [entities, setEntities] = useState<DataEntity[]>(defaultEntities);
   const [isSimulatorRunning, setIsSimulatorRunning] = useState(true);
+  const [hasInterviewData, setHasInterviewData] = useState(false);
+
+  // Load entities from interview design
+  useEffect(() => {
+    loadInterviewEntities();
+  }, []);
+
+  const loadInterviewEntities = () => {
+    try {
+      const storedDesign = localStorage.getItem('demo_interview_design');
+      if (storedDesign) {
+        const design = JSON.parse(storedDesign);
+        
+        // Check if there are entities from the interview
+        if (design.entities && design.entities.length > 0) {
+          const interviewEntities: DataEntity[] = design.entities.map((e: DesignArtifact, i: number) => ({
+            id: e.details?.code || `entity_${i}`,
+            name: e.name,
+            description: e.details?.description || `Entity from ${design.industry || 'business'} design`,
+            recordsPerMinute: Math.floor(Math.random() * 150) + 50,
+            enabled: true,
+            status: 'running' as const,
+            source: 'interview' as const,
+          }));
+          setEntities(interviewEntities);
+          setHasInterviewData(true);
+        } else if (design.kpis && design.kpis.length > 0) {
+          // Derive entities from KPIs if no explicit entities
+          const kpiBasedEntities = deriveEntitiesFromKPIs(design.kpis, design.industry);
+          if (kpiBasedEntities.length > 0) {
+            setEntities(kpiBasedEntities);
+            setHasInterviewData(true);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load interview entities:', err);
+    }
+  };
+
+  const deriveEntitiesFromKPIs = (kpis: DesignArtifact[], industry?: string): DataEntity[] => {
+    const entityMap: Record<string, DataEntity> = {};
+    
+    // Derive entities based on KPI categories
+    kpis.forEach((kpi) => {
+      const category = kpi.details?.category || 'General';
+      
+      if (!entityMap[category]) {
+        entityMap[category] = {
+          id: category.toLowerCase().replace(/\s+/g, '_'),
+          name: `${category} Data`,
+          description: `${category} metrics for ${industry || 'business'} analytics`,
+          recordsPerMinute: Math.floor(Math.random() * 100) + 25,
+          enabled: true,
+          status: 'running',
+          source: 'interview',
+        };
+      }
+    });
+    
+    // Add some standard entities based on industry
+    if (industry?.toLowerCase().includes('retail')) {
+      entityMap['transactions'] = {
+        id: 'transactions',
+        name: 'Transactions',
+        description: 'Sales transactions and order data',
+        recordsPerMinute: 150,
+        enabled: true,
+        status: 'running',
+        source: 'interview',
+      };
+    } else if (industry?.toLowerCase().includes('manufacturing')) {
+      entityMap['production'] = {
+        id: 'production',
+        name: 'Production Runs',
+        description: 'Manufacturing batch and production data',
+        recordsPerMinute: 75,
+        enabled: true,
+        status: 'running',
+        source: 'interview',
+      };
+    }
+    
+    return Object.values(entityMap);
+  };
 
   const toggleEntity = (id: string) => {
     setEntities((prev) =>
@@ -191,16 +291,19 @@ export default function DataSimulatorPage() {
       </div>
 
       {/* Info Banner */}
-      <div className="theme-card rounded-2xl p-6 bg-gradient-to-r from-alpha-500/10 to-purple-500/10 border border-alpha-500/20">
+      <div className={`theme-card rounded-2xl p-6 bg-gradient-to-r ${hasInterviewData ? 'from-emerald-500/10 to-alpha-500/10 border-emerald-500/20' : 'from-alpha-500/10 to-purple-500/10 border-alpha-500/20'} border`}>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-alpha-500/20 flex items-center justify-center">
-            <Zap className="w-6 h-6 text-alpha-400" />
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasInterviewData ? 'bg-emerald-500/20' : 'bg-alpha-500/20'}`}>
+            {hasInterviewData ? <Sparkles className="w-6 h-6 text-emerald-400" /> : <Zap className="w-6 h-6 text-alpha-400" />}
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold theme-text-title">Simulated Data Ready</h3>
+            <h3 className="font-semibold theme-text-title">
+              {hasInterviewData ? 'Interview-Driven Entities' : 'Simulated Data Ready'}
+            </h3>
             <p className="text-sm theme-text-secondary">
-              Your simulated data streams are configured based on the entities identified during your AI interview.
-              The Sample Analytics page will use this data to show you live dashboards.
+              {hasInterviewData 
+                ? `These entities were derived from your AI interview. ${entities.length} data streams configured based on your business design.`
+                : 'Your simulated data streams are configured based on the entities identified during your AI interview. The Sample Analytics page will use this data to show you live dashboards.'}
             </p>
           </div>
           <Settings className="w-6 h-6 theme-text-muted" />

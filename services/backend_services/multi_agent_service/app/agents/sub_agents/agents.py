@@ -1844,6 +1844,96 @@ class DeveloperAgent(BaseAgent):
                     },
                     "required": ["model_specification_id", "model_name", "model_purpose"]
                 }
+            ),
+            # UI Component Generation Tools
+            ToolDefinition(
+                name="generate_react_component",
+                description="Generate a React component for analytics dashboards based on design specifications",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "component_name": {"type": "string", "description": "Name of the React component (PascalCase)"},
+                        "component_type": {
+                            "type": "string",
+                            "enum": ["dashboard", "chart", "metric_card", "table", "form", "layout"],
+                            "description": "Type of component to generate"
+                        },
+                        "design_spec": {
+                            "type": "object",
+                            "description": "Design specification from UI Designer Agent",
+                            "properties": {
+                                "layout": {"type": "string", "enum": ["grid", "flex", "stack"]},
+                                "columns": {"type": "integer"},
+                                "sections": {"type": "array", "items": {"type": "object"}},
+                                "color_scheme": {"type": "string"},
+                                "responsive": {"type": "boolean"}
+                            }
+                        },
+                        "kpis": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "visualization": {"type": "string", "enum": ["metric", "bar", "line", "pie", "gauge", "table"]},
+                                    "target": {"type": "number"},
+                                    "unit": {"type": "string"}
+                                }
+                            },
+                            "description": "KPIs to display in the component"
+                        },
+                        "data_sources": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "API endpoints or data sources to connect"
+                        },
+                        "include_real_time": {"type": "boolean", "description": "Include WebSocket for real-time updates"}
+                    },
+                    "required": ["component_name", "component_type"]
+                }
+            ),
+            ToolDefinition(
+                name="generate_dashboard_page",
+                description="Generate a complete analytics dashboard page with multiple components",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "page_name": {"type": "string", "description": "Name of the dashboard page"},
+                        "page_title": {"type": "string", "description": "Display title for the page"},
+                        "industry": {"type": "string", "description": "Industry context for styling"},
+                        "kpis": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {"type": "string"},
+                                    "name": {"type": "string"},
+                                    "category": {"type": "string"},
+                                    "visualization": {"type": "string"},
+                                    "position": {"type": "string", "enum": ["hero", "grid", "sidebar", "footer"]}
+                                }
+                            },
+                            "description": "KPIs to include on the dashboard"
+                        },
+                        "charts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "chart_type": {"type": "string", "enum": ["bar", "line", "pie", "area", "scatter", "heatmap"]},
+                                    "title": {"type": "string"},
+                                    "data_key": {"type": "string"},
+                                    "size": {"type": "string", "enum": ["small", "medium", "large", "full"]}
+                                }
+                            },
+                            "description": "Charts to display"
+                        },
+                        "refresh_interval": {"type": "integer", "description": "Auto-refresh interval in seconds"},
+                        "include_filters": {"type": "boolean", "description": "Include date/dimension filters"}
+                    },
+                    "required": ["page_name", "page_title", "kpis"]
+                }
             )
         ]
     
@@ -1866,6 +1956,9 @@ class DeveloperAgent(BaseAgent):
         # Handoff to Tester and Documenter
         self.register_tool("handoff_ml_to_tester", self._handoff_ml_to_tester)
         self.register_tool("handoff_ml_to_documenter", self._handoff_ml_to_documenter)
+        # UI Component Generation
+        self.register_tool("generate_react_component", self._generate_react_component)
+        self.register_tool("generate_dashboard_page", self._generate_dashboard_page)
     
     def get_system_prompt(self, context: AgentContext) -> str:
         """Get the system prompt with context."""
@@ -2324,6 +2417,281 @@ class DeveloperAgent(BaseAgent):
             "handoff": handoff,
             "next_step": "Documenter Agent will create comprehensive ML model documentation"
         }
+    
+    async def _generate_react_component(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate a React component for analytics dashboards."""
+        component_name = tool_input.get("component_name", "AnalyticsComponent")
+        component_type = tool_input.get("component_type", "dashboard")
+        design_spec = tool_input.get("design_spec", {})
+        kpis = tool_input.get("kpis", [])
+        include_real_time = tool_input.get("include_real_time", False)
+        
+        # Generate component code based on type
+        imports = self._generate_react_imports(component_type, include_real_time)
+        component_body = self._generate_component_body(component_name, component_type, kpis, design_spec)
+        
+        code = f'''{imports}
+
+{component_body}
+
+export default {component_name};
+'''
+        
+        component_artifact = {
+            "id": f"REACT-{str(uuid.uuid4())[:8].upper()}",
+            "component_name": component_name,
+            "component_type": component_type,
+            "code": code,
+            "kpis": kpis,
+            "design_spec": design_spec,
+            "file_path": f"src/components/generated/{component_name}.tsx",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "react_components" not in context.artifacts:
+            context.artifacts["react_components"] = []
+        context.artifacts["react_components"].append(component_artifact)
+        
+        return {
+            "success": True,
+            "component_id": component_artifact["id"],
+            "component_name": component_name,
+            "code": code,
+            "file_path": component_artifact["file_path"]
+        }
+    
+    def _generate_react_imports(self, component_type: str, include_real_time: bool) -> str:
+        """Generate React imports based on component type."""
+        base_imports = ["import { useState, useEffect } from 'react';"]
+        
+        if component_type == "dashboard":
+            base_imports.append("import { BarChart3, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';")
+        elif component_type == "chart":
+            base_imports.append("import { LineChart, BarChart, PieChart } from 'lucide-react';")
+        elif component_type == "metric_card":
+            base_imports.append("import { TrendingUp, TrendingDown, Target } from 'lucide-react';")
+        
+        if include_real_time:
+            base_imports.append("import { useWebSocket } from '../hooks/useWebSocket';")
+        
+        return "\n".join(base_imports)
+    
+    def _generate_component_body(self, name: str, comp_type: str, kpis: list, spec: dict) -> str:
+        """Generate the React component body."""
+        layout = spec.get("layout", "grid")
+        columns = spec.get("columns", 4)
+        
+        kpi_cards = ""
+        for i, kpi in enumerate(kpis[:6]):  # Limit to 6 KPIs
+            kpi_name = kpi.get("name", f"KPI {i+1}")
+            kpi_code = kpi.get("code", f"kpi_{i+1}")
+            viz = kpi.get("visualization", "metric")
+            kpi_cards += f'''
+          <div key="{kpi_code}" className="theme-card rounded-2xl p-6">
+            <p className="text-sm theme-text-muted mb-1">{kpi_name}</p>
+            <p className="text-3xl font-bold theme-text-title">{{metrics['{kpi_code}'] || '--'}}</p>
+          </div>'''
+        
+        return f'''interface {name}Props {{
+  sessionId?: string;
+  refreshInterval?: number;
+}}
+
+export function {name}({{ sessionId, refreshInterval = 5000 }}: {name}Props) {{
+  const [metrics, setMetrics] = useState<Record<string, any>>({{}}); 
+  const [isLive, setIsLive] = useState(true);
+
+  useEffect(() => {{
+    if (!isLive) return;
+    const interval = setInterval(() => {{
+      // Simulate metric updates - replace with real API call
+      setMetrics(prev => ({{
+        ...prev,
+        updated_at: new Date().toISOString()
+      }}));
+    }}, refreshInterval);
+    return () => clearInterval(interval);
+  }}, [isLive, refreshInterval]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold theme-text-title">Analytics Dashboard</h2>
+        <button
+          onClick={{() => setIsLive(!isLive)}}
+          className={{`flex items-center gap-2 px-4 py-2 rounded-lg ${{isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}}`}}
+        >
+          <RefreshCw className={{`w-4 h-4 ${{isLive ? 'animate-spin' : ''}}`}} />
+          {{isLive ? 'Live' : 'Paused'}}
+        </button>
+      </div>
+      <div className="grid grid-cols-{columns} gap-6">
+        {kpi_cards if kpi_cards else '<div className="col-span-full text-center theme-text-muted">No KPIs configured</div>'}
+      </div>
+    </div>
+  );
+}}'''
+    
+    async def _generate_dashboard_page(
+        self,
+        tool_input: Dict[str, Any],
+        context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate a complete analytics dashboard page."""
+        page_name = tool_input.get("page_name", "GeneratedDashboard")
+        page_title = tool_input.get("page_title", "Analytics Dashboard")
+        industry = tool_input.get("industry", "general")
+        kpis = tool_input.get("kpis", [])
+        charts = tool_input.get("charts", [])
+        refresh_interval = tool_input.get("refresh_interval", 5)
+        include_filters = tool_input.get("include_filters", True)
+        
+        # Generate complete page code
+        code = self._generate_dashboard_page_code(
+            page_name, page_title, industry, kpis, charts, refresh_interval, include_filters
+        )
+        
+        page_artifact = {
+            "id": f"PAGE-{str(uuid.uuid4())[:8].upper()}",
+            "page_name": page_name,
+            "page_title": page_title,
+            "industry": industry,
+            "code": code,
+            "kpis": kpis,
+            "charts": charts,
+            "file_path": f"src/pages/generated/{page_name}Page.tsx",
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        if "generated_pages" not in context.artifacts:
+            context.artifacts["generated_pages"] = []
+        context.artifacts["generated_pages"].append(page_artifact)
+        
+        return {
+            "success": True,
+            "page_id": page_artifact["id"],
+            "page_name": page_name,
+            "code": code,
+            "file_path": page_artifact["file_path"],
+            "next_step": "Page can be dynamically loaded in the Sample Analytics view"
+        }
+    
+    def _generate_dashboard_page_code(
+        self, name: str, title: str, industry: str, kpis: list, 
+        charts: list, refresh: int, filters: bool
+    ) -> str:
+        """Generate complete dashboard page code."""
+        kpi_count = len(kpis)
+        chart_count = len(charts)
+        
+        return f'''import {{ useState, useEffect }} from 'react';
+import {{ BarChart3, TrendingUp, TrendingDown, RefreshCw, Filter, Calendar }} from 'lucide-react';
+
+interface MetricData {{
+  value: string | number;
+  change: number;
+  trend: 'up' | 'down';
+}}
+
+export default function {name}Page() {{
+  const [metrics, setMetrics] = useState<Record<string, MetricData>>({{}}); 
+  const [isLive, setIsLive] = useState(true);
+  const [dateRange, setDateRange] = useState('7d');
+
+  useEffect(() => {{
+    // Initialize with sample data
+    const initialMetrics: Record<string, MetricData> = {{}};
+    {chr(10).join([f'    initialMetrics["{kpi.get("code", f"kpi_{i}")}"] = {{ value: Math.floor(Math.random() * 1000), change: Math.random() * 20 - 10, trend: Math.random() > 0.5 ? "up" : "down" }};' for i, kpi in enumerate(kpis[:6])])}
+    setMetrics(initialMetrics);
+  }}, []);
+
+  useEffect(() => {{
+    if (!isLive) return;
+    const interval = setInterval(() => {{
+      setMetrics(prev => {{
+        const updated = {{ ...prev }};
+        Object.keys(updated).forEach(key => {{
+          updated[key] = {{
+            ...updated[key],
+            change: Number((updated[key].change + (Math.random() - 0.5) * 2).toFixed(1))
+          }};
+        }});
+        return updated;
+      }});
+    }}, {refresh * 1000});
+    return () => clearInterval(interval);
+  }}, [isLive]);
+
+  return (
+    <div className="space-y-6">
+      {{/* Header */}}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold theme-text-title">{title}</h1>
+          <p className="mt-1 theme-text-secondary">Real-time analytics for {industry}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          {'''<select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-4 py-2 rounded-lg theme-input"
+          >
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>''' if filters else ''}
+          <button
+            onClick={{() => setIsLive(!isLive)}}
+            className={{`flex items-center gap-2 px-4 py-2 rounded-lg ${{isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}}`}}
+          >
+            <RefreshCw className={{`w-4 h-4 ${{isLive ? 'animate-spin' : ''}}`}} />
+            {{isLive ? 'Live' : 'Paused'}}
+          </button>
+        </div>
+      </div>
+
+      {{/* Metric Cards */}}
+      <div className="grid grid-cols-{min(kpi_count, 4)} gap-6">
+        {{Object.entries(metrics).map(([key, data]) => (
+          <div key={{key}} className="theme-card rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <BarChart3 className="w-5 h-5 theme-text-muted" />
+              <span className={{`text-sm font-medium ${{data.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}}`}}>
+                {{data.trend === 'up' ? <TrendingUp className="w-4 h-4 inline" /> : <TrendingDown className="w-4 h-4 inline" />}}
+                {{data.change > 0 ? '+' : ''}}{{data.change.toFixed(1)}}%
+              </span>
+            </div>
+            <p className="text-sm theme-text-muted mb-1">{{key.replace(/_/g, ' ').toUpperCase()}}</p>
+            <p className="text-3xl font-bold theme-text-title">{{typeof data.value === 'number' ? data.value.toLocaleString() : data.value}}</p>
+          </div>
+        ))}}
+      </div>
+
+      {{/* Charts Placeholder */}}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="theme-card rounded-2xl p-6">
+          <h3 className="font-semibold theme-text-title mb-4">Trend Analysis</h3>
+          <div className="h-64 flex items-end gap-2">
+            {{[65, 45, 75, 55, 80, 70, 90].map((h, i) => (
+              <div key={{i}} className="flex-1 bg-gradient-to-t from-alpha-600 to-alpha-400 rounded-t-lg" style={{{{ height: `${{h}}%` }}}} />
+            ))}}
+          </div>
+        </div>
+        <div className="theme-card rounded-2xl p-6">
+          <h3 className="font-semibold theme-text-title mb-4">Distribution</h3>
+          <div className="h-64 flex items-center justify-center">
+            <div className="w-48 h-48 rounded-full border-8 border-alpha-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}}
+'''
 
 
 # =============================================================================

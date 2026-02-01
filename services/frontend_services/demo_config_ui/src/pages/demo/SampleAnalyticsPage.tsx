@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { PieChart, TrendingUp, TrendingDown, DollarSign, Users, Package, ChevronRight, ChevronLeft, RefreshCw, Sparkles } from 'lucide-react';
+import { PieChart, TrendingUp, TrendingDown, DollarSign, Users, Package, ChevronRight, ChevronLeft, RefreshCw, Sparkles, BarChart3, Target, Activity, Zap } from 'lucide-react';
+import DynamicDashboard from '../../components/dynamic/DynamicDashboard';
+import { useDynamicDashboard } from '../../hooks/useDynamicDashboard';
 
 interface MetricCard {
   id: string;
@@ -8,18 +10,94 @@ interface MetricCard {
   change: number;
   trend: 'up' | 'down';
   icon: React.ReactNode;
+  category?: string;
 }
 
-const metrics: MetricCard[] = [
-  { id: 'revenue', name: 'Total Revenue', value: '$1.2M', change: 12.5, trend: 'up', icon: <DollarSign className="w-6 h-6" /> },
-  { id: 'customers', name: 'Active Customers', value: '8,432', change: 8.2, trend: 'up', icon: <Users className="w-6 h-6" /> },
-  { id: 'orders', name: 'Orders Today', value: '1,847', change: -2.4, trend: 'down', icon: <Package className="w-6 h-6" /> },
-  { id: 'conversion', name: 'Conversion Rate', value: '3.8%', change: 0.5, trend: 'up', icon: <TrendingUp className="w-6 h-6" /> },
+interface DesignArtifact {
+  type: string;
+  name: string;
+  code?: string;
+  visualization?: string;
+  category?: string;
+  target?: number;
+  unit?: string;
+}
+
+interface SessionDesign {
+  kpis: DesignArtifact[];
+  entities: DesignArtifact[];
+  dashboards: DesignArtifact[];
+  industry?: string;
+}
+
+const defaultMetrics: MetricCard[] = [
+  { id: 'revenue', name: 'Total Revenue', value: '$1.2M', change: 12.5, trend: 'up', icon: <DollarSign className="w-6 h-6" />, category: 'Financial' },
+  { id: 'customers', name: 'Active Customers', value: '8,432', change: 8.2, trend: 'up', icon: <Users className="w-6 h-6" />, category: 'Customer' },
+  { id: 'orders', name: 'Orders Today', value: '1,847', change: -2.4, trend: 'down', icon: <Package className="w-6 h-6" />, category: 'Operations' },
+  { id: 'conversion', name: 'Conversion Rate', value: '3.8%', change: 0.5, trend: 'up', icon: <TrendingUp className="w-6 h-6" />, category: 'Sales' },
 ];
 
+const iconMap: Record<string, React.ReactNode> = {
+  'Financial': <DollarSign className="w-6 h-6" />,
+  'Customer': <Users className="w-6 h-6" />,
+  'Operations': <Package className="w-6 h-6" />,
+  'Sales': <TrendingUp className="w-6 h-6" />,
+  'Quality': <Target className="w-6 h-6" />,
+  'Efficiency': <Activity className="w-6 h-6" />,
+  'Performance': <Zap className="w-6 h-6" />,
+  'default': <BarChart3 className="w-6 h-6" />,
+};
+
 export default function SampleAnalyticsPage() {
-  const [liveData, setLiveData] = useState(metrics);
+  const [liveData, setLiveData] = useState<MetricCard[]>(defaultMetrics);
   const [isLive, setIsLive] = useState(true);
+  const [sessionDesign, setSessionDesign] = useState<SessionDesign | null>(null);
+  const [useDynamicView, setUseDynamicView] = useState(true);
+  
+  // Dynamic dashboard from interview design
+  const { layout: dynamicLayout, data: dynamicData, hasCustomLayout, refreshLayout } = useDynamicDashboard();
+
+  // Try to load design artifacts from session
+  useEffect(() => {
+    loadSessionDesign();
+  }, []);
+
+  const loadSessionDesign = async () => {
+    try {
+      // Check localStorage for session artifacts from interview
+      const storedDesign = localStorage.getItem('demo_interview_design');
+      if (storedDesign) {
+        const design = JSON.parse(storedDesign) as SessionDesign;
+        setSessionDesign(design);
+        
+        // Convert design KPIs to metric cards
+        if (design.kpis && design.kpis.length > 0) {
+          const designMetrics: MetricCard[] = design.kpis.slice(0, 6).map((kpi, i) => ({
+            id: kpi.code || `kpi_${i}`,
+            name: kpi.name,
+            value: generateRandomValue(kpi.unit),
+            change: Math.round((Math.random() * 20 - 5) * 10) / 10,
+            trend: Math.random() > 0.3 ? 'up' : 'down',
+            icon: iconMap[kpi.category || 'default'] || iconMap['default'],
+            category: kpi.category,
+          }));
+          setLiveData(designMetrics);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load session design:', err);
+    }
+  };
+
+  const generateRandomValue = (unit?: string): string => {
+    if (unit === '$' || unit === 'currency') {
+      return `$${(Math.random() * 2 + 0.5).toFixed(1)}M`;
+    } else if (unit === '%' || unit === 'percent') {
+      return `${(Math.random() * 50 + 50).toFixed(1)}%`;
+    } else {
+      return Math.floor(Math.random() * 10000).toLocaleString();
+    }
+  };
 
   useEffect(() => {
     if (!isLive) return;
@@ -29,12 +107,67 @@ export default function SampleAnalyticsPage() {
         prev.map((m) => ({
           ...m,
           change: parseFloat((m.change + (Math.random() - 0.5) * 2).toFixed(1)),
+          trend: m.change + (Math.random() - 0.5) * 2 > 0 ? 'up' : 'down',
         }))
       );
     }, 3000);
 
     return () => clearInterval(interval);
   }, [isLive]);
+
+  // If we have a custom dynamic layout from the interview, use DynamicDashboard
+  if (hasCustomLayout && dynamicLayout && useDynamicView) {
+    return (
+      <div className="space-y-8">
+        {/* View Toggle Banner */}
+        <div className="theme-card rounded-2xl p-4 bg-gradient-to-r from-emerald-500/10 to-alpha-500/10 border border-emerald-500/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-400">
+                AI-Generated Dashboard from Interview
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setUseDynamicView(false)}
+                className="text-sm px-3 py-1 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600"
+              >
+                View Default
+              </button>
+              <button
+                onClick={refreshLayout}
+                className="text-sm px-3 py-1 rounded-lg bg-alpha-500/20 text-alpha-400 hover:bg-alpha-500/30"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Dashboard */}
+        <DynamicDashboard layout={dynamicLayout} data={dynamicData} onRefresh={refreshLayout} />
+
+        {/* Navigation */}
+        <div className="flex justify-between">
+          <a
+            href="/demo/simulator"
+            className="px-6 py-3 rounded-xl theme-card hover:bg-[var(--card-hover)] font-medium transition-colors flex items-center gap-2"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Back to Simulator
+          </a>
+          <a
+            href="/demo/summary"
+            className="px-6 py-3 rounded-xl bg-alpha-500 hover:bg-alpha-600 text-white font-medium transition-colors flex items-center gap-2"
+          >
+            View Executive Summary
+            <ChevronRight className="w-5 h-5" />
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -47,6 +180,15 @@ export default function SampleAnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {hasCustomLayout && (
+            <button
+              onClick={() => setUseDynamicView(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+            >
+              <Sparkles className="w-4 h-4" />
+              View AI Dashboard
+            </button>
+          )}
           <button
             onClick={() => setIsLive(!isLive)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -70,10 +212,13 @@ export default function SampleAnalyticsPage() {
             <Sparkles className="w-7 h-7 text-white" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold theme-text-title">Your Analytics Are Live!</h2>
+            <h2 className="text-xl font-semibold theme-text-title">
+              {sessionDesign ? 'Custom Analytics Dashboard' : 'Your Analytics Are Live!'}
+            </h2>
             <p className="theme-text-secondary">
-              This is exactly what your dashboards will look like with real data.
-              These metrics are based on your interview selections and powered by the simulator.
+              {sessionDesign 
+                ? `Showing ${sessionDesign.kpis?.length || 0} KPIs from your ${sessionDesign.industry || 'business'} design interview.`
+                : 'This is exactly what your dashboards will look like with real data. These metrics are based on your interview selections and powered by the simulator.'}
             </p>
           </div>
         </div>

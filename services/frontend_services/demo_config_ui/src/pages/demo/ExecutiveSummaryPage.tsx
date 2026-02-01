@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ClipboardCheck, Calendar, DollarSign, Check, ChevronLeft, Download, Send, Building2, Target, BarChart3, Users } from 'lucide-react';
 
 interface TimelinePhase {
@@ -8,7 +8,23 @@ interface TimelinePhase {
   tasks: string[];
 }
 
-const implementationTimeline: TimelinePhase[] = [
+interface DesignArtifact {
+  type: string;
+  name: string;
+  details?: {
+    code?: string;
+    category?: string;
+  };
+}
+
+interface SessionDesign {
+  kpis: DesignArtifact[];
+  entities: DesignArtifact[];
+  dashboards: DesignArtifact[];
+  industry?: string;
+}
+
+const defaultTimeline: TimelinePhase[] = [
   {
     id: 'discovery',
     name: 'Discovery & Planning',
@@ -35,18 +51,52 @@ const implementationTimeline: TimelinePhase[] = [
   },
 ];
 
-const contractSummary = {
-  kpis: 48,
-  dashboards: 6,
-  dataSources: 4,
-  users: 25,
-  annualLicense: 37500,
-  implementation: 75000,
-  managedServices: 8000,
-};
-
 export default function ExecutiveSummaryPage() {
   const [agreed, setAgreed] = useState(false);
+  const [sessionDesign, setSessionDesign] = useState<SessionDesign | null>(null);
+  const [timeline, setTimeline] = useState<TimelinePhase[]>(defaultTimeline);
+
+  // Load design from interview
+  useEffect(() => {
+    loadSessionDesign();
+  }, []);
+
+  const loadSessionDesign = () => {
+    try {
+      const storedDesign = localStorage.getItem('demo_interview_design');
+      if (storedDesign) {
+        const design = JSON.parse(storedDesign) as SessionDesign;
+        setSessionDesign(design);
+        
+        // Adjust timeline based on complexity
+        const kpiCount = design.kpis?.length || 0;
+        const entityCount = design.entities?.length || 0;
+        
+        if (kpiCount > 10 || entityCount > 5) {
+          // Complex project - extend timeline
+          setTimeline([
+            { id: 'discovery', name: 'Discovery & Planning', duration: 'Week 1-3', tasks: ['Detailed requirements', 'Data source mapping', 'Architecture design', 'Stakeholder alignment'] },
+            { id: 'integration', name: 'Data Integration', duration: 'Week 4-7', tasks: [`Connect ${entityCount} data sources`, 'ETL pipeline development', 'Data quality rules', 'Integration testing'] },
+            { id: 'configuration', name: 'Platform Configuration', duration: 'Week 8-11', tasks: [`Configure ${kpiCount} KPIs`, 'Dashboard development', 'Alert configuration', 'User roles setup'] },
+            { id: 'training', name: 'Training & Go-Live', duration: 'Week 12-14', tasks: ['Admin training', 'End-user training', 'UAT testing', 'Production deployment'] },
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load session design:', err);
+    }
+  };
+
+  // Calculate contract summary from design
+  const contractSummary = {
+    kpis: sessionDesign?.kpis?.length || 48,
+    dashboards: sessionDesign?.dashboards?.length || 6,
+    dataSources: sessionDesign?.entities?.length || 4,
+    users: 25,
+    annualLicense: Math.max(25000, (sessionDesign?.kpis?.length || 48) * 750),
+    implementation: Math.max(50000, ((sessionDesign?.kpis?.length || 0) + (sessionDesign?.entities?.length || 0)) * 2500),
+    managedServices: 8000,
+  };
 
   const totalYear1 = contractSummary.annualLicense + contractSummary.implementation + contractSummary.managedServices;
 
@@ -110,10 +160,10 @@ export default function ExecutiveSummaryPage() {
           </p>
 
           <div className="space-y-4">
-            {implementationTimeline.map((phase, index) => (
+            {timeline.map((phase: TimelinePhase, index: number) => (
               <div key={phase.id} className="relative pl-8">
                 {/* Timeline Line */}
-                {index < implementationTimeline.length - 1 && (
+                {index < timeline.length - 1 && (
                   <div className="absolute left-3 top-8 w-0.5 h-full bg-slate-700" />
                 )}
                 {/* Timeline Dot */}
@@ -129,7 +179,7 @@ export default function ExecutiveSummaryPage() {
                     </span>
                   </div>
                   <ul className="space-y-1">
-                    {phase.tasks.map((task, i) => (
+                    {phase.tasks.map((task: string, i: number) => (
                       <li key={i} className="text-sm theme-text-secondary flex items-center gap-2">
                         <div className="w-1 h-1 rounded-full bg-slate-500" />
                         {task}
